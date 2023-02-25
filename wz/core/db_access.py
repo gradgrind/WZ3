@@ -1,7 +1,7 @@
 """
 core/db_access.py
 
-Last updated:  2023-02-18
+Last updated:  2023-02-25
 
 Helper functions for accessing the database.
 
@@ -139,7 +139,9 @@ class DatabaseShortAccess:
             for cmd in sql_list:
                 if not query.exec(cmd):
                     error = query.lastError()
-                    SHOW_ERROR(f"SQL query failed: {error.text()}\n  {cmd}")
+                    REPORT(
+                        "ERROR", f"SQL query failed: {error.text()}\n  {cmd}"
+                    )
                     raise Bug("Failed: create table")
 
 
@@ -182,7 +184,7 @@ def db_query(query_text):
     query = QSqlQuery(query_text)
     if not query.isActive():
         error = query.lastError()
-        SHOW_ERROR(f"SQL query failed: {error.text()}\n  {query_text}")
+        REPORT("ERROR", f"SQL query failed: {error.text()}\n  {query_text}")
     rec = query.record()
     nfields = rec.count()
     value_list = []
@@ -410,7 +412,7 @@ def db_new_row(table, **values):
         # print("-->", newid)
         return newid
     error = query.lastError()
-    SHOW_ERROR(error.text())
+    REPORT("ERROR", error.text())
     return None
 
 
@@ -438,7 +440,7 @@ def db_delete_rows(table, *wheres, **keys):
     if query.exec(qtext):
         return True
     error = query.lastError()
-    SHOW_ERROR(error.text())
+    REPORT("ERROR", error.text())
     return False
 
 
@@ -473,7 +475,7 @@ def read_pairs(data:str) -> list[tuple[str,str]]:
             k, v = line.split(":", 1)
             pairs.append((k.strip(), v.strip().replace("\\n", "\n")))
         except ValueError:
-            SHOW_ERROR(T["BAD_KEY_VALUE_LIST"].format(text=data))
+            REPORT("ERROR", T["BAD_KEY_VALUE_LIST"].format(text=data))
     return pairs
 
 
@@ -490,10 +492,10 @@ def write_pairs(pairs:list[tuple[str,str]]) -> str:
     lines = []
     for k, v in pairs:
         if ":" in k or "\n" in k:
-            SHOW_ERROR(T["BAD_KEY_IN_KV_LIST"].format(key=k))
+            REPORT("ERROR", T["BAD_KEY_IN_KV_LIST"].format(key=k))
             continue
         if "\\n" in v:
-            SHOW_ERROR(T["NEWLINE_TAG_IN_KV_LIST"].format(val=v))
+            REPORT("ERROR", T["NEWLINE_TAG_IN_KV_LIST"].format(val=v))
             continue
         v1 = v.replace("\n", "\\n")
         lines.append(f'{k}:{v1}')
@@ -544,7 +546,7 @@ def migrate_db(path:str, sql_extra: list[str]):
         for cmd in  sql_extra:
             if not query.exec(cmd):
                 error = query.lastError()
-                SHOW_ERROR(f"SQL query failed: {error.text()}\n  {cmd}")
+                REPORT("ERROR", f"SQL query failed: {error.text()}\n  {cmd}")
                 raise Bug("Failed: extend table")
 
 
@@ -562,7 +564,7 @@ def enter_classes():
         " NAME text unique not null, CLASSROOM text)"
     ):
         error = query.lastError()
-        SHOW_ERROR(error.text())
+        REPORT("ERROR", error.text())
 
     classes = []
     names = []
@@ -590,7 +592,7 @@ def enter_classes():
     query.addBindValue(classrooms)
     if not query.execBatch():
         error = query.lastError()
-        SHOW_ERROR(error.text())
+        REPORT("ERROR", error.text())
     print("TABLES1:", con.tables())
 
 

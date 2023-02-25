@@ -1,13 +1,13 @@
 """
 ui/course_dialogs.py
 
-Last updated:  2022-10-30
+Last updated:  2023-02-25
 
 Supporting "dialogs", etc., for various purposes within the course editor.
 
 
 =+LICENCE=============================
-Copyright 2022 Michael Towers
+Copyright 2023 Michael Towers
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -36,8 +36,7 @@ if __name__ == "__main__":
     from core.base import start
 
     #    start.setup(os.path.join(basedir, 'TESTDATA'))
-    #    start.setup(os.path.join(basedir, 'DATA'))
-    start.setup(os.path.join(basedir, "DATA-2023"))
+    start.setup(os.path.join(basedir, "DATA-2024"))
 
 T = TRANSLATIONS("ui.modules.course_editor")
 
@@ -104,9 +103,12 @@ from ui.ui_base import (
     QIcon,
     ### QtCore:
     Qt,
+    Slot,
     QSize,
     QRegularExpression,
     QTimer,
+    ### other
+    uic,
 )
 
 DECIMAL_SEP = CONFIG["DECIMAL_SEP"]
@@ -125,6 +127,232 @@ def get_coursedata():
 
 ### -----
 
+
+class CourseEditorForm(QDialog):
+    def __init__(self, data, parent=None):
+        super().__init__(parent=parent)
+        uic.loadUi(APPDATAPATH("ui/dialog_course_fields.ui"), self)
+        self.classes = data["CLASS"]
+        self.teachers = data["TEACHER"]
+        self.subjects = data["SUBJECT"]
+        self.groups = None
+        self.callback_enabled = False
+        self.cb_class.addItems([s[1] for s in self.classes])
+        self.cb_subject.addItems([s[1] for s in self.subjects])
+        self.cb_teacher.addItems([s[1] for s in self.teachers])
+        self.callback_enabled = True
+
+    def activate(self, course_data):
+        """"Open the dialog with the given data (a <dict> containing
+        the data from the current course, or <None>.
+        """
+        self.callback_enabled = False
+        c = course_data["CLASS"]
+        for i, cdata in enumerate(self.classes):
+            if c == cdata[0]:
+                print("§CLASS:", cdata)
+                self.cb_class.setCurrentIndex(i)
+                self.init_groups(c, course_data["GRP"])
+                break
+        else:
+            raise Bug(f"Unknown class: '{c}'")
+        c = course_data["SUBJECT"]
+        for i, cdata in enumerate(self.subjects):
+            if c == cdata[0]:
+                self.cb_subject.setCurrentIndex(i)
+                break
+        else:
+            raise Bug(f"Unknown subject: '{c}'")
+        c = course_data["TEACHER"]
+        for i, cdata in enumerate(self.teachers):
+            if c == cdata[0]:
+                self.cb_teacher.setCurrentIndex(i)
+                break
+        else:
+            raise Bug(f"Unknown teacher: '{c}'")
+        self.grade_report.setChecked(bool(course_data["GRADES"]))
+        self.text_report.setChecked(bool(course_data["REPORT"]))
+        self.le_subject_title.setText(course_data["REPORT_SUBJECT"])
+        self.le_signature.setText(course_data["AUTHORS"])
+        self.le_info.setText(course_data["INFO"])
+        self.callback_enabled = True
+        self.exec()
+#TODO ... deal with the results
+
+
+
+    @Slot(int)
+    def on_cb_class_currentIndexChanged(self, i:int):
+        if self.callback_enabled:
+            self.init_groups(self.classes[i][0], "")
+
+    def init_groups(self, klass, group):
+        self.cb_group.clear()
+        self.cb_group.addItem("")
+        if klass != "--":
+            # N.B. The null class should have no groups.
+            self.cb_group.addItem("*")
+            groups = Classes().group_info(klass)["GROUP_MAP"]
+            # <groups> is a mapping to the atomic groups
+            #print("§GROUPS:", groups)
+            if groups:
+                self.cb_group.addItems(sorted(groups))
+            if group in groups:
+                self.cb_group.setCurrentText(group)
+            elif group == '*':
+                self.cb_group.setCurrentIndex(1)
+            elif group:
+                raise Bug(f"Unknown group in class '{klass}': '{group}'")
+
+
+
+#TODO ...
+    def closeEvent(self, event):
+        """Prevent dialog closure if there are changes."""
+        if self.modified() and not LoseChangesDialog():
+            event.ignore()
+        else:
+            event.accept()
+
+    def modified(self):
+        return bool(self.form_change_set)
+
+    def clear_modified(self):
+        self.form_change_set = set()
+
+    def init(self, model, keymaps):
+        self.model = model
+        self.table_empty = None
+        for f, kv in keymaps.items():
+            editwidget = self.editors[f]
+            editwidget.setup(kv)
+
+    def _activate(self, row, filter_field=None):
+        """Initialize the dialog with values from the current course
+        and show it.
+
+        The idea behind the extra parameter is that, on empty tables, at
+        least the filter field should be set. To do that here, this
+        field and its value must be passed as a tuple: (field, value).
+        """
+        self.clear_modified()
+        self.current_row = row
+        if row >= 0:
+            self.table_empty = False
+            record = self.model.record(row)
+            for f, t in COURSE_COLS:
+                self.editors[f].setText(str(record.value(f)))
+        else:
+            # print("EMPTY TABLE")
+            self.table_empty = True
+            for f, t in COURSE_COLS:
+                self.editors[f].setText("")
+            if filter_field:
+                self.editors[filter_field[0]].setText(filter_field[1])
+        self.form_modified("", False)  # initialize form button states
+
+        self.__value = -1  # Default return value => don't change row
+        self.exec()
+        return self.__value
+
+    def return_value(self, row):
+        """Quit the dialog, returning the given row number.
+        Value -1 => don't change row, otherwise select the given row.
+        """
+        self.__value = row
+        self.accept()
+
+    def course_add(self):
+        """Add the data in the form editor as a new course."""
+        model = self.model
+        row = 0
+        model.insertRow(row)
+        for f, t in COURSE_COLS[1:]:
+            col = model.fieldIndex(f)
+            val = self.editors[f].text()
+            if f == "CLASS":
+                klass = val
+            model.setData(model.index(row, col), val)
+        if model.submitAll():
+            course = model.query().lastInsertId()
+            # print("INSERTED:", course)
+            for r in range(model.rowCount()):
+                if model.data(model.index(r, 0)) == course:
+                    self.return_value(r)  # Select this row
+                    break
+            else:
+                SHOW_INFO(T["COURSE_ADDED"].format(klass=klass))
+                self.return_value(self.current_row)  # Reselect current row
+        else:
+            error = model.lastError()
+            if "UNIQUE" in error.databaseText():
+                SHOW_ERROR(T["COURSE_EXISTS"])
+            else:
+                SHOW_ERROR(error.text())
+            model.revertAll()
+
+    def course_update(self):
+        """Update the current course with the data in the form editor."""
+        model = self.model
+        row = self.current_row
+        course = model.data(model.index(row, model.fieldIndex("course")))
+        for f in self.form_change_set:
+            col = model.fieldIndex(f)
+            val = self.editors[f].text()
+            model.setData(model.index(row, col), val)
+        if model.submitAll():
+            # The selection is lost – the changed row may even be in a
+            # different place, perhaps not even displayed.
+            # Try to stay with the same id, if it is displayed,
+            # otherwise the same (or else the last) row.
+            # print("UPDATED:", course)
+            for r in range(model.rowCount()):
+                if model.data(model.index(r, 0)) == course:
+                    self.return_value(r)  # Select this row
+                    break
+            else:
+                if row >= model.rowCount():
+                    row = model.rowCount() - 1
+                    self.return_value(row)  # Select this row
+        else:
+            error = model.lastError()
+            if "UNIQUE" in error.databaseText():
+                SHOW_ERROR(T["COURSE_EXISTS"])
+            else:
+                SHOW_ERROR(error.text())
+            model.revertAll()
+
+    def form_modified(self, field, changed):
+        """Handle a change in a form editor field.
+        Maintain the set of changed fields (<self.form_change_set>).
+        Enable and disable the pushbuttons appropriately.
+        """
+        if self.table_empty:
+            self.course_update_button.setEnabled(False)
+            self.course_add_button.setEnabled(True)
+        elif self.table_empty == None:
+            # ignore – not yet set up
+            return
+        elif changed:
+            self.course_update_button.setEnabled(True)
+            self.form_change_set.add(field)
+            if field in COURSE_KEY._fields:
+                self.course_add_button.setEnabled(True)
+        else:
+            self.form_change_set.discard(field)
+            if self.form_change_set:
+                if not self.form_change_set.intersection(COURSE_KEY._fields):
+                    self.course_add_button.setEnabled(False)
+            else:
+                self.course_update_button.setEnabled(False)
+                self.course_add_button.setEnabled(False)
+        # print("FORM CHANGED SET:", self.form_change_set)
+
+
+
+
+
+####################################################
 
 class DayPeriodDialog(QDialog):
     @classmethod

@@ -109,6 +109,7 @@ from ui.ui_base import (
     QTimer,
     ### other
     uic,
+    YesOrNoDialog,
 )
 
 DECIMAL_SEP = CONFIG["DECIMAL_SEP"]
@@ -147,10 +148,12 @@ class CourseEditorForm(QDialog):
         the data from the current course, or <None>.
         """
         self.callback_enabled = False
+        self.course_data = course_data
         c = course_data["CLASS"]
         for i, cdata in enumerate(self.classes):
             if c == cdata[0]:
                 print("§CLASS:", cdata)
+                self.class0 = i
                 self.cb_class.setCurrentIndex(i)
                 self.init_groups(c, course_data["GRP"])
                 break
@@ -159,6 +162,7 @@ class CourseEditorForm(QDialog):
         c = course_data["SUBJECT"]
         for i, cdata in enumerate(self.subjects):
             if c == cdata[0]:
+                self.subject0 = i
                 self.cb_subject.setCurrentIndex(i)
                 break
         else:
@@ -166,6 +170,7 @@ class CourseEditorForm(QDialog):
         c = course_data["TEACHER"]
         for i, cdata in enumerate(self.teachers):
             if c == cdata[0]:
+                self.teacher0 = i
                 self.cb_teacher.setCurrentIndex(i)
                 break
         else:
@@ -176,10 +181,41 @@ class CourseEditorForm(QDialog):
         self.le_signature.setText(course_data["AUTHORS"])
         self.le_info.setText(course_data["INFO"])
         self.callback_enabled = True
-        self.exec()
+        if self.exec() == QDialog.DialogCode.Accepted:
+            pass
 #TODO ... deal with the results
+        print("CHANGED:", self.get_changes())
 
-
+    def get_changes(self):
+        changes = {}
+        ci = self.cb_class.currentIndex()
+        if ci != self.class0:
+            changes["CLASS"] = self.classes[ci][0]
+        si = self.cb_subject.currentIndex()
+        if si != self.subject0:
+            changes["SUBJECT"] = self.subjects[si][0]
+        ti = self.cb_teacher.currentIndex()
+        if ti != self.teacher0:
+            changes["TEACHER"] = self.teachers[ti][0]
+        grp = self.cb_group.currentText()
+        if grp != self.course_data["GRP"]:
+            changes["GRP"] = grp
+        gr = self.grade_report.isChecked()
+        if bool(self.course_data["GRADES"]) != gr:
+            changes["GRADES"] = gr
+        tr = self.text_report.isChecked()
+        if bool(self.course_data["REPORT"]) != tr:
+            changes["REPORT"] = tr
+        st = self.le_subject_title.text()
+        if st != self.course_data["REPORT_SUBJECT"]:
+            changes["REPORT_SUBJECT"] = st
+        sg = self.le_signature.text()
+        if sg != self.course_data["AUTHORS"]:
+            changes["AUTHORS"] = sg
+        it = self.le_info.text()
+        if it != self.course_data["INFO"]:
+            changes["INFO"] = it
+        return changes
 
     @Slot(int)
     def on_cb_class_currentIndexChanged(self, i:int):
@@ -204,28 +240,29 @@ class CourseEditorForm(QDialog):
             elif group:
                 raise Bug(f"Unknown group in class '{klass}': '{group}'")
 
+    def accept(self):
+        changes = self.get_changes()
+        if changes:
+#TODO
+            print("§UPDATE COURSE DATA")
+            super().accept()
+        else:
+            y = YesOrNoDialog("There were no changes ... quit anyway?", "?")
+#T["NO_CHANGES"], T["NO_CHANGES_TITLE"])
+            if y:
+                self.reject()
 
 
 #TODO ...
     def closeEvent(self, event):
         """Prevent dialog closure if there are changes."""
-        if self.modified() and not LoseChangesDialog():
-            event.ignore()
-        else:
-            event.accept()
-
-    def modified(self):
-        return bool(self.form_change_set)
-
-    def clear_modified(self):
-        self.form_change_set = set()
-
-    def init(self, model, keymaps):
-        self.model = model
-        self.table_empty = None
-        for f, kv in keymaps.items():
-            editwidget = self.editors[f]
-            editwidget.setup(kv)
+        if self.get_changes():
+            y = YesOrNoDialog("The changes will be lost ... quit anyway?", "?")
+#T["LOSE_CHANGES"], T["LOSE_CHANGES_TITLE"])
+            if not y:
+                event.ignore()
+                return
+        event.accept()
 
     def _activate(self, row, filter_field=None):
         """Initialize the dialog with values from the current course

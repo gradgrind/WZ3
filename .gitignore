@@ -1,3 +1,11 @@
+tmp
+todo
+git_info
+DATA*
+WZ.geany
+
+#### Python related ...
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

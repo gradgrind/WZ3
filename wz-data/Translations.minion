@@ -335,7 +335,7 @@ ui.modules.course_editor: {
     # Messages
 #    PAYMENT_ENTRY:  "Dieser Eintrag ist kein „Kurs“, gibt aber Deputatsstunden an, die keinen Unterrichtsstunden direkt entsprechen."
     NO_ENTRIES_FOR_COURSE: "Dieser Kurs hat keine Aktivitäten"
-    COURSE_EXISTS:  "Der geänderte „Kurs“ existiert schon"
+#    COURSE_EXISTS:  "Der geänderte „Kurs“ existiert schon"
     REALLY_DELETE:  "Soll dieser „Kurs“ wirklich gelöscht werden?"
     COURSE_ADDED:   "„Kurs“ in Klasse {klass} eingefügt"
     Add_to_choices: "Zu Auswahl hinzufügen"
@@ -363,13 +363,18 @@ ui.modules.course_editor: {
     NO_CHANGES_TITLE: "Keine Änderungen"
     LOSE_CHANGES_TITLE: "Ungespeicherte Änderungen"
     LOSE_CHANGES:   "Die Änderungen werden verworfen ... trotzdem schließen?"
+    COURSE_NOT_UNIQUE:  "Dieser Kurs (Klasse+Gruppe+Fach+Lehrkraft) existiert schon"
 
 #    PAYMENT_VALID_ENTRY: "* oder Dezimalzahl"
 #    INVALID_PAYMENT: "Ungültiger Wert"
 
     # Labels
+    EDIT_COURSE_FIELDS: "Kursfelder bearbeiten"
+    NEW_COURSE:     "Neuer Kurs"
+    
     MODULE_NAME:    "Kurse/Stunden"
     MODULE_TITLE:   "Unterrichtskurse und -stunden verwalten"
+
     CLASSROOM:      "Klassenraum"
     NO_ROOM:        "kein Raum"
     SOME_ROOM:      "irgendein Raum"

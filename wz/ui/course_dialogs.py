@@ -1,7 +1,7 @@
 """
 ui/course_dialogs.py
 
-Last updated:  2023-02-25
+Last updated:  2023-02-26
 
 Supporting "dialogs", etc., for various purposes within the course editor.
 
@@ -42,7 +42,7 @@ T = TRANSLATIONS("ui.modules.course_editor")
 
 ### +++++
 
-from typing import NamedTuple
+#from typing import NamedTuple
 
 from core.db_access import (
     open_database,
@@ -144,10 +144,14 @@ class CourseEditorForm(QDialog):
         self.cb_teacher.addItems([s[1] for s in self.teachers])
         self.callback_enabled = True
 
-    def activate(self, course_data, new=False):
-        """"Open the dialog with the given data (a <dict> containing
-        the data from the current course, or <None>.
+    def activate(self, course_data):
+        """"Open the dialog with the given data, a <dict> containing
+        the data from the current course.
         """
+        self.setWindowTitle(
+            T["EDIT_COURSE_FIELDS"] if course_data["course"]
+            else T["NEW_COURSE"]
+        )
         self.changes = None
         self.callback_enabled = False
         self.course_data = course_data
@@ -253,15 +257,12 @@ class CourseEditorForm(QDialog):
                     ckey[f] = self.course_data[f]
             if test:
                 if db_check_unique_entry("COURSES", **ckey):
-#TODO: T ...
-                    REPORT("ERROR", "COURSE_NOT_UNIQUE")
+                    REPORT("ERROR", T["COURSE_NOT_UNIQUE"])
                     return
             elif not self.course_data["course"]:
                 # A new entry – the key fields have not been changed
-#TODO: T ...
-                REPORT("ERROR", "COURSE_NOT_UNIQUE")
+                REPORT("ERROR", T["COURSE_NOT_UNIQUE"])
                 return
-
             self.changes = changes
             super().accept()
         else:
@@ -277,68 +278,6 @@ class CourseEditorForm(QDialog):
                 event.ignore()
                 return
         event.accept()
-
-#TODO
-    def course_add(self):
-        """Add the data in the form editor as a new course."""
-        model = self.model
-        row = 0
-        model.insertRow(row)
-        for f, t in COURSE_COLS[1:]:
-            col = model.fieldIndex(f)
-            val = self.editors[f].text()
-            if f == "CLASS":
-                klass = val
-            model.setData(model.index(row, col), val)
-        if model.submitAll():
-            course = model.query().lastInsertId()
-            # print("INSERTED:", course)
-            for r in range(model.rowCount()):
-                if model.data(model.index(r, 0)) == course:
-                    self.return_value(r)  # Select this row
-                    break
-            else:
-                SHOW_INFO(T["COURSE_ADDED"].format(klass=klass))
-                self.return_value(self.current_row)  # Reselect current row
-        else:
-            error = model.lastError()
-            if "UNIQUE" in error.databaseText():
-                SHOW_ERROR(T["COURSE_EXISTS"])
-            else:
-                SHOW_ERROR(error.text())
-            model.revertAll()
-
-    def course_update(self):
-        """Update the current course with the data in the form editor."""
-        model = self.model
-        row = self.current_row
-        course = model.data(model.index(row, model.fieldIndex("course")))
-        for f in self.form_change_set:
-            col = model.fieldIndex(f)
-            val = self.editors[f].text()
-            model.setData(model.index(row, col), val)
-        if model.submitAll():
-            # The selection is lost – the changed row may even be in a
-            # different place, perhaps not even displayed.
-            # Try to stay with the same id, if it is displayed,
-            # otherwise the same (or else the last) row.
-            # print("UPDATED:", course)
-            for r in range(model.rowCount()):
-                if model.data(model.index(r, 0)) == course:
-                    self.return_value(r)  # Select this row
-                    break
-            else:
-                if row >= model.rowCount():
-                    row = model.rowCount() - 1
-                    self.return_value(row)  # Select this row
-        else:
-            error = model.lastError()
-            if "UNIQUE" in error.databaseText():
-                SHOW_ERROR(T["COURSE_EXISTS"])
-            else:
-                SHOW_ERROR(error.text())
-            model.revertAll()
-
 
 
 ####################################################
@@ -491,11 +430,11 @@ class ListWidget(QListWidget):
         return s
 
 
-class CourseKeyFields(NamedTuple):
-    CLASS: str
-    GRP: str
-    SUBJECT: str
-    TEACHER: str
+#class CourseKeyFields(NamedTuple):
+#    CLASS: str
+#    GRP: str
+#    SUBJECT: str
+#    TEACHER: str
 
 
 def get_course_info(course):
@@ -508,11 +447,11 @@ def get_course_info(course):
     return CourseKeyFields(*clist[0]) if clist else None
 
 
-class Partner(NamedTuple):
-    id: int
-    course: int  # When the field is null this gets set to an empy string
-    TIME: str
-    PLACE: str
+#class Partner(NamedTuple):
+#    id: int
+#    course: int  # When the field is null this gets set to an empy string
+#    TIME: str
+#    PLACE: str
 
 
 # ?

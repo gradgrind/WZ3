@@ -536,14 +536,12 @@ class CourseEditorPage(Page):
         else:
             raise Bug(f"Course update ({course_id}) failed: {changes}")
 
-#TODO:
     @Slot()
     def on_pb_new_course_clicked(self):
-# Not so much interested in changes – except that the "unique" field-group
-# must be a new combination.
-# The initial course_dict should be that of the current row. If there is
-# no current row, at least the filter field should be copied.
-
+        """Add a new course.
+        The fields of the current course, if there is one, will be taken
+        as "template".
+        """
         if self.course_dict:
             cdict = self.course_dict.copy()
         else:
@@ -559,17 +557,10 @@ class CourseEditorPage(Page):
                 "INFO": "",
             }
             cdict[self.filter_field] = self.filter_value
-# As it shouldn't be in the dict when adding the new course, maybe
-# it should rather be passed as a flag to the editor?
-# There could also be a different title!
-        cdict["course"] = None
+        cdict["course"] = 0
         changes = self.edit_course_fields(cdict)
         if changes:
-#?
-            del(cdict["course"])
             cdict.update(changes)
-#TODO--
-            print("§NEW_COURSE:", cdict)
             db_new_row("COURSES", **cdict)
             self.load_course_table(
                 self.combo_class.currentIndex(), 
@@ -580,7 +571,7 @@ class CourseEditorPage(Page):
         if not self.course_field_editor:
             # Initialize dialog
             self.course_field_editor = CourseEditorForm(self.filter_list, self)
-        return self.course_field_editor.activate(course_dict, True)
+        return self.course_field_editor.activate(course_dict)
 
     def on_lesson_table_itemSelectionChanged(self):
         row = self.course_table.currentRow()

@@ -52,7 +52,8 @@ from qtpy.QtCore import *
 from qtpy.QtSql import *
 from qtpy import uic
 
-__locale = locale.setlocale(locale.LC_ALL, "")
+#__locale = locale.setlocale(locale.LC_ALL, "")
+__locale = locale.setlocale(locale.LC_ALL, "de_DE.UTF-8")
 print("LOCALE:", __locale)
 import qtpy
 print("qtpy:", qtpy.API_NAME, qtpy.QT_VERSION)

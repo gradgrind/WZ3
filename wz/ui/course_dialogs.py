@@ -279,8 +279,7 @@ class CourseEditorForm(QDialog):
                 return
         event.accept()
 
-
-####################################################
+##### The lesson field dialogs #####
 
 class DayPeriodDialog(QDialog):
     @classmethod
@@ -293,56 +292,30 @@ class DayPeriodDialog(QDialog):
 
     def __init__(self, parent=None):
         super().__init__(parent=parent)
-        vbox0 = QVBoxLayout(self)
-        vbox0.setSizeConstraint(QLayout.SizeConstraint.SetFixedSize)
+        uic.loadUi(APPDATAPATH("ui/dialog_day_period.ui"), self)
+        pb = self.buttonBox.button(QDialogButtonBox.StandardButton.Reset)
+        pb.clicked.connect(self.reset)
 
-        hbox1 = QHBoxLayout()
-        vbox0.addLayout(hbox1)
-        self.daylist = ListWidget()
-        #        self.daylist.setMinimumWidth(30)
-        self.daylist.setSelectionMode(
-            QAbstractItemView.SelectionMode.SingleSelection
-        )
-        hbox1.addWidget(self.daylist)
+    def accept(self):
+        if self.fixed_time.isChecked():
+            self.result = index2timeslot(
+                (self.daylist.currentRow(), self.periodlist.currentRow())
+            )
+        else:
+            self.result = self.simultaneous_tag.currentText()
+            if self.result:
+                if '.' in self.result or '@' in self.result:
+                    REPORT("WARNING", T["TAG_WITH_DOT_OR_AT"])
+                    return
+                self.result += f"@{self.weighting.value()}"
+        super().accept()
 
-        self.periodlist = ListWidget()
-        #        self.daylist.setMinimumWidth(30)
-        self.periodlist.setSelectionMode(
-            QAbstractItemView.SelectionMode.SingleSelection
-        )
-        hbox1.addWidget(self.periodlist)
+    def reset(self):
+        self.result = ""
+        super().accept()
 
-        self.fixed_time = QCheckBox(T["TIME_FIXED"])
-        self.fixed_time.stateChanged.connect(self.fix_unfix)
-        vbox0.addWidget(self.fixed_time)
-
-        pbox = QFormLayout()
-        vbox0.addLayout(pbox)
-        self.simultaneous_tag = QComboBox()
-        self.simultaneous_tag.setEditable(True)
-        self.simultaneous_tag.setInsertPolicy(QComboBox.InsertPolicy.NoInsert)
-        self.simultaneous_tag.currentTextChanged.connect(
-            self.select_simultaneous_tag
-        )
-        pbox.addRow(T["SIMULTANEOUS_TAG"], self.simultaneous_tag)
-        self.weighting = QSpinBox()
-        self.weighting.setMinimum(0)
-        self.weighting.setMaximum(10)
-        self.weighting.setValue(10)
-        pbox.addRow(T["WEIGHTING"], self.weighting)
-
-        buttonBox = QDialogButtonBox()
-        vbox0.addWidget(buttonBox)
-        bt_save = buttonBox.addButton(QDialogButtonBox.StandardButton.Save)
-        bt_cancel = buttonBox.addButton(QDialogButtonBox.StandardButton.Cancel)
-        bt_clear = buttonBox.addButton(QDialogButtonBox.StandardButton.Discard)
-        bt_clear.setText(T["Clear"])
-
-        bt_save.clicked.connect(self.do_accept)
-        bt_cancel.clicked.connect(self.reject)
-        bt_clear.clicked.connect(self.do_clear)
-
-    def fix_unfix(self, state):
+    def on_fixed_time_stateChanged(self, state):
+        print("§FIXED TIME:", state)
         if state == Qt.CheckState.Unchecked:
             self.daylist.setEnabled(False)
             self.periodlist.setEnabled(False)
@@ -357,24 +330,6 @@ class DayPeriodDialog(QDialog):
             if self.daylist.currentRow() < 0:
                 self.daylist.setCurrentRow(0)
                 self.periodlist.setCurrentRow(0)
-
-    def do_accept(self):
-        if self.fixed_time.isChecked():
-            self.result = index2timeslot(
-                (self.daylist.currentRow(), self.periodlist.currentRow())
-            )
-        else:
-            self.result = self.simultaneous_tag.currentText()
-            if self.result:
-                if '.' in self.result or '@' in self.result:
-                    SHOW_WARNING(T["TAG_WITH_DOT_OR_AT"])
-                    return
-                self.result += f"@{self.weighting.value()}"
-        self.accept()
-
-    def do_clear(self):
-        self.result = ""
-        self.accept()
 
     def init(self):
         self.daylist.clear()
@@ -391,7 +346,7 @@ class DayPeriodDialog(QDialog):
                 d, p = 0, 0
         except ValueError as e:
             if '.' in start_value:
-                SHOW_ERROR(str(e))
+                REPORT("ERROR", str(e))
                 d, p, fixed = 0, 0, True
             else:
                 # <start_value> is a "simultaneous" tag
@@ -415,9 +370,10 @@ class DayPeriodDialog(QDialog):
         self.exec()
         return self.result
 
-    def select_simultaneous_tag(self, tag):
+    def on_simultaneous_tag_currentTextChanged(self, tag):
         self.weighting.setValue(get_simultaneous_weighting(tag))
 
+####################TODO ...
 
 class ListWidget(QListWidget):
     def sizeHint(self):

@@ -576,7 +576,7 @@ class CourseEditorPage(Page):
     def on_lesson_table_itemSelectionChanged(self):
         row = self.course_table.currentRow()
         print("§§§ on_lesson_table_itemSelectionChanged", row)
-#TODO: populate the form fields
+        # Populate the form fields
         etype, cldata, lgdata, ldata = self.course_lessons[row]
         if etype == -1:
             # payment entry
@@ -617,9 +617,7 @@ class CourseEditorPage(Page):
             self.parallel.setEnabled(True)
             self.notes.setPlainText(lgdata["NOTES"])
             self.notes.setEnabled(True)
-
         self.payment.setText(f'{cldata["WORKLOAD"]} * {cldata["PAY_FACTOR"]}')
-
 
 #TODO:
     def field_editor(self, obj: QLineEdit):

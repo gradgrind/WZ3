@@ -375,6 +375,461 @@ class DayPeriodDialog(QDialog):
 
 ####################TODO ...
 
+
+class RoomDialog(QDialog):
+    @classmethod
+    def popup(cls, start_value="", classroom=""):
+        d = cls()
+        d.init()
+        return d.activate(start_value, classroom)
+
+    def __init__(self, parent=None):
+        super().__init__(parent=parent)
+        uic.loadUi(APPDATAPATH("ui/dialog_room_choice.ui"), self)
+        pb = self.buttonBox.button(QDialogButtonBox.StandardButton.Reset)
+        pb.clicked.connect(self.reset)
+
+        return
+
+#    def __init__(self):
+        super().__init__()
+        vbox0 = QVBoxLayout(self)
+        hbox1 = QHBoxLayout()
+        vbox0.addLayout(hbox1)
+        vboxl = QVBoxLayout()
+        hbox1.addLayout(vboxl)
+
+        self.roomchoice = QTableWidget()
+        self.roomchoice.setEditTriggers(
+            QAbstractItemView.EditTrigger.NoEditTriggers
+        )
+        self.roomchoice.setSelectionMode(
+            QAbstractItemView.SelectionMode.SingleSelection
+        )
+        self.roomchoice.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self.roomchoice.setColumnCount(2)
+        vboxl.addWidget(self.roomchoice)
+
+        vboxm = QVBoxLayout()
+        hbox1.addLayout(vboxm)
+
+        bt_up = QToolButton()
+        bt_up.setToolTip(T["Move_up"])
+        bt_up.clicked.connect(self.move_up)
+        vboxm.addWidget(bt_up)
+        bt_up.setArrowType(Qt.ArrowType.UpArrow)
+        bt_up.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonIconOnly)
+        bt_down = QToolButton()
+        bt_down.setToolTip(T["Move_down"])
+        bt_down.clicked.connect(self.move_down)
+        vboxm.addWidget(bt_down)
+        bt_down.setArrowType(Qt.ArrowType.DownArrow)
+
+        vboxm.addStretch(1)
+        bt_left = QToolButton()
+        vboxm.addWidget(bt_left)
+        bt_left.setArrowType(Qt.ArrowType.LeftArrow)
+        bt_left.setToolTip(T["Add_to_choices"])
+        bt_left.clicked.connect(self.add2choices)
+        bt_right = QToolButton()
+        vboxm.addWidget(bt_right)
+#        bt_right.setIcon(QIcon.fromTheme("trash"))
+        bt_right.setIcon(QIcon.fromTheme("icon_edit-delete"))
+        bt_right.setToolTip(T["Remove_from_choices"])
+        bt_right.clicked.connect(self.discard_choice)
+        vboxm.addStretch(1)
+
+        vboxr = QVBoxLayout()
+        hbox1.addLayout(vboxr)
+
+        self.roomlist = QTableWidget()
+        self.roomlist.setEditTriggers(
+            QAbstractItemView.EditTrigger.NoEditTriggers
+        )
+        self.roomlist.setSelectionMode(
+            QAbstractItemView.SelectionMode.SingleSelection
+        )
+        self.roomlist.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self.roomlist.setColumnCount(2)
+        vboxr.addWidget(self.roomlist)
+
+        self.roomtext = QLineEdit()
+        self.roomtext.editingFinished.connect(self.text_edited)
+        vboxl.addWidget(self.roomtext)
+
+        self.home = QPushButton(f"+ {T['CLASSROOM']}")
+        self.home.clicked.connect(self.add_classroom)
+        vboxl.addWidget(self.home)
+        self.extra = QCheckBox(T["OTHER_ROOMS"])
+        self.extra.stateChanged.connect(self.toggle_extra)
+        vboxl.addWidget(self.extra)
+
+        vbox0.addWidget(HLine())
+        buttonBox = QDialogButtonBox()
+        vbox0.addWidget(buttonBox)
+        bt_save = buttonBox.addButton(QDialogButtonBox.StandardButton.Save)
+        bt_cancel = buttonBox.addButton(QDialogButtonBox.StandardButton.Cancel)
+        bt_clear = buttonBox.addButton(QDialogButtonBox.StandardButton.Discard)
+        bt_clear.setText(T["Clear"])
+
+        bt_save.clicked.connect(self.do_accept)
+        bt_cancel.clicked.connect(self.reject)
+        bt_clear.clicked.connect(self.do_clear)
+
+    def reset(self):
+        print("§RESET")
+
+
+        
+    def text_edited(self):
+        self.set_choices(self.roomtext.text())
+
+    def checkroom(self, roomid, choice_list):
+        """Check that the given room-id is valid.
+        If there is a "classroom", "$" may be used as a short-form.
+        A valid room-id is added to the list <self.choices>, <None> is returned.
+        Otherwise an error message is returned (a string).
+        """
+        is_classroom = False
+        if roomid == "$":
+            if self.classroom:
+                rid = self.classroom
+                is_classroom = True
+            else:
+                return T["NO_CLASSROOM_DEFINED"]
+        else:
+            rid = roomid
+            if rid == self.classroom:
+                is_classroom = True
+        if rid in choice_list or (is_classroom and "$" in choice_list):
+            if is_classroom:
+                return T["CLASSROOM_ALREADY_CHOSEN"]
+            else:
+                return f"{T['ROOM_ALREADY_CHOSEN']}: '{rid}'"
+        if rid in self.room2line:
+            return None
+        return f"{T['UNKNOWN_ROOM_ID']}: '{rid}'"
+
+    def add2choices(self, roomid=None):
+        if not roomid:
+            # Not the most efficient handler, but it uses shared code ...
+            row = self.roomlist.currentRow()
+            riditem = self.roomlist.item(row, 0)
+            roomid = riditem.text()
+        e = self.checkroom(roomid, self.choices)
+        if e:
+            SHOW_ERROR(e)
+            return
+        self.add_valid_room_choice(roomid)
+        self.write_choices()
+
+    def discard_choice(self):
+        row = self.roomchoice.currentRow()
+        if row >= 0:
+            self.choices.pop(row)
+            self.roomchoice.removeRow(row)
+            self.write_choices()
+
+    def add_classroom(self):
+        self.add2choices("$")
+
+    def toggle_extra(self, state):
+        self.write_choices()
+
+    def move_up(self):
+        row = self.roomchoice.currentRow()
+        if row <= 0:
+            return
+        row1 = row - 1
+        item = self.roomchoice.takeItem(row, 0)
+        self.roomchoice.setItem(row, 0, self.roomchoice.takeItem(row1, 0))
+        self.roomchoice.setItem(row1, 0, item)
+        item = self.roomchoice.takeItem(row, 1)
+        self.roomchoice.setItem(row, 1, self.roomchoice.takeItem(row1, 1))
+        self.roomchoice.setItem(row1, 1, item)
+
+        t = self.choices[row]
+        self.choices[row] = self.choices[row1]
+        self.choices[row1] = t
+        self.write_choices()
+        self.roomchoice.selectRow(row1)
+
+    def move_down(self):
+        row = self.roomchoice.currentRow()
+        row1 = row + 1
+        if row1 == len(self.choices):
+            return
+        item = self.roomchoice.takeItem(row, 0)
+        self.roomchoice.setItem(row, 0, self.roomchoice.takeItem(row1, 0))
+        self.roomchoice.setItem(row1, 0, item)
+        item = self.roomchoice.takeItem(row, 1)
+        self.roomchoice.setItem(row, 1, self.roomchoice.takeItem(row1, 1))
+        self.roomchoice.setItem(row1, 1, item)
+
+        t = self.choices[row]
+        self.choices[row] = self.choices[row1]
+        self.choices[row1] = t
+        self.write_choices()
+        self.roomchoice.selectRow(row1)
+
+    def write_choices(self):
+        text = "/".join(self.choices)
+        if self.extra.isChecked():
+            text += "+"
+        self.roomtext.setText(text)
+
+    def do_accept(self):
+        val = self.roomtext.text()
+        if val != self.value0:
+            if val:
+                self.result = val
+            else:
+                self.result = "-"
+        self.accept()
+
+    def do_clear(self):
+        if self.value0:
+            self.result = "-"
+        self.accept()
+
+    def init(self):
+        self.room2line = {}
+        rooms = get_rooms()
+        n = len(rooms)
+        self.roomlist.setRowCount(n)
+        for i in range(n):
+            rid = rooms[i][0]
+            self.room2line[rid] = i
+            item = QTableWidgetItem(rid)
+            self.roomlist.setItem(i, 0, item)
+            item = QTableWidgetItem(rooms[i][1])
+            self.roomlist.setItem(i, 1, item)
+        completer = QCompleter(list(self.room2line))
+        completer.setCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
+        self.roomtext.setCompleter(completer)
+        self.roomlist.resizeColumnsToContents()
+        Hhd = self.roomlist.horizontalHeader()
+        Hhd.hide()
+        # Hhd.setMinimumSectionSize(20)
+        # A rather messy attempt to find an appropriate size for the table
+        Vhd = self.roomlist.verticalHeader()
+        Vhd.hide()
+        Hw = Hhd.length()
+        # Vw = Vhd.sizeHint().width()
+        fixed_width = Hw + 20  # + Vw, if vertical headers in use
+        self.roomlist.setFixedWidth(fixed_width)
+        self.roomchoice.setFixedWidth(fixed_width)
+        Hhd.setStretchLastSection(True)
+        hh = self.roomchoice.horizontalHeader()
+        hh.hide()
+        # Check that this doesn't need toggling after a clear() ...
+        hh.setStretchLastSection(True)
+        self.roomchoice.verticalHeader().hide()
+
+    def activate(self, start_value="", classroom=None):
+        self.value0 = start_value
+        self.result = None
+        self.classroom = classroom
+        if classroom:
+            self.home.show()
+        else:
+            self.home.hide()
+        self.set_choices(start_value)
+        self.roomlist.selectRow(0)
+        self.roomtext.setFocus()
+        self.exec()
+        return self.result
+
+    def set_choices(self, text):
+        if text.endswith("+"):
+            extra = True
+            text = text[:-1]
+        else:
+            extra = False
+        rids = text.split("/")
+        errors = []
+        _choices = []
+        for rid in rids:
+            if not rid:
+                continue
+            e = self.checkroom(rid, _choices)
+            if e:
+                if len(errors) > 3:
+                    errors.append("  ...")
+                    break
+                errors.append(e)
+            else:
+                _choices.append(rid)
+        else:
+            # Perform changes only if not too many errors
+            self.choices = []
+            self.roomchoice.setRowCount(0)
+
+            if _choices:
+                for rid in _choices:
+                    self.add_valid_room_choice(rid)
+                self.roomchoice.selectRow(0)
+            self.extra.setCheckState(
+                Qt.CheckState.Checked if extra else Qt.CheckState.Unchecked
+            )
+        if errors:
+            elist = "\n".join(errors)
+            SHOW_ERROR(f"{T['INVALID_ROOM_IDS']}:\n{elist}")
+        self.write_choices()
+
+    def add_valid_room_choice(self, rid):
+        """Append the room with given id to the choices table.
+        This assumes that the validity of <rid> has already been checked!
+        """
+        self.choices.append(rid)
+        if rid == "$":
+            rid = self.classroom
+        row = self.room2line[rid]
+        at_row = self.roomchoice.rowCount()
+        self.roomchoice.insertRow(at_row)
+        self.roomchoice.setItem(at_row, 0, self.roomlist.item(row, 0).clone())
+        self.roomchoice.setItem(at_row, 1, self.roomlist.item(row, 1).clone())
+        self.roomchoice.resizeColumnsToContents()
+
+
+class SingleRoomDialog(QDialog):
+    @classmethod
+    def popup(cls, start_value="", classroom=""):
+        d = cls()
+        d.init()
+        return d.activate(start_value, classroom)
+
+    def __init__(self):
+        super().__init__()
+        vbox0 = QVBoxLayout(self)
+
+        self.roomlist = QTableWidget()
+        self.roomlist.setEditTriggers(
+            QAbstractItemView.EditTrigger.NoEditTriggers
+        )
+        self.roomlist.setSelectionMode(
+            QAbstractItemView.SelectionMode.SingleSelection
+        )
+        self.roomlist.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self.roomlist.setColumnCount(2)
+        self.roomlist.itemSelectionChanged.connect(self.selection_changed)
+        vbox0.addWidget(self.roomlist)
+
+        self.button_group = QButtonGroup(self)
+        self.button_group.buttonClicked.connect(self.set_special)
+        self.home = QRadioButton(T["CLASSROOM"])
+        self.button_group.addButton(self.home)
+        self.home.setFocusPolicy(Qt.NoFocus)
+        vbox0.addWidget(self.home)
+        self.extra = QRadioButton(T["SOME_ROOM"])
+        self.button_group.addButton(self.extra)
+        self.extra.setFocusPolicy(Qt.NoFocus)
+        vbox0.addWidget(self.extra)
+        self.noroom = QRadioButton(T["NO_ROOM"])
+        self.button_group.addButton(self.noroom)
+        self.noroom.setFocusPolicy(Qt.NoFocus)
+        vbox0.addWidget(self.noroom)
+
+        vbox0.addWidget(HLine())
+        buttonBox = QDialogButtonBox()
+        vbox0.addWidget(buttonBox)
+        bt_save = buttonBox.addButton(QDialogButtonBox.StandardButton.Save)
+        bt_cancel = buttonBox.addButton(QDialogButtonBox.StandardButton.Cancel)
+        bt_save.clicked.connect(self.do_accept)
+        bt_cancel.clicked.connect(self.reject)
+
+    def selection_changed(self):
+        if self.roomlist.selectedItems():
+            bt = self.button_group.checkedButton()
+            if bt:
+                self.button_group.setExclusive(False)
+                bt.setChecked(False)
+                self.button_group.setExclusive(True)
+
+    def set_special(self, button):
+        self.roomlist.clearSelection()
+        self.roomlist.clearFocus()
+
+    def do_accept(self):
+        if self.home.isChecked():
+            val = "$"
+        elif self.extra.isChecked():
+            val = "+"
+        elif self.noroom.isChecked():
+            val = "-"
+        else:
+            row = self.roomlist.currentItem().row()
+            val = self.roomlist.item(row, 0).text()
+        if val != self.value0:
+            if val:
+                self.result = val
+            else:
+                self.result = "-"
+        self.accept()
+
+    def init(self):
+        self.room2line = {}
+        rooms = get_rooms()
+        n = len(rooms)
+        self.roomlist.setRowCount(n)
+        for i in range(n):
+            rid = rooms[i][0]
+            self.room2line[rid] = i
+            item = QTableWidgetItem(rid)
+            self.roomlist.setItem(i, 0, item)
+            item = QTableWidgetItem(rooms[i][1])
+            self.roomlist.setItem(i, 1, item)
+        self.roomlist.resizeColumnsToContents()
+        Hhd = self.roomlist.horizontalHeader()
+        Hhd.hide()
+        # Hhd.setMinimumSectionSize(20)
+        # A rather messy attempt to find an appropriate size for the table
+        Vhd = self.roomlist.verticalHeader()
+        Vhd.hide()
+        Hw = Hhd.length()
+        # Vw = Vhd.sizeHint().width()
+        fixed_width = Hw + 20  # + Vw, if vertical headers in use
+        self.roomlist.setFixedWidth(fixed_width)
+        Hhd.setStretchLastSection(True)
+
+    def activate(self, start_value="", classroom=None):
+        self.value0 = start_value
+        self.result = None
+        self.classroom = classroom
+        self.home.setVisible(bool(classroom))
+        self.roomlist.clearSelection()
+        self.roomlist.clearFocus()
+        if start_value == "$":
+            if classroom:
+                self.home.setChecked(True)
+            else:
+                SHOW_ERROR(T["NO_CLASSROOM"])
+                self.noroom.setChecked(True)
+        elif start_value == "+":
+            self.extra.setChecked(True)
+        elif start_value:
+            try:
+                row = self.room2line[start_value]
+                self.roomlist.selectRow(row)
+                # Clear check-buttons from previous activation:
+                self.selection_changed()
+            except KeyError:
+                SHOW_ERROR(f"{T['UNKNOWN_ROOM_ID']}: '{start_value}'")
+                self.noroom.setChecked(True)
+        else:
+            self.noroom.setChecked(True)
+        self.exec()
+        return self.result
+
+
+
+
+
+
+
+
+
+
 class ListWidget(QListWidget):
     def sizeHint(self):
         s = QSize()
@@ -785,40 +1240,6 @@ class DurationDelegate(QStyledItemDelegate):
         self.__table.setFocus()
 
 
-class DayPeriodDelegate(QStyledItemDelegate):
-    def __init__(self, table, modified=None):
-        super().__init__(parent=table)
-        self.__table = table
-        self.__modified = modified
-
-    class Editor(QLineEdit):
-        # The line-edit is not used, but it has the necessary properties ...
-        def showEvent(self, event):
-            QTimer.singleShot(0, self.clearFocus)
-
-    def createEditor(self, parent, option, index):
-        return self.Editor(parent)
-
-    def setModelData(self, editor, model, index):
-        # This gets called on activation (thanks to the <showEvent>
-        # method in <Editor>).
-        old_value = model.data(index)  # or editor.text()
-        # print("§§§ old:", old_value)
-        rect = self.__table.visualRect(index)
-        pos = self.__table.viewport().mapToGlobal(rect.bottomLeft())
-        result = DayPeriodDialog.popup(old_value, pos=pos)
-        if result is not None:
-#            if (not self.__modified) or self.__modified(index.row(), result):
-#                model.setData(index, result)
-
-            if self.__modified:
-                val = self.__modified(index.row(), result)
-                if val is not None:
-                    model.setData(index, val)
-            else:
-                model.setData(index, result)
-        self.__table.setFocus()
-
 
 class PartnersDelegate(QStyledItemDelegate):
     def __init__(self, table, modified=None):
@@ -1109,439 +1530,6 @@ class BlockTagSelector(QLineEdit):
         self.set_block(result)
 
 
-class RoomDialog(QDialog):
-    @classmethod
-    def popup(cls, start_value="", classroom=""):
-        d = cls()
-        d.init()
-        return d.activate(start_value, classroom)
-
-    def __init__(self):
-        super().__init__()
-        vbox0 = QVBoxLayout(self)
-        hbox1 = QHBoxLayout()
-        vbox0.addLayout(hbox1)
-        vboxl = QVBoxLayout()
-        hbox1.addLayout(vboxl)
-
-        self.roomchoice = QTableWidget()
-        self.roomchoice.setEditTriggers(
-            QAbstractItemView.EditTrigger.NoEditTriggers
-        )
-        self.roomchoice.setSelectionMode(
-            QAbstractItemView.SelectionMode.SingleSelection
-        )
-        self.roomchoice.setSelectionBehavior(QAbstractItemView.SelectRows)
-        self.roomchoice.setColumnCount(2)
-        vboxl.addWidget(self.roomchoice)
-
-        vboxm = QVBoxLayout()
-        hbox1.addLayout(vboxm)
-
-        bt_up = QToolButton()
-        bt_up.setToolTip(T["Move_up"])
-        bt_up.clicked.connect(self.move_up)
-        vboxm.addWidget(bt_up)
-        bt_up.setArrowType(Qt.ArrowType.UpArrow)
-        bt_up.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonIconOnly)
-        bt_down = QToolButton()
-        bt_down.setToolTip(T["Move_down"])
-        bt_down.clicked.connect(self.move_down)
-        vboxm.addWidget(bt_down)
-        bt_down.setArrowType(Qt.ArrowType.DownArrow)
-
-        vboxm.addStretch(1)
-        bt_left = QToolButton()
-        vboxm.addWidget(bt_left)
-        bt_left.setArrowType(Qt.ArrowType.LeftArrow)
-        bt_left.setToolTip(T["Add_to_choices"])
-        bt_left.clicked.connect(self.add2choices)
-        bt_right = QToolButton()
-        vboxm.addWidget(bt_right)
-#        bt_right.setIcon(QIcon.fromTheme("trash"))
-        bt_right.setIcon(QIcon.fromTheme("icon_edit-delete"))
-        bt_right.setToolTip(T["Remove_from_choices"])
-        bt_right.clicked.connect(self.discard_choice)
-        vboxm.addStretch(1)
-
-        vboxr = QVBoxLayout()
-        hbox1.addLayout(vboxr)
-
-        self.roomlist = QTableWidget()
-        self.roomlist.setEditTriggers(
-            QAbstractItemView.EditTrigger.NoEditTriggers
-        )
-        self.roomlist.setSelectionMode(
-            QAbstractItemView.SelectionMode.SingleSelection
-        )
-        self.roomlist.setSelectionBehavior(QAbstractItemView.SelectRows)
-        self.roomlist.setColumnCount(2)
-        vboxr.addWidget(self.roomlist)
-
-        self.roomtext = QLineEdit()
-        self.roomtext.editingFinished.connect(self.text_edited)
-        vboxl.addWidget(self.roomtext)
-
-        self.home = QPushButton(f"+ {T['CLASSROOM']}")
-        self.home.clicked.connect(self.add_classroom)
-        vboxl.addWidget(self.home)
-        self.extra = QCheckBox(T["OTHER_ROOMS"])
-        self.extra.stateChanged.connect(self.toggle_extra)
-        vboxl.addWidget(self.extra)
-
-        vbox0.addWidget(HLine())
-        buttonBox = QDialogButtonBox()
-        vbox0.addWidget(buttonBox)
-        bt_save = buttonBox.addButton(QDialogButtonBox.StandardButton.Save)
-        bt_cancel = buttonBox.addButton(QDialogButtonBox.StandardButton.Cancel)
-        bt_clear = buttonBox.addButton(QDialogButtonBox.StandardButton.Discard)
-        bt_clear.setText(T["Clear"])
-
-        bt_save.clicked.connect(self.do_accept)
-        bt_cancel.clicked.connect(self.reject)
-        bt_clear.clicked.connect(self.do_clear)
-
-    def text_edited(self):
-        self.set_choices(self.roomtext.text())
-
-    def checkroom(self, roomid, choice_list):
-        """Check that the given room-id is valid.
-        If there is a "classroom", "$" may be used as a short-form.
-        A valid room-id is added to the list <self.choices>, <None> is returned.
-        Otherwise an error message is returned (a string).
-        """
-        is_classroom = False
-        if roomid == "$":
-            if self.classroom:
-                rid = self.classroom
-                is_classroom = True
-            else:
-                return T["NO_CLASSROOM_DEFINED"]
-        else:
-            rid = roomid
-            if rid == self.classroom:
-                is_classroom = True
-        if rid in choice_list or (is_classroom and "$" in choice_list):
-            if is_classroom:
-                return T["CLASSROOM_ALREADY_CHOSEN"]
-            else:
-                return f"{T['ROOM_ALREADY_CHOSEN']}: '{rid}'"
-        if rid in self.room2line:
-            return None
-        return f"{T['UNKNOWN_ROOM_ID']}: '{rid}'"
-
-    def add2choices(self, roomid=None):
-        if not roomid:
-            # Not the most efficient handler, but it uses shared code ...
-            row = self.roomlist.currentRow()
-            riditem = self.roomlist.item(row, 0)
-            roomid = riditem.text()
-        e = self.checkroom(roomid, self.choices)
-        if e:
-            SHOW_ERROR(e)
-            return
-        self.add_valid_room_choice(roomid)
-        self.write_choices()
-
-    def discard_choice(self):
-        row = self.roomchoice.currentRow()
-        if row >= 0:
-            self.choices.pop(row)
-            self.roomchoice.removeRow(row)
-            self.write_choices()
-
-    def add_classroom(self):
-        self.add2choices("$")
-
-    def toggle_extra(self, state):
-        self.write_choices()
-
-    def move_up(self):
-        row = self.roomchoice.currentRow()
-        if row <= 0:
-            return
-        row1 = row - 1
-        item = self.roomchoice.takeItem(row, 0)
-        self.roomchoice.setItem(row, 0, self.roomchoice.takeItem(row1, 0))
-        self.roomchoice.setItem(row1, 0, item)
-        item = self.roomchoice.takeItem(row, 1)
-        self.roomchoice.setItem(row, 1, self.roomchoice.takeItem(row1, 1))
-        self.roomchoice.setItem(row1, 1, item)
-
-        t = self.choices[row]
-        self.choices[row] = self.choices[row1]
-        self.choices[row1] = t
-        self.write_choices()
-        self.roomchoice.selectRow(row1)
-
-    def move_down(self):
-        row = self.roomchoice.currentRow()
-        row1 = row + 1
-        if row1 == len(self.choices):
-            return
-        item = self.roomchoice.takeItem(row, 0)
-        self.roomchoice.setItem(row, 0, self.roomchoice.takeItem(row1, 0))
-        self.roomchoice.setItem(row1, 0, item)
-        item = self.roomchoice.takeItem(row, 1)
-        self.roomchoice.setItem(row, 1, self.roomchoice.takeItem(row1, 1))
-        self.roomchoice.setItem(row1, 1, item)
-
-        t = self.choices[row]
-        self.choices[row] = self.choices[row1]
-        self.choices[row1] = t
-        self.write_choices()
-        self.roomchoice.selectRow(row1)
-
-    def write_choices(self):
-        text = "/".join(self.choices)
-        if self.extra.isChecked():
-            text += "+"
-        self.roomtext.setText(text)
-
-    def do_accept(self):
-        val = self.roomtext.text()
-        if val != self.value0:
-            if val:
-                self.result = val
-            else:
-                self.result = "-"
-        self.accept()
-
-    def do_clear(self):
-        if self.value0:
-            self.result = "-"
-        self.accept()
-
-    def init(self):
-        self.room2line = {}
-        rooms = get_rooms()
-        n = len(rooms)
-        self.roomlist.setRowCount(n)
-        for i in range(n):
-            rid = rooms[i][0]
-            self.room2line[rid] = i
-            item = QTableWidgetItem(rid)
-            self.roomlist.setItem(i, 0, item)
-            item = QTableWidgetItem(rooms[i][1])
-            self.roomlist.setItem(i, 1, item)
-        completer = QCompleter(list(self.room2line))
-        completer.setCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
-        self.roomtext.setCompleter(completer)
-        self.roomlist.resizeColumnsToContents()
-        Hhd = self.roomlist.horizontalHeader()
-        Hhd.hide()
-        # Hhd.setMinimumSectionSize(20)
-        # A rather messy attempt to find an appropriate size for the table
-        Vhd = self.roomlist.verticalHeader()
-        Vhd.hide()
-        Hw = Hhd.length()
-        # Vw = Vhd.sizeHint().width()
-        fixed_width = Hw + 20  # + Vw, if vertical headers in use
-        self.roomlist.setFixedWidth(fixed_width)
-        self.roomchoice.setFixedWidth(fixed_width)
-        Hhd.setStretchLastSection(True)
-        hh = self.roomchoice.horizontalHeader()
-        hh.hide()
-        # Check that this doesn't need toggling after a clear() ...
-        hh.setStretchLastSection(True)
-        self.roomchoice.verticalHeader().hide()
-
-    def activate(self, start_value="", classroom=None):
-        self.value0 = start_value
-        self.result = None
-        self.classroom = classroom
-        if classroom:
-            self.home.show()
-        else:
-            self.home.hide()
-        self.set_choices(start_value)
-        self.roomlist.selectRow(0)
-        self.roomtext.setFocus()
-        self.exec()
-        return self.result
-
-    def set_choices(self, text):
-        if text.endswith("+"):
-            extra = True
-            text = text[:-1]
-        else:
-            extra = False
-        rids = text.split("/")
-        errors = []
-        _choices = []
-        for rid in rids:
-            if not rid:
-                continue
-            e = self.checkroom(rid, _choices)
-            if e:
-                if len(errors) > 3:
-                    errors.append("  ...")
-                    break
-                errors.append(e)
-            else:
-                _choices.append(rid)
-        else:
-            # Perform changes only if not too many errors
-            self.choices = []
-            self.roomchoice.setRowCount(0)
-
-            if _choices:
-                for rid in _choices:
-                    self.add_valid_room_choice(rid)
-                self.roomchoice.selectRow(0)
-            self.extra.setCheckState(
-                Qt.CheckState.Checked if extra else Qt.CheckState.Unchecked
-            )
-        if errors:
-            elist = "\n".join(errors)
-            SHOW_ERROR(f"{T['INVALID_ROOM_IDS']}:\n{elist}")
-        self.write_choices()
-
-    def add_valid_room_choice(self, rid):
-        """Append the room with given id to the choices table.
-        This assumes that the validity of <rid> has already been checked!
-        """
-        self.choices.append(rid)
-        if rid == "$":
-            rid = self.classroom
-        row = self.room2line[rid]
-        at_row = self.roomchoice.rowCount()
-        self.roomchoice.insertRow(at_row)
-        self.roomchoice.setItem(at_row, 0, self.roomlist.item(row, 0).clone())
-        self.roomchoice.setItem(at_row, 1, self.roomlist.item(row, 1).clone())
-        self.roomchoice.resizeColumnsToContents()
-
-
-class SingleRoomDialog(QDialog):
-    @classmethod
-    def popup(cls, start_value="", classroom=""):
-        d = cls()
-        d.init()
-        return d.activate(start_value, classroom)
-
-    def __init__(self):
-        super().__init__()
-        vbox0 = QVBoxLayout(self)
-
-        self.roomlist = QTableWidget()
-        self.roomlist.setEditTriggers(
-            QAbstractItemView.EditTrigger.NoEditTriggers
-        )
-        self.roomlist.setSelectionMode(
-            QAbstractItemView.SelectionMode.SingleSelection
-        )
-        self.roomlist.setSelectionBehavior(QAbstractItemView.SelectRows)
-        self.roomlist.setColumnCount(2)
-        self.roomlist.itemSelectionChanged.connect(self.selection_changed)
-        vbox0.addWidget(self.roomlist)
-
-        self.button_group = QButtonGroup(self)
-        self.button_group.buttonClicked.connect(self.set_special)
-        self.home = QRadioButton(T["CLASSROOM"])
-        self.button_group.addButton(self.home)
-        self.home.setFocusPolicy(Qt.NoFocus)
-        vbox0.addWidget(self.home)
-        self.extra = QRadioButton(T["SOME_ROOM"])
-        self.button_group.addButton(self.extra)
-        self.extra.setFocusPolicy(Qt.NoFocus)
-        vbox0.addWidget(self.extra)
-        self.noroom = QRadioButton(T["NO_ROOM"])
-        self.button_group.addButton(self.noroom)
-        self.noroom.setFocusPolicy(Qt.NoFocus)
-        vbox0.addWidget(self.noroom)
-
-        vbox0.addWidget(HLine())
-        buttonBox = QDialogButtonBox()
-        vbox0.addWidget(buttonBox)
-        bt_save = buttonBox.addButton(QDialogButtonBox.StandardButton.Save)
-        bt_cancel = buttonBox.addButton(QDialogButtonBox.StandardButton.Cancel)
-        bt_save.clicked.connect(self.do_accept)
-        bt_cancel.clicked.connect(self.reject)
-
-    def selection_changed(self):
-        if self.roomlist.selectedItems():
-            bt = self.button_group.checkedButton()
-            if bt:
-                self.button_group.setExclusive(False)
-                bt.setChecked(False)
-                self.button_group.setExclusive(True)
-
-    def set_special(self, button):
-        self.roomlist.clearSelection()
-        self.roomlist.clearFocus()
-
-    def do_accept(self):
-        if self.home.isChecked():
-            val = "$"
-        elif self.extra.isChecked():
-            val = "+"
-        elif self.noroom.isChecked():
-            val = "-"
-        else:
-            row = self.roomlist.currentItem().row()
-            val = self.roomlist.item(row, 0).text()
-        if val != self.value0:
-            if val:
-                self.result = val
-            else:
-                self.result = "-"
-        self.accept()
-
-    def init(self):
-        self.room2line = {}
-        rooms = get_rooms()
-        n = len(rooms)
-        self.roomlist.setRowCount(n)
-        for i in range(n):
-            rid = rooms[i][0]
-            self.room2line[rid] = i
-            item = QTableWidgetItem(rid)
-            self.roomlist.setItem(i, 0, item)
-            item = QTableWidgetItem(rooms[i][1])
-            self.roomlist.setItem(i, 1, item)
-        self.roomlist.resizeColumnsToContents()
-        Hhd = self.roomlist.horizontalHeader()
-        Hhd.hide()
-        # Hhd.setMinimumSectionSize(20)
-        # A rather messy attempt to find an appropriate size for the table
-        Vhd = self.roomlist.verticalHeader()
-        Vhd.hide()
-        Hw = Hhd.length()
-        # Vw = Vhd.sizeHint().width()
-        fixed_width = Hw + 20  # + Vw, if vertical headers in use
-        self.roomlist.setFixedWidth(fixed_width)
-        Hhd.setStretchLastSection(True)
-
-    def activate(self, start_value="", classroom=None):
-        self.value0 = start_value
-        self.result = None
-        self.classroom = classroom
-        self.home.setVisible(bool(classroom))
-        self.roomlist.clearSelection()
-        self.roomlist.clearFocus()
-        if start_value == "$":
-            if classroom:
-                self.home.setChecked(True)
-            else:
-                SHOW_ERROR(T["NO_CLASSROOM"])
-                self.noroom.setChecked(True)
-        elif start_value == "+":
-            self.extra.setChecked(True)
-        elif start_value:
-            try:
-                row = self.room2line[start_value]
-                self.roomlist.selectRow(row)
-                # Clear check-buttons from previous activation:
-                self.selection_changed()
-            except KeyError:
-                SHOW_ERROR(f"{T['UNKNOWN_ROOM_ID']}: '{start_value}'")
-                self.noroom.setChecked(True)
-        else:
-            self.noroom.setChecked(True)
-        self.exec()
-        return self.result
-
-
 class PaymentDialog(QDialog):
     @classmethod
     def popup(cls, start_value=""):
@@ -1643,6 +1631,22 @@ if __name__ == "__main__":
 
     #    for p in partners("sp03"):
     #        print("??????", p)
+
+    widget = RoomDialog()
+    widget.init()
+    print("----->", widget.activate(start_value="$/rPh+", classroom="r10G"))
+
+    quit(0)
+
+    widget = SingleRoomDialog()
+    widget.init()
+    print("----->", widget.activate(start_value="rPh", classroom="r10G"))
+    print("----->", widget.activate(start_value="rCh", classroom="r10G"))
+    print("----->", widget.activate(start_value="+", classroom="r10G"))
+    print("----->", widget.activate(start_value="$"))
+    print("----->", widget.activate(start_value="r11G", classroom="r10G"))
+
+    quit(0)
 
     widget = DayPeriodDialog()
     widget.init()

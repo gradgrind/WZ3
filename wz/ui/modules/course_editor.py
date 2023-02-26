@@ -1,7 +1,7 @@
 """
 ui/modules/course_editor.py
 
-Last updated:  2023-02-24
+Last updated:  2023-02-26
 
 Edit course and blocks+lessons data.
 
@@ -52,6 +52,7 @@ from core.db_access import (
     open_database,
     db_read_full_table,
     db_update_field,
+    db_update_fields,
     db_new_row,
     db_delete_rows,
     db_values,
@@ -176,16 +177,15 @@ COURSE_TABLE_FIELDS = ( # the fields shown in the course table
 #FILTER_FIELDS = [cc for cc in COURSE_COLS if cc[0] in FOREIGN_FIELDS]
 
 # Group of fields which determines a course (the tuple must be unique)
-class COURSE_KEY(NamedTuple):
-    CLASS: str
-    GRP: str
-    SUBJECT: str
-    TEACHER: str
-
-    def __str__(self):
-        return f"({self.CLASS}:{self.GRP}:{self.SUBJECT}:{self.TEACHER})"
-
-
+#class COURSE_KEY(NamedTuple):
+#    CLASS: str
+#    GRP: str
+#    SUBJECT: str
+#    TEACHER: str
+#
+#    def __str__(self):
+#        return f"({self.CLASS}:{self.GRP}:{self.SUBJECT}:{self.TEACHER})"
+#COURSE_KEY(*[record.value(f) for f in COURSE_KEY._fields])
 # print("§§§§§§§§§§§", COURSE_KEY._fields, str(COURSE_KEY("10G", "*", "Ma", "EA")))
 
 #TODO: deprecated?
@@ -223,6 +223,8 @@ class CourseEditorPage(Page):
             "BLOCK": self.lesson_block.icon(),
             "PAY": self.lesson_pay.icon(),
         }
+        # Set up activation for the editors for the read-only lesson/block
+        # fields: 
         for w in (
             self.payment, self.wish_room, self.block_name,
             self.notes,
@@ -250,12 +252,7 @@ class CourseEditorPage(Page):
 #TODO?
         open_database()
         clear_cache()
-
-#        self.course_editor.init_data()
-
         self.init_data()
-
-
         self.combo_filter.setCurrentIndex(-1)
         self.combo_filter.setCurrentIndex(0)
 
@@ -278,9 +275,9 @@ class CourseEditorPage(Page):
         )
         self.course_field_editor = None
  
-
     @Slot(int)
     def on_combo_filter_currentIndexChanged(self, i):
+        """Handle a change of filter field for the course table."""
         if i < 0:
             return
         # class, subject, teacher
@@ -299,12 +296,14 @@ class CourseEditorPage(Page):
         """
         if i >= 0:
             self.load_course_table(i, 0)
-            
+
     def load_course_table(self, select_index, table_row):
-        key, val = self.select_list[select_index]
+        self.filter_value = self.select_list[select_index][0]
         self.suppress_handlers = True
         fields, records = db_read_full_table(
-            "COURSES", sort_field="SUBJECT", **{self.filter_field: key}
+            "COURSES", 
+            sort_field="SUBJECT", 
+            **{self.filter_field: self.filter_value}
         )
         # Populate the course table
         self.course_table.setRowCount(len(records))
@@ -316,106 +315,42 @@ class CourseEditorPage(Page):
             c = 0
             for cid, ctype, align in COURSE_TABLE_FIELDS:
                 cell_value = rdict[cid]
-                if ctype == -1:
-                    # Checkbox, needs special handling for alignment.
-                    # Use a cell widget rather than cell item.
-                    box = self.course_table.cellWidget(r, c)
-                    if box:
-                        cw = box.findChild(QCheckBox)
+                item = self.course_table.item(r, c)
+                if not item:
+                    item = QTableWidgetItem()
+                    if align == -1:
+                        a = Qt.AlignmentFlag.AlignLeft
+                    elif align == 1:
+                        a = Qt.AlignmentFlag.AlignRight
                     else:
-                        cw = QCheckBox()
-                        box = QWidget()
-                        l = QHBoxLayout(box)
-                        l.addWidget(cw)
-                        if align == -1:
-                            a = Qt.AlignmentFlag.AlignLeft
-                        elif align == 1:
-                            a = Qt.AlignmentFlag.AlignRight
-                        else:
-                            a = Qt.AlignmentFlag.AlignHCenter
-                        l.setAlignment(a | Qt.AlignmentFlag.AlignVCenter)
-                        l.setContentsMargins(0,0,0,0)
-                        self.course_table.setCellWidget(r, c, box)
-                        cw.toggled.connect(
-                            self.on_report_toggle
-                            if cid == "REPORT"
-                            else self.on_grades_toggle
-                        )
-                    cw.setCheckState(
-                        Qt.CheckState.Checked
-                        if cell_value
-                        else Qt.CheckState.Unchecked
-                    )
-                else:
-                    item = self.course_table.item(r, c)
-                    if not item:
-                        item = QTableWidgetItem()
-                        if align == -1:
-                            a = Qt.AlignmentFlag.AlignLeft
-                        elif align == 1:
-                            a = Qt.AlignmentFlag.AlignRight
-                        else:
-                            a = Qt.AlignmentFlag.AlignHCenter
-                        item.setTextAlignment(a | Qt.AlignmentFlag.AlignVCenter)
-                        self.course_table.setItem(r, c, item)
-                    if ctype == 0:
-                        item.setText(cell_value)
-                    elif ctype == 1:
+                        a = Qt.AlignmentFlag.AlignHCenter
+                    item.setTextAlignment(a | Qt.AlignmentFlag.AlignVCenter)
+                    self.course_table.setItem(r, c, item)
+                if ctype == 1:
 #TODO: rather use a map?
-                        for k, v in self.filter_list[cid]:
-                            if k == cell_value:
-                                item.setText(v)
-                                break
-                        else:
-#TODO: T ...
-                            REPORT(
-                                "ERROR",
-                                f"UNKNOWN VALUE IN FIELD '{cid}': '{cell_value}'"
-                            )
+                    for k, v in self.filter_list[cid]:
+                        if k == cell_value:
+                            item.setText(v)
+                            break
                     else:
-                        raise Bug(f"Invalid ctype ({ctype}) in COURSE_TABLE_FIELDS")
+#TODO: T ...
+                        REPORT(
+                            "ERROR",
+                            f"UNKNOWN VALUE IN FIELD '{cid}': '{cell_value}'"
+                        )
+                else:
+                    item.setText(cell_value)
                 c += 1
         self.suppress_handlers = False
+        self.course_table.setCurrentCell(-1, 0)
+        self.course_dict = None
+        self.pb_delete_course.setEnabled(False)
+        self.pb_edit_course.setEnabled(False)
+        self.frame_r.setEnabled(False)
         if len(records) > 0:
             if table_row >= len(records):
                 table_row = len(records) - 1
             self.course_table.setCurrentCell(table_row, 0)
-
-    def on_report_toggle(self, on):
-        if self.suppress_handlers:
-            return
-        row = self.course_table.currentRow()
-        course_dict = self.courses[row]
-        cnum = course_dict["course"]
-        if not db_update_field(
-            "COURSES",
-            "REPORT",
-            "X" if on else "",
-            course=cnum,
-        ):
-            REPORT(
-                "ERROR",
-#TODO: T ...
-                f"Couldn't update REPORT field of course {cnum}"
-            )
-
-    def on_grades_toggle(self, on):
-        if self.suppress_handlers:
-            return
-        row = self.course_table.currentRow()
-        course_dict = self.courses[row]
-        cnum = course_dict["course"]
-        if not db_update_field(
-            "COURSES",
-            "GRADES",
-            "X" if on else "",
-            course=cnum,
-        ):
-            REPORT(
-                "ERROR",
-#TODO: T ...
-                f"Couldn't update GRADES field of course {cnum}"
-            )
 
     def on_course_table_itemSelectionChanged(self):
         row = self.course_table.currentRow()
@@ -426,23 +361,16 @@ class CourseEditorPage(Page):
 #?        self.current_row = row
         if row >= 0:
             self.pb_delete_course.setEnabled(True)
+            self.pb_edit_course.setEnabled(True)
             self.course_dict = self.courses[row]
             self.set_course(self.course_dict["course"])
 #?            set_coursedata(
 #                COURSE_KEY(*[record.value(f) for f in COURSE_KEY._fields])
 #            )
             self.frame_r.setEnabled(True)
-
         else:
             # e.g. when entering an empty table
-            # print("EMPTY TABLE")
-#?            self.set_course(0)
-            self.pb_delete_course.setEnabled(False)
-            self.course_dict = None
-            # TODO: This could cause problems when an attempt is made to use the value?
-#?            set_coursedata(None)
-            # Actually, the right hand pane should probably be disabled.
-            self.frame_r.setEnabled(False)
+            print("EMPTY TABLE")
 
 #TODO
     def set_course(self, course: int):
@@ -590,19 +518,69 @@ class CourseEditorPage(Page):
         self.edit_course(self.course_table.currentRow())
 
     def edit_course(self, row):
-        print("§EDIT COURSE", row)
-#TODO: Some of this can be shared by the "new course" function.
+        """Activate the course field editor."""
+        changes = self.edit_course_fields(self.course_dict)
+        if changes:
+#TODO--
+            print("§COURSE CHANGED:", changes)
+            self.update_course(row, changes)
+
+    def update_course(self, row, changes):
+        course_id = self.course_dict["course"]
+        if db_update_fields(
+            "COURSES", 
+            [(f, v) for f, v in changes.items()], 
+            course=course_id,
+        ):
+            self.load_course_table(self.combo_class.currentIndex(), row)
+        else:
+            raise Bug(f"Course update ({course_id}) failed: {changes}")
+
+#TODO:
+    @Slot()
+    def on_pb_new_course_clicked(self):
+# Not so much interested in changes – except that the "unique" field-group
+# must be a new combination.
+# The initial course_dict should be that of the current row. If there is
+# no current row, at least the filter field should be copied.
+
+        if self.course_dict:
+            cdict = self.course_dict.copy()
+        else:
+            cdict = {
+                "CLASS": "",
+                "GRP": "",
+                "SUBJECT": "",
+                "TEACHER": "",
+                "REPORT": "",
+                "GRADES": "",
+                "REPORT_SUBJECT": "",
+                "AUTHORS": "",
+                "INFO": "",
+            }
+            cdict[self.filter_field] = self.filter_value
+# As it shouldn't be in the dict when adding the new course, maybe
+# it should rather be passed as a flag to the editor?
+# There could also be a different title!
+        cdict["course"] = None
+        changes = self.edit_course_fields(cdict)
+        if changes:
+#?
+            del(cdict["course"])
+            cdict.update(changes)
+#TODO--
+            print("§NEW_COURSE:", cdict)
+            db_new_row("COURSES", **cdict)
+            self.load_course_table(
+                self.combo_class.currentIndex(), 
+                self.course_table.currentRow()
+            )
+
+    def edit_course_fields(self, course_dict):
         if not self.course_field_editor:
             # Initialize dialog
             self.course_field_editor = CourseEditorForm(self.filter_list, self)
-#        course_id = self.course_dict["course"]
-        self.course_field_editor.activate(self.course_dict)
-
-
-
-
-#TODO: add a "new course" button?
-
+        return self.course_field_editor.activate(course_dict, True)
 
     def on_lesson_table_itemSelectionChanged(self):
         row = self.course_table.currentRow()

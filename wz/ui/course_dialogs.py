@@ -46,6 +46,7 @@ from typing import NamedTuple
 
 from core.db_access import (
     open_database,
+    db_check_unique_entry,
     db_read_table,
     db_values,
     db_read_unique_field,
@@ -143,10 +144,11 @@ class CourseEditorForm(QDialog):
         self.cb_teacher.addItems([s[1] for s in self.teachers])
         self.callback_enabled = True
 
-    def activate(self, course_data):
+    def activate(self, course_data, new=False):
         """"Open the dialog with the given data (a <dict> containing
         the data from the current course, or <None>.
         """
+        self.changes = None
         self.callback_enabled = False
         self.course_data = course_data
         c = course_data["CLASS"]
@@ -181,10 +183,8 @@ class CourseEditorForm(QDialog):
         self.le_signature.setText(course_data["AUTHORS"])
         self.le_info.setText(course_data["INFO"])
         self.callback_enabled = True
-        if self.exec() == QDialog.DialogCode.Accepted:
-            pass
-#TODO ... deal with the results
-        print("CHANGED:", self.get_changes())
+        self.exec() # == QDialog.DialogCode.Accepted:
+        return self.changes
 
     def get_changes(self):
         changes = {}
@@ -202,10 +202,10 @@ class CourseEditorForm(QDialog):
             changes["GRP"] = grp
         gr = self.grade_report.isChecked()
         if bool(self.course_data["GRADES"]) != gr:
-            changes["GRADES"] = gr
+            changes["GRADES"] = "X" if gr else ""
         tr = self.text_report.isChecked()
         if bool(self.course_data["REPORT"]) != tr:
-            changes["REPORT"] = tr
+            changes["REPORT"] = "X" if tr else ""
         st = self.le_subject_title.text()
         if st != self.course_data["REPORT_SUBJECT"]:
             changes["REPORT_SUBJECT"] = st
@@ -243,62 +243,42 @@ class CourseEditorForm(QDialog):
     def accept(self):
         changes = self.get_changes()
         if changes:
-#TODO
-            print("§UPDATE COURSE DATA")
+            ckey = {}
+            test = False
+            for f in "CLASS", "GRP", "SUBJECT", "TEACHER":
+                try:
+                    ckey[f] = changes[f]
+                    test = True
+                except KeyError:
+                    ckey[f] = self.course_data[f]
+            if test:
+                if db_check_unique_entry("COURSES", **ckey):
+#TODO: T ...
+                    REPORT("ERROR", "COURSE_NOT_UNIQUE")
+                    return
+            elif not self.course_data["course"]:
+                # A new entry – the key fields have not been changed
+#TODO: T ...
+                REPORT("ERROR", "COURSE_NOT_UNIQUE")
+                return
+
+            self.changes = changes
             super().accept()
         else:
-            y = YesOrNoDialog("There were no changes ... quit anyway?", "?")
-#T["NO_CHANGES"], T["NO_CHANGES_TITLE"])
+            y = YesOrNoDialog(T["NO_CHANGES"], T["NO_CHANGES_TITLE"])
             if y:
                 self.reject()
 
-
-#TODO ...
     def closeEvent(self, event):
         """Prevent dialog closure if there are changes."""
         if self.get_changes():
-            y = YesOrNoDialog("The changes will be lost ... quit anyway?", "?")
-#T["LOSE_CHANGES"], T["LOSE_CHANGES_TITLE"])
+            y = YesOrNoDialog(T["LOSE_CHANGES"], T["LOSE_CHANGES_TITLE"])
             if not y:
                 event.ignore()
                 return
         event.accept()
 
-    def _activate(self, row, filter_field=None):
-        """Initialize the dialog with values from the current course
-        and show it.
-
-        The idea behind the extra parameter is that, on empty tables, at
-        least the filter field should be set. To do that here, this
-        field and its value must be passed as a tuple: (field, value).
-        """
-        self.clear_modified()
-        self.current_row = row
-        if row >= 0:
-            self.table_empty = False
-            record = self.model.record(row)
-            for f, t in COURSE_COLS:
-                self.editors[f].setText(str(record.value(f)))
-        else:
-            # print("EMPTY TABLE")
-            self.table_empty = True
-            for f, t in COURSE_COLS:
-                self.editors[f].setText("")
-            if filter_field:
-                self.editors[filter_field[0]].setText(filter_field[1])
-        self.form_modified("", False)  # initialize form button states
-
-        self.__value = -1  # Default return value => don't change row
-        self.exec()
-        return self.__value
-
-    def return_value(self, row):
-        """Quit the dialog, returning the given row number.
-        Value -1 => don't change row, otherwise select the given row.
-        """
-        self.__value = row
-        self.accept()
-
+#TODO
     def course_add(self):
         """Add the data in the form editor as a new course."""
         model = self.model
@@ -358,34 +338,6 @@ class CourseEditorForm(QDialog):
             else:
                 SHOW_ERROR(error.text())
             model.revertAll()
-
-    def form_modified(self, field, changed):
-        """Handle a change in a form editor field.
-        Maintain the set of changed fields (<self.form_change_set>).
-        Enable and disable the pushbuttons appropriately.
-        """
-        if self.table_empty:
-            self.course_update_button.setEnabled(False)
-            self.course_add_button.setEnabled(True)
-        elif self.table_empty == None:
-            # ignore – not yet set up
-            return
-        elif changed:
-            self.course_update_button.setEnabled(True)
-            self.form_change_set.add(field)
-            if field in COURSE_KEY._fields:
-                self.course_add_button.setEnabled(True)
-        else:
-            self.form_change_set.discard(field)
-            if self.form_change_set:
-                if not self.form_change_set.intersection(COURSE_KEY._fields):
-                    self.course_add_button.setEnabled(False)
-            else:
-                self.course_update_button.setEnabled(False)
-                self.course_add_button.setEnabled(False)
-        # print("FORM CHANGED SET:", self.form_change_set)
-
-
 
 
 

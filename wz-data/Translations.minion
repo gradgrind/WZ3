@@ -359,7 +359,11 @@ ui.modules.course_editor: {
     PAYTAG_WITH_NO_NUMBER: "Ohne „Anzahl“ darf es keine Deputatskennung geben"
     NULL_FACTOR_NOT_CLEAN: "Faktor 0: Die anderen Felder müssen leer sein"
     TAG_WITH_DOT_OR_AT: "Parallel-Kennung darf kein '.' oder '@' enthalten"
-    
+    NO_CHANGES:     "Die Daten sind unverändert ... trotzdem schließen?"
+    NO_CHANGES_TITLE: "Keine Änderungen"
+    LOSE_CHANGES_TITLE: "Ungespeicherte Änderungen"
+    LOSE_CHANGES:   "Die Änderungen werden verworfen ... trotzdem schließen?"
+
 #    PAYMENT_VALID_ENTRY: "* oder Dezimalzahl"
 #    INVALID_PAYMENT: "Ungültiger Wert"
 

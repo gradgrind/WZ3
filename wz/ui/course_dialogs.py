@@ -108,6 +108,7 @@ from ui.ui_base import (
     QSize,
     QRegularExpression,
     QTimer,
+    QEvent,
     ### other
     uic,
     YesOrNoDialog,
@@ -373,14 +374,14 @@ class DayPeriodDialog(QDialog):
     def on_simultaneous_tag_currentTextChanged(self, tag):
         self.weighting.setValue(get_simultaneous_weighting(tag))
 
-####################TODO ...
-
 
 class RoomDialog(QDialog):
     @classmethod
-    def popup(cls, start_value="", classroom=""):
-        d = cls()
+    def popup(cls, start_value="", classroom="", parent=None, pos=None):
+        d = cls(parent)
         d.init()
+        if pos:
+            d.move(pos)
         return d.activate(start_value, classroom)
 
     def __init__(self, parent=None):
@@ -388,209 +389,22 @@ class RoomDialog(QDialog):
         uic.loadUi(APPDATAPATH("ui/dialog_room_choice.ui"), self)
         pb = self.buttonBox.button(QDialogButtonBox.StandardButton.Reset)
         pb.clicked.connect(self.reset)
+        self.roomtext.installEventFilter(self)
 
-        return
-
-#    def __init__(self):
-        super().__init__()
-        vbox0 = QVBoxLayout(self)
-        hbox1 = QHBoxLayout()
-        vbox0.addLayout(hbox1)
-        vboxl = QVBoxLayout()
-        hbox1.addLayout(vboxl)
-
-        self.roomchoice = QTableWidget()
-        self.roomchoice.setEditTriggers(
-            QAbstractItemView.EditTrigger.NoEditTriggers
-        )
-        self.roomchoice.setSelectionMode(
-            QAbstractItemView.SelectionMode.SingleSelection
-        )
-        self.roomchoice.setSelectionBehavior(QAbstractItemView.SelectRows)
-        self.roomchoice.setColumnCount(2)
-        vboxl.addWidget(self.roomchoice)
-
-        vboxm = QVBoxLayout()
-        hbox1.addLayout(vboxm)
-
-        bt_up = QToolButton()
-        bt_up.setToolTip(T["Move_up"])
-        bt_up.clicked.connect(self.move_up)
-        vboxm.addWidget(bt_up)
-        bt_up.setArrowType(Qt.ArrowType.UpArrow)
-        bt_up.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonIconOnly)
-        bt_down = QToolButton()
-        bt_down.setToolTip(T["Move_down"])
-        bt_down.clicked.connect(self.move_down)
-        vboxm.addWidget(bt_down)
-        bt_down.setArrowType(Qt.ArrowType.DownArrow)
-
-        vboxm.addStretch(1)
-        bt_left = QToolButton()
-        vboxm.addWidget(bt_left)
-        bt_left.setArrowType(Qt.ArrowType.LeftArrow)
-        bt_left.setToolTip(T["Add_to_choices"])
-        bt_left.clicked.connect(self.add2choices)
-        bt_right = QToolButton()
-        vboxm.addWidget(bt_right)
-#        bt_right.setIcon(QIcon.fromTheme("trash"))
-        bt_right.setIcon(QIcon.fromTheme("icon_edit-delete"))
-        bt_right.setToolTip(T["Remove_from_choices"])
-        bt_right.clicked.connect(self.discard_choice)
-        vboxm.addStretch(1)
-
-        vboxr = QVBoxLayout()
-        hbox1.addLayout(vboxr)
-
-        self.roomlist = QTableWidget()
-        self.roomlist.setEditTriggers(
-            QAbstractItemView.EditTrigger.NoEditTriggers
-        )
-        self.roomlist.setSelectionMode(
-            QAbstractItemView.SelectionMode.SingleSelection
-        )
-        self.roomlist.setSelectionBehavior(QAbstractItemView.SelectRows)
-        self.roomlist.setColumnCount(2)
-        vboxr.addWidget(self.roomlist)
-
-        self.roomtext = QLineEdit()
-        self.roomtext.editingFinished.connect(self.text_edited)
-        vboxl.addWidget(self.roomtext)
-
-        self.home = QPushButton(f"+ {T['CLASSROOM']}")
-        self.home.clicked.connect(self.add_classroom)
-        vboxl.addWidget(self.home)
-        self.extra = QCheckBox(T["OTHER_ROOMS"])
-        self.extra.stateChanged.connect(self.toggle_extra)
-        vboxl.addWidget(self.extra)
-
-        vbox0.addWidget(HLine())
-        buttonBox = QDialogButtonBox()
-        vbox0.addWidget(buttonBox)
-        bt_save = buttonBox.addButton(QDialogButtonBox.StandardButton.Save)
-        bt_cancel = buttonBox.addButton(QDialogButtonBox.StandardButton.Cancel)
-        bt_clear = buttonBox.addButton(QDialogButtonBox.StandardButton.Discard)
-        bt_clear.setText(T["Clear"])
-
-        bt_save.clicked.connect(self.do_accept)
-        bt_cancel.clicked.connect(self.reject)
-        bt_clear.clicked.connect(self.do_clear)
-
-    def reset(self):
-        print("§RESET")
-
-
-        
-    def text_edited(self):
-        self.set_choices(self.roomtext.text())
-
-    def checkroom(self, roomid, choice_list):
-        """Check that the given room-id is valid.
-        If there is a "classroom", "$" may be used as a short-form.
-        A valid room-id is added to the list <self.choices>, <None> is returned.
-        Otherwise an error message is returned (a string).
-        """
-        is_classroom = False
-        if roomid == "$":
-            if self.classroom:
-                rid = self.classroom
-                is_classroom = True
-            else:
-                return T["NO_CLASSROOM_DEFINED"]
-        else:
-            rid = roomid
-            if rid == self.classroom:
-                is_classroom = True
-        if rid in choice_list or (is_classroom and "$" in choice_list):
-            if is_classroom:
-                return T["CLASSROOM_ALREADY_CHOSEN"]
-            else:
-                return f"{T['ROOM_ALREADY_CHOSEN']}: '{rid}'"
-        if rid in self.room2line:
-            return None
-        return f"{T['UNKNOWN_ROOM_ID']}: '{rid}'"
-
-    def add2choices(self, roomid=None):
-        if not roomid:
-            # Not the most efficient handler, but it uses shared code ...
-            row = self.roomlist.currentRow()
-            riditem = self.roomlist.item(row, 0)
-            roomid = riditem.text()
-        e = self.checkroom(roomid, self.choices)
-        if e:
-            SHOW_ERROR(e)
-            return
-        self.add_valid_room_choice(roomid)
-        self.write_choices()
-
-    def discard_choice(self):
-        row = self.roomchoice.currentRow()
-        if row >= 0:
-            self.choices.pop(row)
-            self.roomchoice.removeRow(row)
-            self.write_choices()
-
-    def add_classroom(self):
-        self.add2choices("$")
-
-    def toggle_extra(self, state):
-        self.write_choices()
-
-    def move_up(self):
-        row = self.roomchoice.currentRow()
-        if row <= 0:
-            return
-        row1 = row - 1
-        item = self.roomchoice.takeItem(row, 0)
-        self.roomchoice.setItem(row, 0, self.roomchoice.takeItem(row1, 0))
-        self.roomchoice.setItem(row1, 0, item)
-        item = self.roomchoice.takeItem(row, 1)
-        self.roomchoice.setItem(row, 1, self.roomchoice.takeItem(row1, 1))
-        self.roomchoice.setItem(row1, 1, item)
-
-        t = self.choices[row]
-        self.choices[row] = self.choices[row1]
-        self.choices[row1] = t
-        self.write_choices()
-        self.roomchoice.selectRow(row1)
-
-    def move_down(self):
-        row = self.roomchoice.currentRow()
-        row1 = row + 1
-        if row1 == len(self.choices):
-            return
-        item = self.roomchoice.takeItem(row, 0)
-        self.roomchoice.setItem(row, 0, self.roomchoice.takeItem(row1, 0))
-        self.roomchoice.setItem(row1, 0, item)
-        item = self.roomchoice.takeItem(row, 1)
-        self.roomchoice.setItem(row, 1, self.roomchoice.takeItem(row1, 1))
-        self.roomchoice.setItem(row1, 1, item)
-
-        t = self.choices[row]
-        self.choices[row] = self.choices[row1]
-        self.choices[row1] = t
-        self.write_choices()
-        self.roomchoice.selectRow(row1)
-
-    def write_choices(self):
-        text = "/".join(self.choices)
-        if self.extra.isChecked():
-            text += "+"
-        self.roomtext.setText(text)
-
-    def do_accept(self):
+    def accept(self):
         val = self.roomtext.text()
         if val != self.value0:
             if val:
                 self.result = val
             else:
                 self.result = "-"
-        self.accept()
+        super().accept()
 
-    def do_clear(self):
+    def reset(self):
+        print("§RESET")
         if self.value0:
             self.result = "-"
-        self.accept()
+        super().accept()
 
     def init(self):
         self.room2line = {}
@@ -607,24 +421,6 @@ class RoomDialog(QDialog):
         completer = QCompleter(list(self.room2line))
         completer.setCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
         self.roomtext.setCompleter(completer)
-        self.roomlist.resizeColumnsToContents()
-        Hhd = self.roomlist.horizontalHeader()
-        Hhd.hide()
-        # Hhd.setMinimumSectionSize(20)
-        # A rather messy attempt to find an appropriate size for the table
-        Vhd = self.roomlist.verticalHeader()
-        Vhd.hide()
-        Hw = Hhd.length()
-        # Vw = Vhd.sizeHint().width()
-        fixed_width = Hw + 20  # + Vw, if vertical headers in use
-        self.roomlist.setFixedWidth(fixed_width)
-        self.roomchoice.setFixedWidth(fixed_width)
-        Hhd.setStretchLastSection(True)
-        hh = self.roomchoice.horizontalHeader()
-        hh.hide()
-        # Check that this doesn't need toggling after a clear() ...
-        hh.setStretchLastSection(True)
-        self.roomchoice.verticalHeader().hide()
 
     def activate(self, start_value="", classroom=None):
         self.value0 = start_value
@@ -664,7 +460,6 @@ class RoomDialog(QDialog):
             # Perform changes only if not too many errors
             self.choices = []
             self.roomchoice.setRowCount(0)
-
             if _choices:
                 for rid in _choices:
                     self.add_valid_room_choice(rid)
@@ -674,7 +469,7 @@ class RoomDialog(QDialog):
             )
         if errors:
             elist = "\n".join(errors)
-            SHOW_ERROR(f"{T['INVALID_ROOM_IDS']}:\n{elist}")
+            REPORT("ERROR", f"{T['INVALID_ROOM_IDS']}:\n{elist}")
         self.write_choices()
 
     def add_valid_room_choice(self, rid):
@@ -689,7 +484,143 @@ class RoomDialog(QDialog):
         self.roomchoice.insertRow(at_row)
         self.roomchoice.setItem(at_row, 0, self.roomlist.item(row, 0).clone())
         self.roomchoice.setItem(at_row, 1, self.roomlist.item(row, 1).clone())
-        self.roomchoice.resizeColumnsToContents()
+#        self.roomchoice.resizeColumnsToContents()
+
+    def write_choices(self):
+        """Write the rooms in <self.choices> to the text field.
+        """
+        text = "/".join(self.choices)
+        if self.extra.isChecked():
+            text += "+"
+        self.roomtext.setText(text)
+
+    def checkroom(self, roomid, choice_list):
+        """Check that the given room-id is valid.
+        If there is a "classroom", "$" may be used as a short-form.
+        A valid room-id is added to the list <self.choices>, <None> is returned.
+        Otherwise an error message is returned (a string).
+        """
+        is_classroom = False
+        if roomid == "$":
+            if self.classroom:
+                rid = self.classroom
+                is_classroom = True
+            else:
+                return T["NO_CLASSROOM_DEFINED"]
+        else:
+            rid = roomid
+            if rid == self.classroom:
+                is_classroom = True
+        if rid in choice_list or (is_classroom and "$" in choice_list):
+            if is_classroom:
+                return T["CLASSROOM_ALREADY_CHOSEN"]
+            else:
+                return f"{T['ROOM_ALREADY_CHOSEN']}: '{rid}'"
+        if rid in self.room2line:
+            return None
+        return f"{T['UNKNOWN_ROOM_ID']}: '{rid}'"
+
+    def on_roomtext_editingFinished(self):
+        self.set_choices(self.roomtext.text())
+
+    @Slot()
+    def on_tb_add_clicked(self):
+        row = self.roomlist.currentRow()
+        riditem = self.roomlist.item(row, 0)
+        self.add2choices(riditem.text())
+
+    @Slot()
+    def on_home_clicked(self):
+        self.add2choices("$")
+
+    def add2choices(self, roomid):
+        print("§ADD:", roomid)
+        e = self.checkroom(roomid, self.choices)
+        if e:
+            SHOW_ERROR(e)
+            return
+        self.add_valid_room_choice(roomid)
+        self.write_choices()
+
+    @Slot()
+    def on_tb_bin_clicked(self):
+        row = self.roomchoice.currentRow()
+        if row >= 0:
+            self.choices.pop(row)
+            self.roomchoice.removeRow(row)
+            self.write_choices()
+
+    @Slot(int)
+    def on_extra_stateChanged(self, state):
+        print("§EXTRA:", repr(state))
+        self.write_choices()
+
+    @Slot()
+    def on_tb_up_clicked(self):
+        row = self.roomchoice.currentRow()
+        if row <= 0:
+            return
+        row1 = row - 1
+        item = self.roomchoice.takeItem(row, 0)
+        self.roomchoice.setItem(row, 0, self.roomchoice.takeItem(row1, 0))
+        self.roomchoice.setItem(row1, 0, item)
+        item = self.roomchoice.takeItem(row, 1)
+        self.roomchoice.setItem(row, 1, self.roomchoice.takeItem(row1, 1))
+        self.roomchoice.setItem(row1, 1, item)
+        t = self.choices[row]
+        self.choices[row] = self.choices[row1]
+        self.choices[row1] = t
+        self.write_choices()
+        self.roomchoice.selectRow(row1)
+
+    @Slot()
+    def on_tb_down_clicked(self):
+        row = self.roomchoice.currentRow()
+        row1 = row + 1
+        if row1 == len(self.choices):
+            return
+        item = self.roomchoice.takeItem(row, 0)
+        self.roomchoice.setItem(row, 0, self.roomchoice.takeItem(row1, 0))
+        self.roomchoice.setItem(row1, 0, item)
+        item = self.roomchoice.takeItem(row, 1)
+        self.roomchoice.setItem(row, 1, self.roomchoice.takeItem(row1, 1))
+        self.roomchoice.setItem(row1, 1, item)
+        t = self.choices[row]
+        self.choices[row] = self.choices[row1]
+        self.choices[row1] = t
+        self.write_choices()
+        self.roomchoice.selectRow(row1)
+
+
+
+
+    def eventFilter(self, obj: QListWidget, event: QEvent) -> bool:
+        """Event filter for the "roomtext" field.
+        Suppress the return character, to avoid closing the dialog.
+        """
+        if (event.type() == QEvent.KeyPress
+            and event.key() == Qt.Key.Key_Return
+        ):
+            print("§RETURN PRESSED ...")
+#TODO: Accept the room if it is valid, otherwise report invalidity.
+# If accepted, clear the field.
+# Is this manual entry really such a useful thing? Perhaps I could
+# use key interception to move to an area in the room list? Then the
+# roomtext field could be either read-only or removed.
+# Use QTableWidget method (slot) <scrollToItem>? And <findItems> to find
+# the items in the first place.
+            return True
+        else:
+            #?
+            return False
+            # standard event processing
+            return super().eventFilter(obj, event)
+        
+
+
+
+####################TODO ...
+
 
 
 class SingleRoomDialog(QDialog):
@@ -1634,17 +1565,17 @@ if __name__ == "__main__":
 
     widget = RoomDialog()
     widget.init()
-    print("----->", widget.activate(start_value="$/rPh+", classroom="r10G"))
+    print("----->", widget.activate(start_value="$/Ph+", classroom="10G"))
 
     quit(0)
 
     widget = SingleRoomDialog()
     widget.init()
-    print("----->", widget.activate(start_value="rPh", classroom="r10G"))
-    print("----->", widget.activate(start_value="rCh", classroom="r10G"))
-    print("----->", widget.activate(start_value="+", classroom="r10G"))
+    print("----->", widget.activate(start_value="Ph", classroom="10G"))
+    print("----->", widget.activate(start_value="Ch", classroom="10G"))
+    print("----->", widget.activate(start_value="+", classroom="10G"))
     print("----->", widget.activate(start_value="$"))
-    print("----->", widget.activate(start_value="r11G", classroom="r10G"))
+    print("----->", widget.activate(start_value="11G", classroom="10G"))
 
     quit(0)
 

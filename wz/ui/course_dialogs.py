@@ -389,7 +389,7 @@ class RoomDialog(QDialog):
         uic.loadUi(APPDATAPATH("ui/dialog_room_choice.ui"), self)
         pb = self.buttonBox.button(QDialogButtonBox.StandardButton.Reset)
         pb.clicked.connect(self.reset)
-        self.roomtext.installEventFilter(self)
+        self.roomlist.installEventFilter(self)
 
     def accept(self):
         val = self.roomtext.text()
@@ -418,9 +418,6 @@ class RoomDialog(QDialog):
             self.roomlist.setItem(i, 0, item)
             item = QTableWidgetItem(rooms[i][1])
             self.roomlist.setItem(i, 1, item)
-        completer = QCompleter(list(self.room2line))
-        completer.setCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
-        self.roomtext.setCompleter(completer)
 
     def activate(self, start_value="", classroom=None):
         self.value0 = start_value
@@ -432,7 +429,7 @@ class RoomDialog(QDialog):
             self.home.hide()
         self.set_choices(start_value)
         self.roomlist.selectRow(0)
-        self.roomtext.setFocus()
+        self.roomlist.setFocus()
         self.exec()
         return self.result
 
@@ -484,7 +481,6 @@ class RoomDialog(QDialog):
         self.roomchoice.insertRow(at_row)
         self.roomchoice.setItem(at_row, 0, self.roomlist.item(row, 0).clone())
         self.roomchoice.setItem(at_row, 1, self.roomlist.item(row, 1).clone())
-#        self.roomchoice.resizeColumnsToContents()
 
     def write_choices(self):
         """Write the rooms in <self.choices> to the text field.
@@ -519,9 +515,6 @@ class RoomDialog(QDialog):
         if rid in self.room2line:
             return None
         return f"{T['UNKNOWN_ROOM_ID']}: '{rid}'"
-
-    def on_roomtext_editingFinished(self):
-        self.set_choices(self.roomtext.text())
 
     @Slot()
     def on_tb_add_clicked(self):
@@ -591,31 +584,28 @@ class RoomDialog(QDialog):
         self.write_choices()
         self.roomchoice.selectRow(row1)
 
-
-
-
-    def eventFilter(self, obj: QListWidget, event: QEvent) -> bool:
-        """Event filter for the "roomtext" field.
-        Suppress the return character, to avoid closing the dialog.
+    def eventFilter(self, obj: QTableWidget, event: QEvent) -> bool:
+        """Implement a "better" key search for the room list:
+        Pressing an alphanumeric key will move the selection to the first
+        matching room id. Only the starting character of the room id is
+        considered.
         """
-        if (event.type() == QEvent.KeyPress
-            and event.key() == Qt.Key.Key_Return
-        ):
-            print("§RETURN PRESSED ...")
-#TODO: Accept the room if it is valid, otherwise report invalidity.
-# If accepted, clear the field.
-# Is this manual entry really such a useful thing? Perhaps I could
-# use key interception to move to an area in the room list? Then the
-# roomtext field could be either read-only or removed.
-# Use QTableWidget method (slot) <scrollToItem>? And <findItems> to find
-# the items in the first place.
-            return True
-        else:
-            #?
-            return False
-            # standard event processing
-            return super().eventFilter(obj, event)
-        
+        if event.type() == QEvent.KeyPress:
+            key = event.text()
+            if key.isalnum():
+                ilist = self.roomlist.findItems(
+                    key, 
+                    Qt.MatchFlag.MatchStartsWith
+                )
+                if ilist:
+                    self.roomlist.setCurrentItem(ilist[0])
+                    self.roomlist.scrollToItem(
+                        ilist[0],
+                        QAbstractItemView.ScrollHint.PositionAtTop
+                    )
+                return True
+        return False
+
 
 
 
@@ -1563,11 +1553,19 @@ if __name__ == "__main__":
     #    for p in partners("sp03"):
     #        print("??????", p)
 
+    widget = PaymentDialog()
+    print("----->", widget.activate(start_value="2*HuEp"))
+    print("----->", widget.activate(start_value=""))
+    print("----->", PaymentDialog.popup(start_value="0,5*HuEp/tag1"))
+    print("----->", widget.activate(start_value="Fred*HuEp"))
+
+    #    quit(0)
+
     widget = RoomDialog()
     widget.init()
     print("----->", widget.activate(start_value="$/Ph+", classroom="10G"))
 
-    quit(0)
+#    quit(0)
 
     widget = SingleRoomDialog()
     widget.init()
@@ -1587,14 +1585,6 @@ if __name__ == "__main__":
     print("----->", widget.activate(""))
     print("----->", widget.activate("Di.4"))
     print("----->", widget.activate("Di.9"))
-
-    widget = PaymentDialog()
-    print("----->", widget.activate(start_value="2*HuEp"))
-    print("----->", widget.activate(start_value=""))
-    print("----->", PaymentDialog.popup(start_value="0,5*HuEp/tag1"))
-    print("----->", widget.activate(start_value="Fred*HuEp"))
-
-    #    quit(0)
 
     widget = BlockTagDialog()
     print("----->", widget.activate("XXX#"))

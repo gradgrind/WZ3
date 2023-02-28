@@ -10,6 +10,9 @@
     <height>317</height>
    </rect>
   </property>
+  <property name="focusPolicy">
+   <enum>Qt::NoFocus</enum>
+  </property>
   <property name="windowTitle">
    <string>Raumwahl</string>
   </property>
@@ -22,6 +25,9 @@
         <widget class="QTableWidget" name="roomchoice">
          <property name="editTriggers">
           <set>QAbstractItemView::NoEditTriggers</set>
+         </property>
+         <property name="tabKeyNavigation">
+          <bool>false</bool>
          </property>
          <property name="alternatingRowColors">
           <bool>true</bool>
@@ -75,9 +81,6 @@
         </widget>
        </item>
        <item>
-        <widget class="QLineEdit" name="roomtext"/>
-       </item>
-       <item>
         <widget class="QPushButton" name="home">
          <property name="text">
           <string>+ Klassenraum</string>
@@ -88,6 +91,13 @@
         <widget class="QCheckBox" name="extra">
          <property name="text">
           <string>auch andere Räume</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QLineEdit" name="roomtext">
+         <property name="readOnly">
+          <bool>true</bool>
          </property>
         </widget>
        </item>
@@ -165,7 +175,8 @@
           <string>...</string>
          </property>
          <property name="icon">
-          <iconset theme="edit-delete"/>
+          <iconset theme="edit-delete">
+           <normaloff>.</normaloff>.</iconset>
          </property>
          <property name="iconSize">
           <size>
@@ -194,6 +205,9 @@
       <widget class="QTableWidget" name="roomlist">
        <property name="editTriggers">
         <set>QAbstractItemView::NoEditTriggers</set>
+       </property>
+       <property name="tabKeyNavigation">
+        <bool>false</bool>
        </property>
        <property name="alternatingRowColors">
         <bool>true</bool>

@@ -1,10 +1,10 @@
 """
-core/basic_data.py - last updated 2022-11-05
+core/basic_data.py - last updated 2023-02-28
 
 Handle caching of the basic data sources
 
 ==============================
-Copyright 2022 Michael Towers
+Copyright 2023 Michael Towers
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -230,7 +230,7 @@ def get_payment_weights() -> KeyValueList:
     except KeyError:
         pass
     payment_weights = db_key_value_list(
-        "XDPT_WEIGHTINGS", "TAG", "WEIGHT", check=check
+        "PAY_FACTORS", "TAG", "WEIGHT", check=check
     )
     SHARED_DATA["PAYMENT"] = payment_weights
     return payment_weights

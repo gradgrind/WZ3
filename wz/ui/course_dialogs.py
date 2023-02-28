@@ -389,7 +389,17 @@ class RoomDialog(QDialog):
         uic.loadUi(APPDATAPATH("ui/dialog_room_choice.ui"), self)
         pb = self.buttonBox.button(QDialogButtonBox.StandardButton.Reset)
         pb.clicked.connect(self.reset)
-        self.roomlist.installEventFilter(self)
+# This would be an alternative to the built-in table search.
+#        self.roomlist.installEventFilter(self)
+
+    def on_roomlist_currentItemChanged(self, item):
+        """If an item in the room list is selected on the second column,
+        reselect it on the first column.
+        This causes the built-in search feature to work as intended –
+        i.e. on the first letter of the first column.
+        """
+        if item.column() > 0:
+            self.roomlist.setCurrentCell(item.row(), 0)
 
     def accept(self):
         val = self.roomtext.text()
@@ -584,8 +594,9 @@ class RoomDialog(QDialog):
         self.write_choices()
         self.roomchoice.selectRow(row1)
 
+    '''#In view of the built-in search feature, this seems unnecessary.
     def eventFilter(self, obj: QTableWidget, event: QEvent) -> bool:
-        """Implement a "better" key search for the room list:
+        """Implement a key search for the room list:
         Pressing an alphanumeric key will move the selection to the first
         matching room id. Only the starting character of the room id is
         considered.
@@ -605,11 +616,131 @@ class RoomDialog(QDialog):
                     )
                 return True
         return False
-
+    '''
 
 
 
 ####################TODO ...
+
+class PaymentDialog(QDialog):
+    @classmethod
+    def popup(cls, start_value=""):
+        d = cls()
+        return d.activate(start_value)
+
+    def __init__(self):
+        super().__init__()
+        uic.loadUi(APPDATAPATH("ui/dialog_workload.ui"), self)
+        pb = self.buttonBox.button(QDialogButtonBox.StandardButton.Reset)
+        pb.clicked.connect(self.reset)
+        v = QRegularExpressionValidator(PAYMENT_FORMAT)
+        self.workload.setValidator(v)
+        self.factor_list = (
+            [("--", "0")]
+            + [(k, f"{k} ({v})") for k, v in get_payment_weights()]
+        )
+        self.pay_factor.addItems(f[0] for f in self.factor_list)
+        v = QRegularExpressionValidator(PAYMENT_TAG_FORMAT)
+        self.partner.setValidator(v)
+
+        return
+
+#        form = QFormLayout(self)
+        self.number = QLineEdit()
+        form.addRow(T["NUMBER"], self.number)
+        v = QRegularExpressionValidator(PAYMENT_FORMAT)
+        self.number.setValidator(v)
+        self.factor = KeySelector()
+        form.addRow(T["FACTOR"], self.factor)
+        self.factor.set_items(
+            [("--", "0")]
+            + [(k, f"{k} ({v})") for k, v in get_payment_weights()]
+        )
+        self.ptag = QLineEdit()
+        form.addRow(T["PARALLEL_TAG"], self.ptag)
+        v = QRegularExpressionValidator(PAYMENT_TAG_FORMAT)
+        self.ptag.setValidator(v)
+        form.addRow(HLine())
+        buttonBox = QDialogButtonBox()
+        form.addRow(buttonBox)
+        bt_save = buttonBox.addButton(QDialogButtonBox.StandardButton.Save)
+        bt_cancel = buttonBox.addButton(QDialogButtonBox.StandardButton.Cancel)
+        bt_clear = buttonBox.addButton(QDialogButtonBox.StandardButton.Discard)
+        bt_clear.setText(T["Clear"])
+        bt_save.clicked.connect(self.do_accept)
+        bt_cancel.clicked.connect(self.reject)
+        bt_clear.clicked.connect(self.do_clear)
+
+    def reset(self):
+        print("§RESET")
+
+    def do_accept(self):
+        n = self.number.text()
+        f = self.factor.selected()
+        t = self.ptag.text()
+        if f == "--":
+            if n or t:
+                SHOW_ERROR(T["NULL_FACTOR_NOT_CLEAN"])
+                return
+            text = ""
+        else:
+            if t:
+                if not n:
+                    SHOW_ERROR(T["PAYTAG_WITH_NO_NUMBER"])
+                    return
+                t = "/" + t
+            text = n + "*" + f + t
+            try:
+                # Check final value
+                read_payment(text)
+            except ValueError as e:
+                SHOW_ERROR(str(e))
+                return
+        if text != self.text0:
+            self.result = text
+        self.accept()
+
+    def do_clear(self):
+        if self.text0:
+            self.result = ""
+        self.accept()
+
+    def activate(self, start_value=""):
+        self.result = None
+        self.text0 = start_value
+        try:
+#TODO:
+            pdata = read_payment(start_value)
+            if pdata.isNone():
+                self.workload.setText("")
+                self.pay_factor.setCurrentIndex(0)
+                self.partner.setText("")
+            else:
+                if pdata.tag and not pdata.number:
+#?
+                    SHOW_ERROR(T["PAYTAG_WITH_NO_NUMBER"])
+                    self.partner.setText("")
+                else:
+                    self.partner.setText(pdata.tag)
+                self.workload.setText(pdata.number)
+                for i, kv in enumerate(self.factor_list):
+                    if kv[0] == pdata.factor:
+                        self.pay_factor.setCurrentIndex(i)
+                        break
+                else:
+#TODO: T ...
+                    raise ValueError(f"UNKNOWN_PAY_FACTOR: {pdata.factor}")
+        except ValueError as e:
+            REPORT("ERROR", str(e))
+            self.workload.setText("1")
+            self.pay_factor.setCurrentIndex(1)
+            self.partner.setText("")
+        self.exec()
+        return self.result
+
+
+
+
 
 
 
@@ -1451,97 +1582,6 @@ class BlockTagSelector(QLineEdit):
         self.set_block(result)
 
 
-class PaymentDialog(QDialog):
-    @classmethod
-    def popup(cls, start_value=""):
-        d = cls()
-        return d.activate(start_value)
-
-    def __init__(self):
-        super().__init__()
-        form = QFormLayout(self)
-        self.number = QLineEdit()
-        form.addRow(T["NUMBER"], self.number)
-        v = QRegularExpressionValidator(PAYMENT_FORMAT)
-        self.number.setValidator(v)
-        self.factor = KeySelector()
-        form.addRow(T["FACTOR"], self.factor)
-        self.factor.set_items(
-            [("--", "0")]
-            + [(k, f"{k} ({v})") for k, v in get_payment_weights()]
-        )
-        self.ptag = QLineEdit()
-        form.addRow(T["PARALLEL_TAG"], self.ptag)
-        v = QRegularExpressionValidator(PAYMENT_TAG_FORMAT)
-        self.ptag.setValidator(v)
-        form.addRow(HLine())
-        buttonBox = QDialogButtonBox()
-        form.addRow(buttonBox)
-        bt_save = buttonBox.addButton(QDialogButtonBox.StandardButton.Save)
-        bt_cancel = buttonBox.addButton(QDialogButtonBox.StandardButton.Cancel)
-        bt_clear = buttonBox.addButton(QDialogButtonBox.StandardButton.Discard)
-        bt_clear.setText(T["Clear"])
-        bt_save.clicked.connect(self.do_accept)
-        bt_cancel.clicked.connect(self.reject)
-        bt_clear.clicked.connect(self.do_clear)
-
-    def do_accept(self):
-        n = self.number.text()
-        f = self.factor.selected()
-        t = self.ptag.text()
-        if f == "--":
-            if n or t:
-                SHOW_ERROR(T["NULL_FACTOR_NOT_CLEAN"])
-                return
-            text = ""
-        else:
-            if t:
-                if not n:
-                    SHOW_ERROR(T["PAYTAG_WITH_NO_NUMBER"])
-                    return
-                t = "/" + t
-            text = n + "*" + f + t
-            try:
-                # Check final value
-                read_payment(text)
-            except ValueError as e:
-                SHOW_ERROR(str(e))
-                return
-        if text != self.text0:
-            self.result = text
-        self.accept()
-
-    def do_clear(self):
-        if self.text0:
-            self.result = ""
-        self.accept()
-
-    def activate(self, start_value=""):
-        self.result = None
-        self.text0 = start_value
-        try:
-            pdata = read_payment(start_value)
-            if pdata.isNone():
-                self.number.setText("")
-                self.factor.setCurrentIndex(0)
-                self.ptag.setText("")
-            else:
-                if pdata.tag and not pdata.number:
-                    SHOW_ERROR(T["PAYTAG_WITH_NO_NUMBER"])
-                    self.ptag.setText("")
-                else:
-                    self.ptag.setText(pdata.tag)
-                self.number.setText(pdata.number)
-                self.factor.reset(pdata.factor)
-        except ValueError as e:
-            SHOW_ERROR(str(e))
-            self.number.setText("1")
-            self.factor.setCurrentIndex(1)
-            self.ptag.setText("")
-        self.exec()
-        return self.result
-
-
 # --#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#
 
 if __name__ == "__main__":
@@ -1553,6 +1593,10 @@ if __name__ == "__main__":
     #    for p in partners("sp03"):
     #        print("??????", p)
 
+    widget = RoomDialog()
+    widget.init()
+    print("----->", widget.activate(start_value="$/Ph+", classroom="10G"))
+
     widget = PaymentDialog()
     print("----->", widget.activate(start_value="2*HuEp"))
     print("----->", widget.activate(start_value=""))
@@ -1560,10 +1604,6 @@ if __name__ == "__main__":
     print("----->", widget.activate(start_value="Fred*HuEp"))
 
     #    quit(0)
-
-    widget = RoomDialog()
-    widget.init()
-    print("----->", widget.activate(start_value="$/Ph+", classroom="10G"))
 
 #    quit(0)
 

@@ -1,7 +1,7 @@
 """
 ui/modules/course_editor.py
 
-Last updated:  2023-02-26
+Last updated:  2023-03-01
 
 Edit course and blocks+lessons data.
 
@@ -108,31 +108,37 @@ from ui.ui_base import (
     uic,
 )
 
+#TODO: Import these "on demand"?
+from ui.dialogs.dialog_course_fields import CourseEditorForm
+from ui.dialogs.dialog_day_period import DayPeriodDialog
+from ui.dialogs.dialog_room_choice import RoomDialog
+from ui.dialogs.dialog_workload import WorkloadDialog
+
 #?
-from ui.course_dialogs import (
-    CourseEditorForm,
-
-
-    set_coursedata,
-    get_coursedata,
-    GroupSelector,
-    #    DurationSelector,
-    #    DayPeriodSelector,
-    #    PartnersSelector,
-    PaymentSelector,
-    RoomSelector,
-    #    partners,
-    #DayPeriodDelegate,
-    DayPeriodDialog,
-    DurationDelegate,
-    #    PartnersDelegate,
-    BlockTagSelector,
-    BlockTagDialog,
-    #    parse_time_field,
-    #    get_time_entry,
-    TableWidget,
-    courses_with_lessontag,
-)
+#from ui.course_dialogs import (
+#    CourseEditorForm,
+#
+#
+#    set_coursedata,
+#    get_coursedata,
+#    GroupSelector,
+#    #    DurationSelector,
+#    #    DayPeriodSelector,
+#    #    PartnersSelector,
+#    PaymentSelector,
+#    RoomSelector,
+#    #    partners,
+#    #DayPeriodDelegate,
+#    DayPeriodDialog,
+#    DurationDelegate,
+#    #    PartnersDelegate,
+#    BlockTagSelector,
+#    BlockTagDialog,
+#    #    parse_time_field,
+#    #    get_time_entry,
+#    TableWidget,
+#    courses_with_lessontag,
+#)
 
 # Course table fields
 #TODO: still needed?
@@ -617,6 +623,8 @@ class CourseEditorPage(Page):
             self.parallel.setEnabled(True)
             self.notes.setPlainText(lgdata["NOTES"])
             self.notes.setEnabled(True)
+#TODO: PARTNER (->GROUP? or something reflecting real nature)
+# Perhaps using the NamedTuple from basic_data?
         self.payment.setText(f'{cldata["WORKLOAD"]} * {cldata["PAY_FACTOR"]}')
 
 #TODO:

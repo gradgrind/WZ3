@@ -342,10 +342,6 @@ ui.modules.course_editor: {
     Remove_from_choices: "Von Auswahl entfernen"
     Move_up:        "Nach oben verschieben"
     Move_down:      "Nach unten verschieben"
-    ROOM_ALREADY_CHOSEN: "Raum schon in Auswahl"
-    CLASSROOM_ALREADY_CHOSEN: "Klassenraum schon in Auswahl"
-    UNKNOWN_ROOM_ID: "Unbekanntes Raumkürzel"
-    INVALID_ROOM_IDS: "Ungültige Raumkürzel"
     INVALID_BLOCK_TAG: "Ungültiges Block-Kennzeichen"
     UNKNOWN_SUBJECT_TAG: "Unbekanntes Fachkürzel: {sid}"
     EMPTY_PARTNER_TAG: "Leeres „Partner-Kennzeichen“"
@@ -358,20 +354,11 @@ ui.modules.course_editor: {
     BLOCK_WITH_NO_TAG: "Mit leerem Block-Kennzeichen kann es keine Unterrichtsstunden geben"
     PAYTAG_WITH_NO_NUMBER: "Ohne „Anzahl“ darf es keine Deputatskennung geben"
     NULL_FACTOR_NOT_CLEAN: "Faktor 0: Die anderen Felder müssen leer sein"
-    TAG_WITH_DOT_OR_AT: "Parallel-Kennung darf kein '.' oder '@' enthalten"
-    NO_CHANGES:     "Die Daten sind unverändert ... trotzdem schließen?"
-    NO_CHANGES_TITLE: "Keine Änderungen"
-    LOSE_CHANGES_TITLE: "Ungespeicherte Änderungen"
-    LOSE_CHANGES:   "Die Änderungen werden verworfen ... trotzdem schließen?"
-    COURSE_NOT_UNIQUE:  "Dieser Kurs (Klasse+Gruppe+Fach+Lehrkraft) existiert schon"
 
 #    PAYMENT_VALID_ENTRY: "* oder Dezimalzahl"
 #    INVALID_PAYMENT: "Ungültiger Wert"
 
     # Labels
-    EDIT_COURSE_FIELDS: "Kursfelder bearbeiten"
-    NEW_COURSE:     "Neuer Kurs"
-    
     MODULE_NAME:    "Kurse/Stunden"
     MODULE_TITLE:   "Unterrichtskurse und -stunden verwalten"
 
@@ -448,10 +435,33 @@ ui.modules.course_editor: {
 #    EDIT_LESSON:    "Bearbeiten"
 
 # new
-    NUMBER:         Anzahl
-    FACTOR:         Gewichtungsfaktor
     PARALLEL_GROUPS: "mit Gruppen"
     PARALLEL_TEACHERS: "mit Lehrkräften"
+}
+
+ui.dialogs.dialog_course_fields: {
+    EDIT_COURSE_FIELDS: "Kursfelder bearbeiten"
+    NEW_COURSE:     "Neuer Kurs"
+    COURSE_NOT_UNIQUE:  "Dieser Kurs (Klasse+Gruppe+Fach+Lehrkraft) existiert schon"
+    NO_CHANGES_TITLE: "Keine Änderungen"
+    NO_CHANGES:     "Die Daten sind unverändert ... trotzdem schließen?"
+    LOSE_CHANGES_TITLE: "Ungespeicherte Änderungen"
+    LOSE_CHANGES:   "Die Änderungen werden verworfen ... trotzdem schließen?"
+}
+
+ui.dialogs.dialog_day_period: {
+    TAG_WITH_DOT_OR_AT: "Parallel-Kennung darf kein '.' oder '@' enthalten"
+}
+
+ui.dialogs.dialog_room_choice: {
+    INVALID_ROOM_IDS: "Ungültige Raumkürzel"
+    NO_CLASSROOM_DEFINED: "Kein Klassenraum definiert"
+    CLASSROOM_ALREADY_CHOSEN: "Klassenraum schon in Auswahl"
+    ROOM_ALREADY_CHOSEN: "Raum schon in Auswahl"
+    UNKNOWN_ROOM_ID: "Unbekanntes Raumkürzel"
+}
+
+ui.dialogs.dialog_workload: {
 }
 
 ui.modules.grades_manager: {

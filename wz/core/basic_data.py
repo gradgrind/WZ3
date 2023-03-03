@@ -44,6 +44,7 @@ PAYMENT_FORMAT = QRegularExpression(f"^{__FLOAT}$")
 PAYMENT_MAX = 30.0
 __TAG_CHAR = "[A-Za-z0-9_.]"
 TAG_FORMAT = QRegularExpression(f"^{__TAG_CHAR}+$")
+BLOCK_TAG_FORMAT = QRegularExpression(f"^[#]{__TAG_CHAR}*$")
 PAYMENT_TAG_FORMAT = QRegularExpression(f"^{__TAG_CHAR}*(?:/{__FLOAT})?$")
 NO_SUBJECT = "-----"
 
@@ -215,34 +216,36 @@ class BlockTag(NamedTuple):
     tag: str
     subject: str
 
-    def isNone(self):
-        return (not self.sid) and (not self.tag)
+    @classmethod
+    def read(cls, tag:str):
+        """Decode the given block tag. Return a <BlockTag> instance.
+        """
+        if not tag:
+            return cls("", "", NO_SUBJECT)
+        try:
+            sid, btag = tag.split("#", 1)
+        except ValueError:
+            raise ValueError(T["BLOCKTAG_INVALID"].format(tag=tag))
+        return cls.build(sid, btag)
+
+    @classmethod
+    def build(cls, sid, tag):
+        if not sid:
+            raise ValueError(T["BLOCK_TAG_WITHOUT_SUBJECT"])
+        try:
+            subject = get_subjects().map(sid)
+        except KeyError:
+            raise ValueError(
+                T["BLOCKTAG_UNKNOWN_SUBJECT"].format(sid=sid)
+            )
+        if not tag:
+            return cls(sid, "", subject)
+        if TAG_FORMAT.match(tag).hasMatch():
+            return cls(sid, tag, subject)
+        raise ValueError(T["BLOCKTAG_INVALID_TAG"].format(tag=tag))
 
     def __str__(self):
-        return f"{self.sid}#{self.tag}" if self.sid else self.tag
-
-
-def read_block_tag(block_tag: str) -> BlockTag:
-    """Decode the given block tag. Return a triple:
-    (subject-id, identifier-tag, subject name).
-    """
-    if not block_tag:
-        return BlockTag("", "", NO_SUBJECT)
-    try:
-        sid, tag = block_tag.split("#", 1)
-    except ValueError:
-        return BlockTag("", block_tag, NO_SUBJECT)
-    try:
-        subject = get_subjects().map(sid)
-    except KeyError:
-        raise ValueError(
-            T["BLOCKTAG_UNKNOWN_SUBJECT"].format(tag=block_tag, sid=sid)
-        )
-    if not tag:
-        return BlockTag(sid, "", subject)
-    if TAG_FORMAT.match(tag).hasMatch():
-        return BlockTag(sid, tag, subject)
-    raise ValueError(T["BLOCKTAG_INVALID"].format(tag=block_tag))
+        return f"{self.sid}#{self.tag}" if self.sid else ""
 
 
 '''
@@ -341,6 +344,9 @@ class WorkloadData(NamedTuple):
     
     def isNone(self):
         return not self.PAY_FACTOR
+
+    def isValid(self):
+        return self.PAY_FACTOR != "!"
 
     def __str__(self):
         if self.PAY_FACTOR:

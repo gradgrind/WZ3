@@ -29,8 +29,11 @@ core.basic_data: {
     PAYMENT_TAG_WITHOUT_NUMBER: "Gruppen-Kennzeichen ohne Stundenzahl: „{tag}“"
     PAYMENT_NUMBER_WITHOUT_WEIGHT: "Stundenzahl ohne Deputatsfaktor"
     #
-    BLOCKTAG_INVALID: "Block-Kennzeichen {tag} hat ungültige „Kennung“"
-    BLOCKTAG_UNKNOWN_SUBJECT: "Block-Kennzeichen {tag} hat unbekanntes Fach: '{sid}'"
+    BLOCKTAG_INVALID: "Block-Kennzeichen '{tag}' ist ungültig"
+    BLOCKTAG_INVALID_TAG: "Block-Kennung '{tag}' ist ungültig"
+    BLOCKTAG_UNKNOWN_SUBJECT: "Block-Kennzeichen hat unbekanntes Fach: '{sid}'"
+    BLOCK_TAG_WITHOUT_SUBJECT: "Block-Kennzeichen ohne Blockfach"
+    #
     NO_TIME_FOR_PARTNERS: "Zeitangabe für Partner-Kennzeichen '{tag}' fehlt in Datenbank"
     INVALID_TIMESLOT: "Ungültige Zeitangabe, sollte 'Tag.Stunde' sein: {val}"
     UNKNOWN_GROUP:  "In Klasse {klass}, unbekannte Gruppe: {group}"

@@ -93,13 +93,13 @@ class WorkloadDialog(QDialog):
         w = self.val0.WORKLOAD
         self.workload.setText(w)
         self.nlessons.setChecked(bool(w))
-        try:
-            i = self.factor_list.index(self.val0.PAY_FACTOR)
-        except ValueError:
-            if self.val0.PAY_FACTOR == "!":
-                i = 0
-            else:
+        if self.val0.isValid():
+            try:
+                i = self.factor_list.index(self.val0.PAY_FACTOR)
+            except ValueError:
                 raise Bug(f"Unknown PAY_FACTOR: {self.val0.PAY_FACTOR}")
+        else:
+            i = 0
         self.pay_factor.setCurrentIndex(i)
         self.work_group.setText(self.val0.WORK_GROUP)
         self.exec()

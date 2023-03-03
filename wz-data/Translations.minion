@@ -21,12 +21,14 @@ core.db_access: {
 }
 
 core.basic_data: {
-    # Messages
+    ## Messages
     BAD_WEIGHT:     "Ungültiger Gewichtungsfaktor für Deputatsstunden: {key} -> '{val}'"
-    INVALID_PAYMENT: "Ungültige Form der Deputatsangabe: {text}"
-    INVALID_PAYMENT_TAG: "Ungültiges Partner-Kennzeichen: '{text}'"
+    INVALID_PAYMENT_TAG: "Ungültiges Gruppen-Kennzeichen: „{tag}“"
     BAD_NUMBER:     "Ungültige Nummer der Deputatsstunden: {val}"
-    UNKNOWN_PAYMENT_WEIGHT: "Unbekannter Gewichtungsfaktor für Deputatsstunden: {key}"
+    UNKNOWN_PAYMENT_WEIGHT: "Unbekannter Deputatsfaktor: {key}"
+    PAYMENT_TAG_WITHOUT_NUMBER: "Gruppen-Kennzeichen ohne Stundenzahl: „{tag}“"
+    PAYMENT_NUMBER_WITHOUT_WEIGHT: "Stundenzahl ohne Deputatsfaktor"
+    #
     BLOCKTAG_INVALID: "Block-Kennzeichen {tag} hat ungültige „Kennung“"
     BLOCKTAG_UNKNOWN_SUBJECT: "Block-Kennzeichen {tag} hat unbekanntes Fach: '{sid}'"
     NO_TIME_FOR_PARTNERS: "Zeitangabe für Partner-Kennzeichen '{tag}' fehlt in Datenbank"

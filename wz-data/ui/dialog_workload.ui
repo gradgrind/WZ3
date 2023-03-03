@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>328</width>
-    <height>167</height>
+    <width>381</width>
+    <height>211</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -15,36 +15,79 @@
   </property>
   <layout class="QVBoxLayout" name="verticalLayout">
    <item>
-    <layout class="QFormLayout" name="formLayout">
-     <item row="0" column="0">
-      <widget class="QLabel" name="label1">
-       <property name="text">
-        <string>Anzahl</string>
-       </property>
-      </widget>
-     </item>
-     <item row="0" column="1">
-      <widget class="QLineEdit" name="workload"/>
-     </item>
-     <item row="1" column="0">
+    <widget class="QGroupBox" name="nlessons">
+     <property name="toolTip">
+      <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Bei normalen Unterrichtstunden ergibt sich das Deputat aus der Anzahl der Stunden – multipliziert mit dem Deputatsfaktor.&lt;/p&gt;&lt;p&gt;Alternativ kann eine konkrete „Stundenzahl“ hier angegeben werden.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+     </property>
+     <property name="title">
+      <string>Stunden angeben (z.B. „Epochen“)</string>
+     </property>
+     <property name="checkable">
+      <bool>true</bool>
+     </property>
+     <layout class="QVBoxLayout" name="verticalLayout_2">
+      <item>
+       <layout class="QFormLayout" name="formLayout">
+        <item row="0" column="0">
+         <widget class="QLabel" name="label1">
+          <property name="text">
+           <string>Anzahl</string>
+          </property>
+          <property name="buddy">
+           <cstring>workload</cstring>
+          </property>
+         </widget>
+        </item>
+        <item row="0" column="1">
+         <widget class="QLineEdit" name="workload">
+          <property name="toolTip">
+           <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Die Anzahl der Blöcke/Epochen für diesen „Kurs“. Das Deputat ergibt sich aus dem Produkt dieser Zahl mit dem Deputatsfaktor.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+          </property>
+         </widget>
+        </item>
+        <item row="1" column="0">
+         <widget class="QLabel" name="label3">
+          <property name="toolTip">
+           <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;br/&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+          </property>
+          <property name="text">
+           <string>Gruppen-Kennzeichen</string>
+          </property>
+          <property name="buddy">
+           <cstring>work_group</cstring>
+          </property>
+         </widget>
+        </item>
+        <item row="1" column="1">
+         <widget class="QLineEdit" name="work_group">
+          <property name="toolTip">
+           <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Wenn in einem Block mehrere Gruppen („Kurse“) gemeinsam unterrichtet werden, sollten sie hier ein Kennzeichen haben, damit die Deputate nicht mehrfach gezählt werden.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+          </property>
+         </widget>
+        </item>
+       </layout>
+      </item>
+     </layout>
+    </widget>
+   </item>
+   <item>
+    <layout class="QHBoxLayout" name="horizontalLayout">
+     <item>
       <widget class="QLabel" name="label2">
        <property name="text">
         <string>Deputatsfaktor</string>
        </property>
-      </widget>
-     </item>
-     <item row="1" column="1">
-      <widget class="QComboBox" name="pay_factor"/>
-     </item>
-     <item row="2" column="0">
-      <widget class="QLabel" name="label3">
-       <property name="text">
-        <string>Partner-Kennzeichen</string>
+       <property name="buddy">
+        <cstring>pay_factor</cstring>
        </property>
       </widget>
      </item>
-     <item row="2" column="1">
-      <widget class="QLineEdit" name="partner"/>
+     <item>
+      <widget class="QComboBox" name="pay_factor">
+       <property name="toolTip">
+        <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Um das Deputat für einen „Kurs“ zu errechnen, wird die Stundenzahl mit diesem Faktor multipliziert.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+       </property>
+      </widget>
      </item>
     </layout>
    </item>

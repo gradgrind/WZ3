@@ -24,6 +24,8 @@ Copyright 2023 Michael Towers
 =-LICENCE========================================
 """
 
+#TODO: help for handling work-groups?
+
 if __name__ == "__main__":
     import sys, os
 
@@ -34,15 +36,17 @@ if __name__ == "__main__":
     from core.base import start
     start.setup(os.path.join(basedir, 'TESTDATA'))
 
-T = TRANSLATIONS("ui.dialogs.dialog_workload")
+#T = TRANSLATIONS("ui.dialogs.dialog_workload")
 
 ### +++++
 
+from typing import Optional
 from core.basic_data import (
     PAYMENT_FORMAT,
     PAYMENT_TAG_FORMAT,
+    WorkloadData,
     get_payment_weights,
-    read_payment,
+    course_lesson2workload,
 )
 from ui.ui_base import (
     ### QtWidgets:
@@ -59,7 +63,7 @@ from ui.ui_base import (
 
 class WorkloadDialog(QDialog):
     @classmethod
-    def popup(cls, start_value=""):
+    def popup(cls, start_value):
         d = cls()
         return d.activate(start_value)
 
@@ -70,117 +74,75 @@ class WorkloadDialog(QDialog):
         pb.clicked.connect(self.reset)
         v = QRegularExpressionValidator(PAYMENT_FORMAT)
         self.workload.setValidator(v)
-        self.factor_list = (
-            [("--", "0")]
-            + [(k, f"{k} ({v})") for k, v in get_payment_weights()]
-        )
-        self.pay_factor.addItems(f[0] for f in self.factor_list)
+        self.factor_list = [""]
+        self.pay_factor.addItem("-- (0)")
+        for k, v in get_payment_weights():
+            self.factor_list.append(k)
+            self.pay_factor.addItem(f"{k} ({v})")
         v = QRegularExpressionValidator(PAYMENT_TAG_FORMAT)
-        self.partner.setValidator(v)
+        self.work_group.setValidator(v)
 
-        return
-
-#        form = QFormLayout(self)
-        self.number = QLineEdit()
-        form.addRow(T["NUMBER"], self.number)
-        v = QRegularExpressionValidator(PAYMENT_FORMAT)
-        self.number.setValidator(v)
-        self.factor = KeySelector()
-        form.addRow(T["FACTOR"], self.factor)
-        self.factor.set_items(
-            [("--", "0")]
-            + [(k, f"{k} ({v})") for k, v in get_payment_weights()]
-        )
-        self.ptag = QLineEdit()
-        form.addRow(T["PARALLEL_TAG"], self.ptag)
-        v = QRegularExpressionValidator(PAYMENT_TAG_FORMAT)
-        self.ptag.setValidator(v)
-        form.addRow(HLine())
-        buttonBox = QDialogButtonBox()
-        form.addRow(buttonBox)
-        bt_save = buttonBox.addButton(QDialogButtonBox.StandardButton.Save)
-        bt_cancel = buttonBox.addButton(QDialogButtonBox.StandardButton.Cancel)
-        bt_clear = buttonBox.addButton(QDialogButtonBox.StandardButton.Discard)
-        bt_clear.setText(T["Clear"])
-        bt_save.clicked.connect(self.do_accept)
-        bt_cancel.clicked.connect(self.reject)
-        bt_clear.clicked.connect(self.do_clear)
-
-    def reset(self):
-        print("§RESET")
-
-    def do_accept(self):
-        n = self.number.text()
-        f = self.factor.selected()
-        t = self.ptag.text()
-        if f == "--":
-            if n or t:
-                SHOW_ERROR(T["NULL_FACTOR_NOT_CLEAN"])
-                return
-            text = ""
-        else:
-            if t:
-                if not n:
-                    SHOW_ERROR(T["PAYTAG_WITH_NO_NUMBER"])
-                    return
-                t = "/" + t
-            text = n + "*" + f + t
-            try:
-                # Check final value
-                read_payment(text)
-            except ValueError as e:
-                SHOW_ERROR(str(e))
-                return
-        if text != self.text0:
-            self.result = text
-        self.accept()
-
-    def do_clear(self):
-        if self.text0:
-            self.result = ""
-        self.accept()
-
-    def activate(self, start_value=""):
+    def activate(self, start_value:dict) -> Optional[WorkloadData]:
+        """Open the dialog. The initial values are taken from <start_value>,
+        which must contain the keys WORKLOAD, PAY_FACTOR, WORK_GROUP.
+        The values are checked before showing the dialog.
+        Return a <WorkloadData> instance if the data is changed.
+        """
         self.result = None
-        self.text0 = start_value
+        self.val0 = course_lesson2workload(**start_value)
+        w = self.val0.WORKLOAD
+        self.workload.setText(w)
+        self.nlessons.setChecked(bool(w))
         try:
-#TODO:
-            pdata = read_payment(start_value)
-            if pdata.isNone():
-                self.workload.setText("")
-                self.pay_factor.setCurrentIndex(0)
-                self.partner.setText("")
+            i = self.factor_list.index(self.val0.PAY_FACTOR)
+        except ValueError:
+            if self.val0.PAY_FACTOR == "!":
+                i = 0
             else:
-                if pdata.tag and not pdata.number:
-#?
-                    SHOW_ERROR(T["PAYTAG_WITH_NO_NUMBER"])
-                    self.partner.setText("")
-                else:
-                    self.partner.setText(pdata.tag)
-                self.workload.setText(pdata.number)
-                for i, kv in enumerate(self.factor_list):
-                    if kv[0] == pdata.factor:
-                        self.pay_factor.setCurrentIndex(i)
-                        break
-                else:
-#TODO: T ...
-                    raise ValueError(f"UNKNOWN_PAY_FACTOR: {pdata.factor}")
-        except ValueError as e:
-            REPORT("ERROR", str(e))
-            self.workload.setText("1")
-            self.pay_factor.setCurrentIndex(1)
-            self.partner.setText("")
+                raise Bug(f"Unknown PAY_FACTOR: {self.val0.PAY_FACTOR}")
+        self.pay_factor.setCurrentIndex(i)
+        self.work_group.setText(self.val0.WORK_GROUP)
         self.exec()
         return self.result
 
+    def on_nlessons_toggled(self, state):
+        if state:
+            self.workload.setText("1")
+        else:
+            self.workload.setText("")
+            self.work_group.setText("")
+
+    def reset(self):
+        """Return an "empty" value."""
+        self.result = course_lesson2workload("", "", "")
+        super().accept()
+
+    def accept(self):
+        w = self.workload.text()
+        wg = self.work_group.text()
+        pf = self.factor_list[self.pay_factor.currentIndex()]
+        r = course_lesson2workload(w, pf, wg)
+        if r.PAY_FACTOR == '!':
+            return  # invalid data
+        if r != self.val0:
+            self.result = r
+        super().accept()
+        
 
 # --#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#
 
 if __name__ == "__main__":
     from core.db_access import open_database
     open_database()
-    widget = WorkloadDialog()
-    print("----->", widget.activate(start_value="2*HuEp"))
-    print("----->", widget.activate(start_value=""))
-    print("----->", PaymentDialog.popup(start_value="0,5*HuEp/tag1"))
-    print("----->", widget.activate(start_value="Fred*HuEp"))
+    print("----->", WorkloadDialog.popup(
+        {"WORKLOAD": "", "PAY_FACTOR": "HuKl", "WORK_GROUP": ""}
+    ))
+    print("----->", WorkloadDialog.popup(
+        {"WORKLOAD": "2", "PAY_FACTOR": "DpSt", "WORK_GROUP": ""}
+    ))
+    print("----->", WorkloadDialog.popup(
+        {"WORKLOAD": "0,5", "PAY_FACTOR": "HuEp", "WORK_GROUP": "tag1"}
+    ))
+    print("----->", WorkloadDialog.popup(
+        {"WORKLOAD": "Fred", "PAY_FACTOR": "HuEp", "WORK_GROUP": ""}
+    ))

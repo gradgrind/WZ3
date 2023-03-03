@@ -1,5 +1,5 @@
 """
-core/basic_data.py - last updated 2023-02-28
+core/basic_data.py - last updated 2023-03-03
 
 Handle caching of the basic data sources
 
@@ -210,32 +210,6 @@ def sublessons(tag:str, reset:bool=False) -> list[Sublesson]:
     return l
 
 
-def get_payment_weights() -> KeyValueList:
-    """Return the "payment lesson weightings" as a KeyValueList of
-    (tag, weight) pairs.
-    This data is cached, so subsequent calls get the same instance.
-    """
-
-    def check(item):
-        i2 = item[1]
-        if PAYMENT_FORMAT.match(i2).hasMatch():
-            return i2
-        else:
-            # TODO: rather raise ValueError?
-            SHOW_ERROR(T["BAD_WEIGHT"].format(key=item[0], val=i2))
-            return None
-
-    try:
-        return SHARED_DATA["PAYMENT"]
-    except KeyError:
-        pass
-    payment_weights = db_key_value_list(
-        "PAY_FACTORS", "TAG", "WEIGHT", check=check
-    )
-    SHARED_DATA["PAYMENT"] = payment_weights
-    return payment_weights
-
-
 class BlockTag(NamedTuple):
     sid: str
     tag: str
@@ -330,69 +304,118 @@ def check_group(klass, group=None):
 #    LENGTH_NOT_NUMBER: "Stundendauer ({val}) ist keine Zahl"
 #    LENGTH_NOT_VALID: "Stundendauer ({val}) ist nicht möglich"
 
+### FUNCTIONS FOR WORKLOAD/PAYMENT DETAILS ###
 
-class PaymentData(NamedTuple):
-    number: str
-    factor: str
-    tag: str
-#    divisor: str
+def get_payment_weights() -> KeyValueList:
+    """Return the "payment lesson weightings" as a KeyValueList of
+    (tag, weight) pairs.
+    This data is cached, so subsequent calls get the same instance.
+    """
+
+    def check(item):
+        i2 = item[1]
+        if PAYMENT_FORMAT.match(i2).hasMatch():
+            return i2
+        else:
+            # TODO: rather raise ValueError?
+            SHOW_ERROR(T["BAD_WEIGHT"].format(key=item[0], val=i2))
+            return None
+
+    try:
+        return SHARED_DATA["PAYMENT"]
+    except KeyError:
+        pass
+    payment_weights = db_key_value_list(
+        "PAY_FACTORS", "TAG", "WEIGHT", check=check
+    )
+    SHARED_DATA["PAYMENT"] = payment_weights
+    return payment_weights
+
+
+class WorkloadData(NamedTuple):
+    WORKLOAD: str
+    PAY_FACTOR: str
+    WORK_GROUP: str
     number_val: float
     factor_val: float
-
+    
     def isNone(self):
-        return not self.factor
+        return not self.PAY_FACTOR
 
     def __str__(self):
-        if self.factor:
-            t = f"/{self.tag}" if self.tag else ""
-#            if self.divisor:
-#                t += f"/{self.divisor}"
-            return f"{self.number}*{self.factor}{t}"
+        if self.PAY_FACTOR:
+            t = f"/{self.WORK_GROUP}" if self.WORK_GROUP else ""
+            return f"{self.WORKLOAD}*{self.PAY_FACTOR}{t}"
         return ""
 
 
-def read_payment(payment: str) -> Optional[PaymentData]:
-    """Read the individual parts of a payment entry.
-    If the input is invalid a <ValueError> exception wil be raised.
+def course_lesson2workload(
+    WORKLOAD, PAY_FACTOR, WORK_GROUP, **xargs
+) -> WorkloadData:
+    """Check the validity of the arguments and return a <WorkloadData>
+    instance. If any errors are reported, return an empty result.
     """
-    if not payment:
-#        return PaymentData("", "", "", "", 0.0, 0.0)
-        return PaymentData("", "", "", 0.0, 0.0)
-    try:
-        n, f = payment.split("*", 1)  # can raise ValueError
-    except ValueError:
-        raise ValueError(T["INVALID_PAYMENT"].format(text=payment))
-    try:
-        f, t = f.split("/", 1)
-    except ValueError:
-#        t, d = "", ""
-        t = ""
-    else:
-        if not PAYMENT_TAG_FORMAT.match(t).hasMatch():
-            raise ValueError(T["INVALID_PAYMENT_TAG"].format(text=t))
-#        try:
-#            t, d = t.split("/", 1)
-#        except ValueError:
-#            t, d = t, ""
-    if n:
-        try:
-            if PAYMENT_FORMAT.match(n).hasMatch():
-                nd = float(n.replace(",", "."))
-                if nd < 0.0 or nd > PAYMENT_MAX:
+    ok = True
+    if PAY_FACTOR:
+        if WORKLOAD:
+            try:
+                if PAYMENT_FORMAT.match(WORKLOAD).hasMatch():
+                    nd = float(WORKLOAD.replace(",", "."))
+                    if nd < 0.0 or nd > PAYMENT_MAX:
+                        raise ValueError
+                else:
                     raise ValueError
-            else:
-                raise ValueError
+            except ValueError:
+                REPORT("ERROR", T["BAD_NUMBER"].format(val=WORKLOAD))
+                ok = False
+        else:
+            # Use the number & length of the actual lessons
+            nd = -1.0
+        try:
+            fd = float(
+                get_payment_weights().map(PAY_FACTOR).replace(",", ".")
+            )
+        except KeyError:
+                REPORT("ERROR", T["UNKNOWN_PAYMENT_WEIGHT"].format(key=f))
+                ok = False
         except ValueError:
-            raise ValueError(T["BAD_NUMBER"].format(val=n))
+            REPORT(
+                "ERROR", 
+                f"BUG: Invalid db entry in PAY_FACTORS: key {PAY_FACTOR}"
+            )
+            ok = False
+        if WORK_GROUP:
+            if not WORKLOAD:
+                REPORT(
+                    "ERROR", 
+                    T["PAYMENT_TAG_WITHOUT_NUMBER"].format(tag=WORK_GROUP)
+                )
+                ok = False
+            elif not PAYMENT_TAG_FORMAT.match(WORK_GROUP).hasMatch():
+                REPORT(
+                    "ERROR", 
+                    T["INVALID_PAYMENT_TAG"].format(tag=WORK_GROUP)
+                )
+                ok = False
+        if ok: 
+            return WorkloadData(WORKLOAD, PAY_FACTOR, WORK_GROUP, nd, fd)
+    elif WORKLOAD:
+        REPORT(
+            "ERROR", 
+            T["PAYMENT_NUMBER_WITHOUT_WEIGHT"]
+        )
+    elif WORK_GROUP:
+        REPORT(
+            "ERROR", 
+            T["PAYMENT_TAG_WITHOUT_NUMBER"].format(tag=WORK_GROUP)
+        )
     else:
-        nd = 0.0
-    try:
-        fd = float(get_payment_weights().map(f).replace(",", "."))
-    except KeyError:
-        raise ValueError(T["UNKNOWN_PAYMENT_WEIGHT"].format(key=f))
-#    return PaymentData(n, f, t, d, nd, fd)
-    return PaymentData(n, f, t, nd, fd)
+        # "Empty" result
+        return WorkloadData("", "", "", 0.0, 0.0)
+    # Error result
+    return WorkloadData("", "!", "", 0.0, 0.0)
 
+### END: FUNCTIONS FOR WORKLOAD/PAYMENT DETAILS ###
 
 def timeslot2index(timeslot):
     """Convert a "timeslot" in the tag-form (e.g. "Mo.3") to a pair

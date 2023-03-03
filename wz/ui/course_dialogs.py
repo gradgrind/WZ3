@@ -60,7 +60,7 @@ from core.basic_data import (
     get_payment_weights,
     sublessons,
     get_simultaneous_weighting,
-    read_payment,
+#    read_payment,
     read_block_tag,
     SHARED_DATA,
     timeslot2index,
@@ -1593,6 +1593,14 @@ if __name__ == "__main__":
     #    for p in partners("sp03"):
     #        print("??????", p)
 
+    widget = BlockTagDialog()
+    print("----->", widget.activate("XXX#"))
+    print("----->", widget.activate("ZwE#09G10G"))
+    print("----->", widget.activate("Hu#"))
+    print("----->", widget.activate("NoSubject"))
+
+    quit(0)
+
     widget = RoomDialog()
     widget.init()
     print("----->", widget.activate(start_value="$/Ph+", classroom="10G"))
@@ -1625,14 +1633,6 @@ if __name__ == "__main__":
     print("----->", widget.activate(""))
     print("----->", widget.activate("Di.4"))
     print("----->", widget.activate("Di.9"))
-
-    widget = BlockTagDialog()
-    print("----->", widget.activate("XXX#"))
-    print("----->", widget.activate("ZwE#09G10G"))
-    print("----->", widget.activate("Hu#"))
-    print("----->", widget.activate("NoSubject"))
-
-    #    quit(0)
 
     #    widget = PartnersDialog()
     #    print("----->", widget.activate("huO"))

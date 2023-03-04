@@ -1,7 +1,7 @@
 """
 ui/modules/course_editor.py
 
-Last updated:  2023-03-01
+Last updated:  2023-03-04
 
 Edit course and blocks+lessons data.
 
@@ -56,6 +56,7 @@ from core.db_access import (
     db_new_row,
     db_delete_rows,
     db_values,
+    db_read_unique_entry,
     NoRecord,
 )
 from core.teachers import Teachers
@@ -229,6 +230,9 @@ class CourseEditorPage(Page):
             "BLOCK": self.lesson_block.icon(),
             "PAY": self.lesson_pay.icon(),
         }
+        self.course_table.horizontalHeader().setSectionResizeMode(
+            QHeaderView.ResizeMode.ResizeToContents
+        )
         # Set up activation for the editors for the read-only lesson/block
         # fields: 
         for w in (
@@ -276,9 +280,6 @@ class CourseEditorPage(Page):
                 for tid, tiddata in teachers.items()
             ]
         }
-        self.course_table.horizontalHeader().setSectionResizeMode(
-            QHeaderView.ResizeMode.ResizeToContents
-        )
         self.course_field_editor = None
  
     @Slot(int)

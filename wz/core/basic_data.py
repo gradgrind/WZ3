@@ -1,5 +1,5 @@
 """
-core/basic_data.py - last updated 2023-03-03
+core/basic_data.py - last updated 2023-03-04
 
 Handle caching of the basic data sources
 
@@ -44,7 +44,7 @@ PAYMENT_FORMAT = QRegularExpression(f"^{__FLOAT}$")
 PAYMENT_MAX = 30.0
 __TAG_CHAR = "[A-Za-z0-9_.]"
 TAG_FORMAT = QRegularExpression(f"^{__TAG_CHAR}+$")
-BLOCK_TAG_FORMAT = QRegularExpression(f"^[#]{__TAG_CHAR}*$")
+BLOCK_TAG_FORMAT = QRegularExpression(f"^{__TAG_CHAR}*$")
 PAYMENT_TAG_FORMAT = QRegularExpression(f"^{__TAG_CHAR}*(?:/{__FLOAT})?$")
 NO_SUBJECT = "-----"
 
@@ -212,21 +212,19 @@ def sublessons(tag:str, reset:bool=False) -> list[Sublesson]:
 
 
 class BlockTag(NamedTuple):
-    sid: str
-    tag: str
-    subject: str
+    sid: str        # must be a valid, known, subject-id
+    tag: str        # see reg-exp BLOCK_TAG_FORMAT
+    subject: str    # the subject-name
 
     @classmethod
     def read(cls, tag:str):
         """Decode the given block tag. Return a <BlockTag> instance.
         """
-        if not tag:
-            return cls("", "", NO_SUBJECT)
         try:
-            sid, btag = tag.split("#", 1)
+            s, t = tag.split("#", 1)
         except ValueError:
             raise ValueError(T["BLOCKTAG_INVALID"].format(tag=tag))
-        return cls.build(sid, btag)
+        return cls.build(s, t)
 
     @classmethod
     def build(cls, sid, tag):
@@ -238,14 +236,12 @@ class BlockTag(NamedTuple):
             raise ValueError(
                 T["BLOCKTAG_UNKNOWN_SUBJECT"].format(sid=sid)
             )
-        if not tag:
-            return cls(sid, "", subject)
-        if TAG_FORMAT.match(tag).hasMatch():
+        if BLOCK_TAG_FORMAT.match(tag).hasMatch():
             return cls(sid, tag, subject)
         raise ValueError(T["BLOCKTAG_INVALID_TAG"].format(tag=tag))
 
     def __str__(self):
-        return f"{self.sid}#{self.tag}" if self.sid else ""
+        return f"{self.sid}#{self.tag}"
 
 
 '''

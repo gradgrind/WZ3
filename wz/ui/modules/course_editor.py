@@ -114,6 +114,7 @@ from ui.dialogs.dialog_course_fields import CourseEditorForm
 from ui.dialogs.dialog_day_period import DayPeriodDialog
 from ui.dialogs.dialog_room_choice import RoomDialog
 from ui.dialogs.dialog_workload import WorkloadDialog
+from ui.dialogs.dialog_block_name import BlockNameDialog
 
 #?
 #from ui.course_dialogs import (

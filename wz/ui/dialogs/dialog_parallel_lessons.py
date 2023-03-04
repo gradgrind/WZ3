@@ -1,9 +1,10 @@
 """
-ui/dialogs/dialog_room_choice.py
+ui/dialogs/dialog_parallel_lessons.py
 
 Last updated:  2023-03-04
 
-Supporting "dialog" for the course editor – handle blocks.
+Supporting "dialog" for the course editor – handle wishes for lessons
+starting at the same time.
 
 
 =+LICENCE=============================
@@ -34,24 +35,21 @@ if __name__ == "__main__":
     from core.base import start
     start.setup(os.path.join(basedir, 'TESTDATA'))
 
-#T = TRANSLATIONS("ui.dialogs.dialog_block_name")
+#T = TRANSLATIONS("ui.dialogs.dialog_parallel_lessons")
 
 ### +++++
 
+#TODO ...
+
 from typing import Optional
 from core.basic_data import (
-    BLOCK_TAG_FORMAT,
-    get_subjects,
-    get_teachers,
-    BlockTag,
+    TAG_FORMAT,
 )
 from core.db_access import db_read_table, db_read_unique_entry
 from ui.ui_base import (
     ### QtWidgets:
     QDialog,
     QDialogButtonBox,
-    QHeaderView,
-    QTableWidgetItem,
     ### QtGui:
     ### QtCore:
     Qt,
@@ -63,7 +61,14 @@ from ui.ui_base import (
 
 ### -----
 
-class BlockNameDialog(QDialog):
+# The data is stored in the db table PARALLEL_LESSONS, with fields
+#   (id: primary key)
+#   lesson_id: foreign key -> LESSONS.id (unique, non-null)
+#   TAG: The tag used to join a group of lessons
+#   WEIGHTING: 0 – 10 (empty is like 0?)
+
+#TODO ...
+class ParallelsDialog(QDialog):
     @classmethod
     def popup(cls, start_value):
         d = cls()
@@ -71,15 +76,16 @@ class BlockNameDialog(QDialog):
 
     def __init__(self):
         super().__init__()
-        uic.loadUi(APPDATAPATH("ui/dialog_block_name.ui"), self)
-        self.table_courses.horizontalHeader().setSectionResizeMode(
-            QHeaderView.ResizeMode.ResizeToContents
-        )
-        self.pb_accept = self.buttonBox.button(
-            QDialogButtonBox.StandardButton.Ok
-        )
-        validator = QRegularExpressionValidator(BLOCK_TAG_FORMAT)
-        self.block_tag.setValidator(validator)
+        uic.loadUi(APPDATAPATH("ui/dialog_parallel_lessons.ui"), self)
+        pb = self.buttonBox.button(QDialogButtonBox.StandardButton.Reset)
+        pb.clicked.connect(self.reset)
+        
+        
+#        self.pb_accept = self.buttonBox.button(
+#            QDialogButtonBox.StandardButton.Ok
+#        )
+        validator = QRegularExpressionValidator(TAG_FORMAT)
+        self.tag.setValidator(validator)
 
     @Slot(int)
     def on_block_subject_currentIndexChanged(self, i):
@@ -114,10 +120,11 @@ class BlockNameDialog(QDialog):
         self.init_courses("")
         
     @Slot(str)
-    def on_block_tag_currentTextChanged(self, text): # show courses
-        if self.disable_triggers:
-            return
-        self.init_courses(text)
+    def on_tag_currentTextChanged(self, text): # show courses
+#        if self.disable_triggers:
+#            return
+        print("§TAG changed:", text)
+#TODO
 
     def init_courses(self, btag):
         try:
@@ -163,21 +170,41 @@ class BlockNameDialog(QDialog):
                 self.table_courses.setItem(r, 4, tw)
             tw.setText(c[2])
                   
-    def activate(self, start_value:str) -> Optional[BlockTag]:
+    def activate(self, start_value:str) -> str:
         """Open the dialog.
         """
         self.result = None
         self.disable_triggers = True
-        self.sid0, self.tag0 = "", ""
-        if start_value:
+        self.value0 = start_value
+        ## Populate the tag chooser
+        self.tag_map = {}
+        f, records = db_read_table(
+            "PARALLEL_LESSONS", 
+            ["TAG", "id", "lesson_id", "WEIGHTING"]
+        )
+#TODO--  just for testing!
+        records = [
+            ("TAG2", 2, 1, 8),
+            ("TAG1", 3, 3, 5),
+            ("TAG1", 4, 8, 5),
+            ("TAG3", 5, 4, 6),
+        ]
+        for r in records:
+            tag = r[0]
+            data = r[1:]
             try:
-                btag = BlockTag.read(start_value)
-                self.sid0, self.tag0 = btag.sid, btag.tag
-            except ValueError as e:
-                REPORT("ERROR", str(e))
-        ## Populate the subject chooser
-        self.sid_list = []
-        self.block_subject.clear()
+                self.tag_map[tag].append(data)
+            except KeyError:
+                self.tag_map[tag] = [data]
+        self.tag.clear()
+        self.tag.addItems(sorted(self.tag_map))
+        self.tag.setCurrentText(start_value)
+        
+        self.exec()
+        return self.result
+
+#???
+        self.tag.clear()
         for sid, name in get_subjects():
             if sid[0] == "-":
                 continue
@@ -195,18 +222,14 @@ class BlockNameDialog(QDialog):
         self.exec()
         return self.result
 
+    def reset(self):
+        self.result = ""
+        super().accept()
+
     def accept(self):
-        i = self.block_subject.currentIndex()
-        s = self.sid_list[i] if i >= 0 else ""
-        t = self.block_tag.currentText()
-        try:
-            btag = BlockTag.build(s, t)
-        except ValueError as e:
-            REPORT("ERROR", str(e))
-            return
-        if s != self.sid0 or t != self.tag0:
-            # Value has been modified and is valid
-            self.result = btag
+        t = self.tag.currentText()
+        if t and t != self.value0:
+            self.result = t
         super().accept()
         
 
@@ -215,9 +238,5 @@ class BlockNameDialog(QDialog):
 if __name__ == "__main__":
     from core.db_access import open_database
     open_database()
-    print("----->", BlockNameDialog.popup(""))
-    print("----->", BlockNameDialog.popup("KoRa#"))
-    print("----->", BlockNameDialog.popup("XXX#"))
-    print("----->", BlockNameDialog.popup("ZwE#09G10G"))
-    print("----->", BlockNameDialog.popup("Hu#"))
-    print("----->", BlockNameDialog.popup("NoSubject"))
+    print("----->", ParallelsDialog.popup(""))
+    print("----->", ParallelsDialog.popup("TAG1"))

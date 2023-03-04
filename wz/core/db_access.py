@@ -1,7 +1,7 @@
 """
 core/db_access.py
 
-Last updated:  2023-02-26
+Last updated:  2023-03-04
 
 Helper functions for accessing the database.
 
@@ -282,6 +282,16 @@ def db_read_table(
         return fields, value_list
     else:
         return [rec.fieldName(i) for i in range(nfields)], value_list
+
+
+def db_read_unique(table, fields, **keys):
+    flist, rlist = db_read_table(table, fields, **keys)
+    if len(rlist) == 1:
+        return rlist[0]
+    raise Bug(
+        f"Table {table}, query for {repr(keys)}:\n"
+        f"  {len(rlist)} records (1 expected)"
+    )
 
 
 def db_read_unique_field(table, field, *wheres, **keys):

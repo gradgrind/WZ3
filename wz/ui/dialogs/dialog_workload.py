@@ -47,8 +47,10 @@ from core.basic_data import (
     get_payment_weights,
     Workload,
 )
+from core.db_access import db_update_fields
 from ui.ui_base import (
     ### QtWidgets:
+    APP,
     QDialog,
     QDialogButtonBox,
     ### QtGui:
@@ -126,6 +128,34 @@ class WorkloadDialog(QDialog):
             self.result = r
         super().accept()
         
+
+# Used by course/lesson editor
+def edit_workload(course_lesson):
+    """Pop up a workload dialog for the current course/lessons.
+    If the info is changed, update the database entry and return the
+    string representation of the new value.
+    Otherwise return <None>.
+    The parameter is the <dict> containing the fields of the
+    COURSE_LESSONS record.
+    """
+    result = WorkloadDialog.popup(
+        start_value=course_lesson,
+        parent=APP.activeWindow()
+    )
+    if result is not None:
+        # Update the db, no redisplay necessary
+        udmap = [
+            (f, getattr(result, f))
+            for f in ("WORKLOAD", "PAY_FACTOR", "WORK_GROUP")
+        ]
+        db_update_fields(
+            "COURSE_LESSONS",
+            udmap,
+            id=course_lesson["id"]
+        )
+        course_lesson.update(dict(udmap))
+    return str(result)
+
 
 # --#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#
 

@@ -126,9 +126,9 @@ IMPORTS = {
     "notes": "",
 }
 from ui.dialogs.dialog_course_fields import CourseEditorForm
-from ui.dialogs.dialog_day_period import DayPeriodDialog
-from ui.dialogs.dialog_room_choice import RoomDialog
-from ui.dialogs.dialog_workload import WorkloadDialog
+from ui.dialogs.dialog_day_period import edit_time
+from ui.dialogs.dialog_room_choice import edit_room
+from ui.dialogs.dialog_workload import edit_workload
 from ui.dialogs.dialog_block_name import BlockNameDialog
 from ui.dialogs.dialog_parallel_lessons import ParallelsDialog
 
@@ -676,47 +676,37 @@ class CourseEditorPage(Page):
     def field_editor(self, obj: QLineEdit):
         object_name = obj.objectName()
         print("EDIT", object_name)
+        ### PAYMENT (COURSE_LESSONS)
         if object_name == "payment":
-            result = WorkloadDialog.popup(
-                start_value=self.current_lesson.COURSE_LESSON_INFO,
-                parent=self
+            result = edit_workload(self.current_lesson.COURSE_LESSON_INFO)
+            if result is not None:
+                obj.setText(result)
+        ### ROOM (COURSE_LESSONS)
+        elif object_name == "wish_room":
+            result = edit_room(
+                self.current_lesson.COURSE_LESSON_INFO,
+                Classes().get_classroom(
+                    self.course_dict["CLASS"], null_ok=True
+                )
             )
             if result is not None:
-                # Update the db, no redisplay necessary
-                udmap = [
-                    (f, getattr(result, f))
-                    for f in ("WORKLOAD", "PAY_FACTOR", "WORK_GROUP")
-                ]
-                db_update_fields(
-                    "COURSE_LESSONS",
-                    udmap,
-                    id=self.current_lesson.COURSE_LESSON_INFO["id"]
-                )
-                self.current_lesson.COURSE_LESSON_INFO.update(
-                    dict(udmap)
-                )
-                obj.setText(str(result))
+                obj.setText(result)
 #TODO ...
-        elif object_name == "wish_room":
-            pass
+        ### BLOCK (LESSON_GROUP)
         elif object_name == "block_name":
             pass
+        ### NOTES (LESSON_GROUP)
         elif object_name == "notes":
             pass
+        ### LENGTH (LESSONS)
         elif object_name == "lesson_length":
             pass
+        ### TIME (LESSONS)
         elif object_name == "wish_time":
-            result = DayPeriodDialog.popup(start_value=obj.text(), parent=self)
+            result = edit_time(self.current_lesson.LESSON_INFO)
             if result is not None:
-                # Update the db, no redisplay necessary
-                db_update_field(
-                    "LESSONS",
-                    "TIME",
-                    result,
-                    id=self.current_lesson.LESSON_INFO["id"]
-                )
-                self.current_lesson.LESSON_INFO["TIME"] = result
                 obj.setText(result)
+        ### PARALLEL (LESSONS)
         elif object_name == "parallel":
             pass
 

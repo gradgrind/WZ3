@@ -1,7 +1,7 @@
 """
 ui/dialogs/dialog_room_choice.py
 
-Last updated:  2023-03-01
+Last updated:  2023-03-05
 
 Supporting "dialog" for the course editor – select room(s).
 
@@ -41,8 +41,10 @@ T = TRANSLATIONS("ui.dialogs.dialog_room_choice")
 from core.basic_data import (
     get_rooms,
 )
+from core.db_access import db_update_field
 from ui.ui_base import (
     ### QtWidgets:
+    APP,
     QDialog,
     QDialogButtonBox,
     QTableWidgetItem,
@@ -58,7 +60,7 @@ from ui.ui_base import (
 
 class RoomDialog(QDialog):
     @classmethod
-    def popup(cls, start_value="", classroom="", parent=None, pos=None):
+    def popup(cls, start_value="", classroom=None, parent=None, pos=None):
         d = cls(parent)
         d.init()
         if pos:
@@ -85,16 +87,12 @@ class RoomDialog(QDialog):
     def accept(self):
         val = self.roomtext.text()
         if val != self.value0:
-            if val:
-                self.result = val
-            else:
-                self.result = "-"
+            self.result = val
         super().accept()
 
     def reset(self):
-        print("§RESET")
         if self.value0:
-            self.result = "-"
+            self.result = ""
         super().accept()
 
     def init(self):
@@ -218,7 +216,6 @@ class RoomDialog(QDialog):
         self.add2choices("$")
 
     def add2choices(self, roomid):
-        print("§ADD:", roomid)
         e = self.checkroom(roomid, self.choices)
         if e:
             SHOW_ERROR(e)
@@ -236,7 +233,6 @@ class RoomDialog(QDialog):
 
     @Slot(int)
     def on_extra_stateChanged(self, state):
-        print("§EXTRA:", repr(state))
         self.write_choices()
 
     @Slot()
@@ -300,6 +296,31 @@ class RoomDialog(QDialog):
     '''
 
 
+# Used by course/lesson editor
+def edit_room(course_lesson, classroom):
+    """Pop up a room choice dialog for the current course.
+    If the room is changed, update the database entry and return the
+    new value.
+    Otherwise return <None>.
+    The parameters are the <dict> containing the fields of the
+    COURSE_LESSONS record and the classroom.
+    """
+    result = RoomDialog.popup(
+        start_value=course_lesson["ROOM"],
+        classroom=classroom,
+        parent=APP.activeWindow()
+    )
+    if result is not None:
+        db_update_field(
+            "COURSE_LESSONS",
+            "ROOM",
+            result,
+            id=course_lesson["id"]
+        )
+        course_lesson["ROOM"] = result
+    return result
+
+
 # --#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#
 
 if __name__ == "__main__":
@@ -308,3 +329,4 @@ if __name__ == "__main__":
     widget = RoomDialog()
     widget.init()
     print("----->", widget.activate(start_value="$/Ph+", classroom="10G"))
+    print("----->", widget.activate(start_value=""))

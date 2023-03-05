@@ -39,13 +39,14 @@ T = TRANSLATIONS("ui.dialogs.dialog_day_period")
 ### +++++
 
 from core.db_access import (
-    db_values,
+    db_values, db_update_field
 )
 from core.basic_data import (
     get_days, get_periods, timeslot2index,index2timeslot
 )
 from ui.ui_base import (
     ### QtWidgets:
+    APP,
     QDialog,
     QDialogButtonBox,
     ### QtGui:
@@ -149,6 +150,29 @@ class DayPeriodDialog(QDialog):
     def on_simultaneous_tag_currentTextChanged(self, tag):
         self.weighting.setValue(get_simultaneous_weighting(tag))
 
+
+# Used by course/lesson editor
+def edit_time(lesson):
+    """Pop up a lesson-time choice dialog for the current lesson.
+    If the time is changed, update the database entry and return the
+    new value.
+    Otherwise return <None>.
+    The parameter is the <dict> containing the fields of the LESSON record.
+    """
+    result = DayPeriodDialog.popup(
+        start_value=lesson["TIME"],
+        parent=APP.activeWindow()
+    )
+    if result is not None:
+        db_update_field(
+            "LESSONS",
+            "TIME",
+            result,
+            id=lesson["id"]
+        )
+        lesson["TIME"] = result
+    return result
+    
 
 # --#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#
 

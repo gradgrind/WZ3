@@ -1,10 +1,10 @@
 """
-core/classes.py - last updated 2022-08-18
+core/classes.py - last updated 2023-03-05
 
 Manage class data.
 
 =+LICENCE=================================
-Copyright 2022 Michael Towers
+Copyright 2023 Michael Towers
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -94,8 +94,8 @@ class Classes(dict):
             classes.append((k, data.name))
         return classes
 
-    def get_classroom(self, klass):
-        if klass == "--":
+    def get_classroom(self, klass, null_ok=False):
+        if (not null_ok) and klass == "--":
             raise Bug("Empty class has no classroom")
         return self[klass].classroom
 

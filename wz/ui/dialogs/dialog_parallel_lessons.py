@@ -1,7 +1,7 @@
 """
 ui/dialogs/dialog_parallel_lessons.py
 
-Last updated:  2023-03-04
+Last updated:  2023-03-05
 
 Supporting "dialog" for the course editor – handle wishes for lessons
 starting at the same time.
@@ -71,12 +71,12 @@ from ui.ui_base import (
 
 class ParallelsDialog(QDialog):
     @classmethod
-    def popup(cls, start_value):
-        d = cls()
+    def popup(cls, start_value, parent=None):
+        d = cls(parent)
         return d.activate(start_value)
 
-    def __init__(self):
-        super().__init__()
+    def __init__(self, parent=None):
+        super().__init__(parent=parent)
         uic.loadUi(APPDATAPATH("ui/dialog_parallel_lessons.ui"), self)
         pb = self.buttonBox.button(QDialogButtonBox.StandardButton.Reset)
         pb.clicked.connect(self.reset)

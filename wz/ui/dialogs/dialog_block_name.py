@@ -1,7 +1,7 @@
 """
 ui/dialogs/dialog_room_choice.py
 
-Last updated:  2023-03-04
+Last updated:  2023-03-05
 
 Supporting "dialog" for the course editor – handle blocks.
 
@@ -65,12 +65,12 @@ from ui.ui_base import (
 
 class BlockNameDialog(QDialog):
     @classmethod
-    def popup(cls, start_value):
-        d = cls()
+    def popup(cls, start_value, parent=None):
+        d = cls(parent)
         return d.activate(start_value)
 
-    def __init__(self):
-        super().__init__()
+    def __init__(self, parent=None):
+        super().__init__(parent=parent)
         uic.loadUi(APPDATAPATH("ui/dialog_block_name.ui"), self)
         self.table_courses.horizontalHeader().setSectionResizeMode(
             QHeaderView.ResizeMode.ResizeToContents

@@ -1,7 +1,7 @@
 """
 core/db_access.py
 
-Last updated:  2023-03-04
+Last updated:  2023-03-05
 
 Helper functions for accessing the database.
 
@@ -284,10 +284,25 @@ def db_read_table(
         return [rec.fieldName(i) for i in range(nfields)], value_list
 
 
+def db_read_full_table(table, *wheres, **keys):
+    return db_read_table(table, None, *wheres, **keys)
+
+
+def db_read_fields(table, fields, *wheres, **keys):
+    """Read a list of fields from all records from the given table,
+    the normal selection parameters (see <db_read_table>) are available.
+    """
+    if not fields:
+        raise Bug(f"no fields passed to db_read_fields on table {table}")
+    return db_read_table(table, fields, *wheres, **keys)[1]
+
+
 def db_read_unique(table, fields, **keys):
     flist, rlist = db_read_table(table, fields, **keys)
     if len(rlist) == 1:
         return rlist[0]
+    if not rlist:
+        raise NoRecord
     raise Bug(
         f"Table {table}, query for {repr(keys)}:\n"
         f"  {len(rlist)} records (1 expected)"
@@ -320,10 +335,6 @@ def db_check_unique_entry(table, *wheres, **keys):
         return False
 
 
-def db_read_full_table(table, *wheres, sort_field=None, **keys):
-    return db_read_table(table, None, *wheres, sort_field=sort_field, **keys)
-
-
 def db_values(table, value_field, *wheres, **keys):
     """Wrapper for db_read_table returning a single list, just the
     first fields of each record. Thus it is especially suitable when
@@ -343,14 +354,6 @@ def db_key_value_list(
         table, [key_field, value_field], sort_field=sort_field
     )
     return KeyValueList(value_list, check)
-
-
-def db_read_fields(table, fields, sort_field=None):
-    """Read all records from the given table.
-    Return a list of records, each record being a list of the field
-    values in the given field order.
-    """
-    return db_read_table(table, fields, sort_field=sort_field)[1]
 
 
 def db_update_fields(table, field_values, *wheres, **keys):

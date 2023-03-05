@@ -1,7 +1,7 @@
 """
 ui/modules/course_editor.py
 
-Last updated:  2023-03-04
+Last updated:  2023-03-05
 
 Edit course and blocks+lessons data.
 
@@ -47,9 +47,11 @@ T = TRANSLATIONS("ui.modules.course_editor")
 ### +++++
 
 from typing import NamedTuple
-
+from importlib import import_module
 from core.db_access import (
     open_database,
+    db_read_fields,
+    db_read_unique,
     db_read_full_table,
     db_update_field,
     db_update_fields,
@@ -62,6 +64,7 @@ from core.db_access import (
 from core.teachers import Teachers
 from core.classes import Classes
 from core.basic_data import (
+    Workload,
     clear_cache,
     get_payment_weights,
     get_subjects,
@@ -109,12 +112,25 @@ from ui.ui_base import (
     uic,
 )
 
-#TODO: Import these "on demand"?
+IMPORTS = {
+#?
+    "course_fields": "ui.dialogs.dialog_course_fields",
+
+    "wish_time": "ui.dialogs.dialog_day_period",
+    "wish_room": "ui.dialogs.dialog_room_choice",
+    "payment": "ui.dialogs.dialog_workload",
+    "block_name": "ui.dialogs.dialog_block_name",
+    "parallel": "ui.dialogs.dialog_parallel_lessons",
+#?
+    "lesson_length": "",
+    "notes": "",
+}
 from ui.dialogs.dialog_course_fields import CourseEditorForm
 from ui.dialogs.dialog_day_period import DayPeriodDialog
 from ui.dialogs.dialog_room_choice import RoomDialog
 from ui.dialogs.dialog_workload import WorkloadDialog
 from ui.dialogs.dialog_block_name import BlockNameDialog
+from ui.dialogs.dialog_parallel_lessons import ParallelsDialog
 
 #?
 #from ui.course_dialogs import (
@@ -212,6 +228,18 @@ BLOCK_COLS = [
 #TODO: deprecated?
 BLOCKCOLS_SHOW = ("LESSON_TAG", "PAYMENT", "NOTES")
 
+class LessonRowData(NamedTuple):
+    """ROW_TYPE:
+        -2 – no item (all other fields <None>)
+        -1 – workload/payment item (only COURSE_LESSON_INFO not <None>)
+         0 – "normal" lesson group (not a block)
+         1 – block lesson group
+    """
+    ROW_TYPE: int
+    COURSE_LESSON_INFO: dict
+    LESSON_GROUP_INFO: dict
+    LESSON_INFO: dict
+
 ### -----
 
 
@@ -220,6 +248,7 @@ def init():
 
 
 class CourseEditorPage(Page):
+#?
     name = T["MODULE_NAME"]
     title = T["MODULE_TITLE"]
 
@@ -247,6 +276,8 @@ class CourseEditorPage(Page):
         """Event filter for the "lesson" fields.
         Activate the appropriate editor on mouse-left-press or return-key.
         """
+        if not obj.isEnabled():
+            return False
         if (event.type() == QEvent.Type.MouseButtonPress
             and event.button() == Qt.MouseButton.LeftButton
         ) or (event.type() == QEvent.KeyPress
@@ -450,7 +481,6 @@ class CourseEditorPage(Page):
                         f"for block '{block_name}', course {course}"
                     )
                     self.course_lesson_map[block_name] = row
-
                 if block_name:
                     etype = 1
                     icon = self.icons["BLOCK"]
@@ -466,12 +496,14 @@ class CourseEditorPage(Page):
                     w = QTableWidgetItem(icon, "")
                     self.lesson_table.setItem(row, 0, w)
                     ln = ldata["LENGTH"]
-                    w = QTableWidgetItem(ln)
+                    w = QTableWidgetItem(str(ln))
                     self.lesson_table.setItem(row, 1, w)
                     if block_name:
                         w = QTableWidgetItem(block_name)
                         self.lesson_table.setItem(row, 2, w)
-                    self.course_lessons.append((etype, cldict, lgdata, ldata))
+                    self.course_lessons.append(
+                        LessonRowData(etype, cldict, lgdata, ldata)
+                    )
                     row += 1
             else:
                 # payment item
@@ -487,9 +519,11 @@ class CourseEditorPage(Page):
                 self.lesson_table.setItem(row, 0, w)
                 w = QTableWidgetItem("–")
                 self.lesson_table.setItem(row, 1, w)
-                self.course_lessons.append((-1, cldict, lgdata, None))
+                self.course_lessons.append(
+                    LessonRowData(-1, cldict, None, None)
+                )
                 row += 1
-
+        self.on_lesson_table_itemSelectionChanged()
 #TODO: Is something like this needed?
 # Toggle the stretch on the last section because of a possible bug in
 # Qt, where the stretch can be lost when repopulating.
@@ -582,11 +616,14 @@ class CourseEditorPage(Page):
         return self.course_field_editor.activate(course_dict)
 
     def on_lesson_table_itemSelectionChanged(self):
-        row = self.course_table.currentRow()
+        row = self.lesson_table.currentRow()
         print("§§§ on_lesson_table_itemSelectionChanged", row)
         # Populate the form fields
-        etype, cldata, lgdata, ldata = self.course_lessons[row]
-        if etype == -1:
+        if row < 0:
+            self.current_lesson = LessonRowData(-2, None, None, None)
+        else:
+            self.current_lesson = self.course_lessons[row]
+        if self.current_lesson.ROW_TYPE < 0:
             # payment entry
             self.lesson_length.clear()
             self.lesson_length.setEnabled(False)
@@ -601,40 +638,65 @@ class CourseEditorPage(Page):
             self.notes.clear()
             self.notes.setEnabled(False)
         else:
-            self.lesson_length.setText(ldata["LENGTH"])
-            self.lesson_length.setEnabled(True)
-            self.wish_room.setText(cldata["ROOM"])
-            self.wish_room.setEnabled(True)
-            self.block_name.setText(lgdata["BLOCK_NAME"])
-            self.block_name.setEnabled(True)
-            self.wish_time.setText(ldata["TIME"])
-            self.wish_time.setEnabled(True)
-            records = db_read_table(
-                "PARALLEL_LESSONS", ["TAG", "WEIGHTING"], lesson_id=ldata["id"]
+            self.lesson_length.setText(
+                str(self.current_lesson.LESSON_INFO["LENGTH"])
             )
-            if len(records) == 0:
-                self.parallel.clear()
-            elif len(records) == 1:
-                t, w = records[0]
-                self.parallel.setText(f'{t} @ {w}')
-            else:
-                raise Bug(
-                    "Multiple PARALLEL_LESSONS entries for lesson"
-                    f" with id {ldata['id']}"
+            self.lesson_length.setEnabled(True)
+            self.wish_room.setText(
+                self.current_lesson.COURSE_LESSON_INFO["ROOM"]
+            )
+            self.wish_room.setEnabled(True)
+            self.block_name.setText(
+                self.current_lesson.LESSON_GROUP_INFO["BLOCK_NAME"]
+            )
+            self.block_name.setEnabled(True)
+            self.wish_time.setText(self.current_lesson.LESSON_INFO["TIME"])
+            self.wish_time.setEnabled(True)
+            try:
+                t, w = db_read_unique(
+                    "PARALLEL_LESSONS",
+                    ["TAG", "WEIGHTING"], 
+                    lesson_id=self.current_lesson.LESSON_INFO["id"]
                 )
+            except NoRecord:
+                self.parallel.clear()
+            else:
+                self.parallel.setText(f'{t} @ {w}')
             self.parallel.setEnabled(True)
-            self.notes.setPlainText(lgdata["NOTES"])
+            self.notes.setText(self.current_lesson.LESSON_GROUP_INFO["NOTES"])
             self.notes.setEnabled(True)
-#TODO: PARTNER (->GROUP? or something reflecting real nature)
-# Perhaps using the NamedTuple from basic_data?
-        self.payment.setText(f'{cldata["WORKLOAD"]} * {cldata["PAY_FACTOR"]}')
-
-#TODO:
+        if row < 0:
+            self.payment.setEnabled(False)
+            self.payment.clear()
+        else:
+            self.payment.setEnabled(True)
+            wd = Workload(**self.current_lesson.COURSE_LESSON_INFO)
+            self.payment.setText(str(wd))
+            
     def field_editor(self, obj: QLineEdit):
         object_name = obj.objectName()
         print("EDIT", object_name)
         if object_name == "payment":
-            pass
+            result = WorkloadDialog.popup(
+                start_value=self.current_lesson.COURSE_LESSON_INFO,
+                parent=self
+            )
+            if result is not None:
+                # Update the db, no redisplay necessary
+                udmap = [
+                    (f, getattr(result, f))
+                    for f in ("WORKLOAD", "PAY_FACTOR", "WORK_GROUP")
+                ]
+                db_update_fields(
+                    "COURSE_LESSONS",
+                    udmap,
+                    id=self.current_lesson.COURSE_LESSON_INFO["id"]
+                )
+                self.current_lesson.COURSE_LESSON_INFO.update(
+                    dict(udmap)
+                )
+                obj.setText(str(result))
+#TODO ...
         elif object_name == "wish_room":
             pass
         elif object_name == "block_name":
@@ -645,8 +707,16 @@ class CourseEditorPage(Page):
             pass
         elif object_name == "wish_time":
             result = DayPeriodDialog.popup(start_value=obj.text(), parent=self)
-            print("SET_TIME", result)
-            obj.setText(result)
+            if result is not None:
+                # Update the db, no redisplay necessary
+                db_update_field(
+                    "LESSONS",
+                    "TIME",
+                    result,
+                    id=self.current_lesson.LESSON_INFO["id"]
+                )
+                self.current_lesson.LESSON_INFO["TIME"] = result
+                obj.setText(result)
         elif object_name == "parallel":
             pass
 

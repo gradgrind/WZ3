@@ -1,7 +1,7 @@
 """
 ui/dialogs/dialog_room_choice.py
 
-Last updated:  2023-03-01
+Last updated:  2023-03-05
 
 Supporting "dialog" for the course editor – set workload/pay.
 
@@ -44,9 +44,8 @@ from typing import Optional
 from core.basic_data import (
     PAYMENT_FORMAT,
     PAYMENT_TAG_FORMAT,
-    WorkloadData,
     get_payment_weights,
-    course_lesson2workload,
+    Workload,
 )
 from ui.ui_base import (
     ### QtWidgets:
@@ -63,33 +62,32 @@ from ui.ui_base import (
 
 class WorkloadDialog(QDialog):
     @classmethod
-    def popup(cls, start_value):
-        d = cls()
+    def popup(cls, start_value:dict, parent=None):
+        d = cls(parent)
         return d.activate(start_value)
 
-    def __init__(self):
-        super().__init__()
+    def __init__(self, parent=None):
+        super().__init__(parent=parent)
         uic.loadUi(APPDATAPATH("ui/dialog_workload.ui"), self)
         pb = self.buttonBox.button(QDialogButtonBox.StandardButton.Reset)
         pb.clicked.connect(self.reset)
         v = QRegularExpressionValidator(PAYMENT_FORMAT)
         self.workload.setValidator(v)
-        self.factor_list = [""]
-        self.pay_factor.addItem("-- (0)")
+        self.factor_list = []
         for k, v in get_payment_weights():
             self.factor_list.append(k)
             self.pay_factor.addItem(f"{k} ({v})")
         v = QRegularExpressionValidator(PAYMENT_TAG_FORMAT)
         self.work_group.setValidator(v)
 
-    def activate(self, start_value:dict) -> Optional[WorkloadData]:
+    def activate(self, start_value:dict) -> Optional[Workload]:
         """Open the dialog. The initial values are taken from <start_value>,
         which must contain the keys WORKLOAD, PAY_FACTOR, WORK_GROUP.
         The values are checked before showing the dialog.
-        Return a <WorkloadData> instance if the data is changed.
+        Return a <Workload> instance if the data is changed.
         """
         self.result = None
-        self.val0 = course_lesson2workload(**start_value)
+        self.val0 = Workload(**start_value)
         w = self.val0.WORKLOAD
         self.workload.setText(w)
         self.nlessons.setChecked(bool(w))
@@ -114,14 +112,14 @@ class WorkloadDialog(QDialog):
 
     def reset(self):
         """Return an "empty" value."""
-        self.result = course_lesson2workload("", "", "")
+        self.result = Workload("", "", "")
         super().accept()
 
     def accept(self):
         w = self.workload.text()
         wg = self.work_group.text()
         pf = self.factor_list[self.pay_factor.currentIndex()]
-        r = course_lesson2workload(w, pf, wg)
+        r = Workload(w, pf, wg)
         if r.PAY_FACTOR == '!':
             return  # invalid data
         if r != self.val0:

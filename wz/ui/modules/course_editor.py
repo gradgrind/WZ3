@@ -429,7 +429,7 @@ class CourseEditorPage(Page):
 #NOTE: There should be only one COURSE_LESSONS entry for "lesson"
 # types and "payment" types. For "block" types there can be more than
 # one entry, but they should be connected with LESSON_GROUP entries
-# with distinct (non-empty) BLOCK_NAME values.
+# with distinct (non-empty) BLOCK_x values.
 # If violations are discovered, there should be an error report. It
 # might be helpful to delete the offending entries, but as they are
 # really not expected – and should not be possible – it is perhaps
@@ -474,7 +474,10 @@ class CourseEditorPage(Page):
                     lgfields[i]: val for i, val in enumerate(lgrecord)
                 }
                 # This contains the block-name, if any
-                block_name = lgdata["BLOCK_NAME"]
+                block_sid = lgdata["BLOCK_SID"]
+                block_tag = lgdata["BLOCK_TAG"]
+
+#?
                 # Check uniqueness
                 if block_name in self.course_lesson_map:
                     raise Bug("Multiple entries in COURSE_LESSONS"
@@ -647,7 +650,8 @@ class CourseEditorPage(Page):
             )
             self.wish_room.setEnabled(True)
             self.block_name.setText(
-                self.current_lesson.LESSON_GROUP_INFO["BLOCK_NAME"]
+#?
+#                 self.current_lesson.LESSON_GROUP_INFO["BLOCK_NAME"]
             )
             self.block_name.setEnabled(True)
             self.wish_time.setText(self.current_lesson.LESSON_INFO["TIME"])
@@ -709,6 +713,7 @@ class CourseEditorPage(Page):
         ### LENGTH (LESSONS)
         elif object_name == "lesson_length":
             pass
+#redisplay?
         ### TIME (LESSONS)
         elif object_name == "wish_time":
             result = edit_time(self.current_lesson.LESSON_INFO)

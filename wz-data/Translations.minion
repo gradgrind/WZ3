@@ -469,6 +469,10 @@ ui.dialogs.dialog_room_choice: {
 ui.dialogs.dialog_workload: {
 }
 
+ui.dialogs.dialog_block_name: {
+    SIMPLE_LESSONS_EXIST: "Dieser Kurs hat schon einfache Unterrichtsstunden."
+}
+
 ui.modules.grades_manager: {
     # Labels
     MODULE_NAME:    "Noten"

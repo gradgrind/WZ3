@@ -34,7 +34,7 @@ if __name__ == "__main__":
     from core.base import start
     start.setup(os.path.join(basedir, 'TESTDATA'))
 
-#T = TRANSLATIONS("ui.dialogs.dialog_block_name")
+T = TRANSLATIONS("ui.dialogs.dialog_block_name")
 
 ### +++++
 
@@ -46,9 +46,11 @@ from core.basic_data import (
     BlockTag,
 )
 from core.db_access import (
-    db_read_table, 
+    db_read_fields, 
     db_read_unique_entry,
     db_update_field,
+    db_values,
+    db_read_unique_field,
 )
 from ui.ui_base import (
     ### QtWidgets:
@@ -70,13 +72,17 @@ from ui.ui_base import (
 
 class BlockNameDialog(QDialog):
     @classmethod
-    def popup(cls, start_value, parent=None):
+    def popup(cls, parent=None, **kargs):
         d = cls(parent)
-        return d.activate(start_value)
+        return d.activate(**kargs)
 
     def __init__(self, parent=None):
         super().__init__(parent=parent)
         uic.loadUi(APPDATAPATH("ui/dialog_block_name.ui"), self)
+        self.pb_reset = self.buttonBox.button(
+            QDialogButtonBox.StandardButton.Reset
+        )
+        self.pb_reset.clicked.connect(self.reset)
         self.table_courses.horizontalHeader().setSectionResizeMode(
             QHeaderView.ResizeMode.ResizeToContents
         )
@@ -93,6 +99,11 @@ class BlockNameDialog(QDialog):
         print("§SUBJECT:", i)
         sid = self.sid_list[i]
         self.set_sid(sid)
+        if self.block_tag.count():
+            self.disable_triggers = True
+            self.block_tag.setCurrentIndex(0)
+            self.disable_triggers = False
+            self.init_courses(self.block_tag.currentText())
 
     def set_sid(self, sid):
         self.sid = sid
@@ -102,21 +113,18 @@ class BlockNameDialog(QDialog):
         if sid:
             self.pb_accept.setEnabled(True)
             self.block_tag.setEnabled(True)
-            f, self.tags = db_read_table(
+            tags = db_read_fields(
                 "LESSON_GROUP", 
-                ["lesson_group", "BLOCK_NAME"],
-                f"BLOCK_NAME LIKE '{sid}#%'",
-                sort_field="BLOCK_NAME",
+                ["lesson_group", "BLOCK_TAG"],
+                sort_field="BLOCK_TAG",
+                BLOCK_SID=sid,
             )
-            l = len(sid) + 1
-            for i, t in self.tags:
-                btag = t[l:]
-                self.sid_block_map[btag] = i
-                self.block_tag.addItem(btag)
+            for i, t in tags:
+                self.sid_block_map[t] = i
+                self.block_tag.addItem(t)
         else:
             self.pb_accept.setEnabled(False)
             self.block_tag.setEnabled(False)
-        self.init_courses("")
         
     @Slot(str)
     def on_block_tag_currentTextChanged(self, text): # show courses
@@ -129,16 +137,21 @@ class BlockNameDialog(QDialog):
             lesson_group=self.sid_block_map[btag]
         except KeyError:
             self.table_courses.setRowCount(0)
+            self.pb_reset.setEnabled(False)
             return
-        f, self.course_refs = db_read_table(
+        course_refs = db_read_fields(
             "COURSE_LESSONS", 
             ["id", "course", "ROOM"],
             lesson_group=lesson_group
         )
-        self.table_courses.setRowCount(len(self.course_refs))
+        # Enable the reset button if there is exactly one course:
+        self.pb_reset.setEnabled(len(course_refs) == 1)
+        self.table_courses.setRowCount(len(course_refs))
         self.course_map = {}
-        for r, c in enumerate(self.course_refs):
+        self.course_ids = []
+        for r, c in enumerate(course_refs):
             cid = c[1]
+            self.course_ids.append(cid)
             cdata = dict(zip(*db_read_unique_entry("COURSES", course=cid)))
             # class field
             if not (tw := self.table_courses.item(r, 0)):
@@ -167,16 +180,32 @@ class BlockNameDialog(QDialog):
                 tw = QTableWidgetItem()
                 self.table_courses.setItem(r, 4, tw)
             tw.setText(c[2])
-                  
-    def activate(self, start_value:str) -> Optional[BlockTag]:
+        ## Show lessons
+        self.list_lessons.clear()
+        for l, t in db_read_fields(
+            "LESSONS",
+            ["LENGTH", "TIME"],
+            lesson_group=lesson_group
+        ):
+            text = str(l)
+            if t:
+                text += f"  @ {t}"
+            self.list_lessons.addItem(text)
+
+    def activate(
+        self, 
+        BLOCK_SID="", 
+        BLOCK_TAG="", 
+        **xargs
+    ) -> Optional[BlockTag]:
         """Open the dialog.
         """
         self.result = None
         self.disable_triggers = True
         self.sid0, self.tag0 = "", ""
-        if start_value:
+        if BLOCK_SID or BLOCK_TAG:
             try:
-                btag = BlockTag.read(start_value)
+                btag = BlockTag.build(BLOCK_SID, BLOCK_TAG)
                 self.sid0, self.tag0 = btag.sid, btag.tag
             except ValueError as e:
                 REPORT("ERROR", str(e))
@@ -199,6 +228,32 @@ class BlockNameDialog(QDialog):
         self.init_courses(self.tag0)
         self.exec()
         return self.result
+
+    def reset(self):
+        """If there is only one course, and this does not already have
+        simple lessons, offer to convert the group to a simple group.
+        If the conditions are not fulfilled, report this as an error
+        and return to the dialog.
+        """
+        if len(self.course_ids) != 1:
+            raise Bug("reset: expected exactly one course!")
+        # Check for simple lesson-group
+        lesson_refs = db_values(
+            "COURSE_LESSONS", 
+            "lesson_group",
+            course=self.course_ids[0]
+        )
+        for l in lesson_refs:
+            bsid = db_read_unique_field(
+                "LESSON_GROUP", 
+                "BLOCK_SID",
+                lesson_group=l
+            )
+            if not bsid:
+                REPORT("ERROR", T["SIMPLE_LESSONS_EXIST"])
+                return
+        self.result = BlockTag("", "", "")   # "illegal" value
+        super().accept()
 
     def accept(self):
         i = self.block_subject.currentIndex()
@@ -259,9 +314,9 @@ def edit_block(lesson_group):
 if __name__ == "__main__":
     from core.db_access import open_database
     open_database()
-    print("----->", BlockNameDialog.popup(""))
-    print("----->", BlockNameDialog.popup("KoRa#"))
-    print("----->", BlockNameDialog.popup("XXX#"))
-    print("----->", BlockNameDialog.popup("ZwE#09G10G"))
-    print("----->", BlockNameDialog.popup("Hu#"))
-    print("----->", BlockNameDialog.popup("NoSubject"))
+    print("----->", BlockNameDialog.popup())
+    print("----->", BlockNameDialog.popup(BLOCK_SID="KoRa"))
+    print("----->", BlockNameDialog.popup(BLOCK_SID="ZwE", BLOCK_TAG="09G10G"))
+    print("----->", BlockNameDialog.popup(BLOCK_SID="XXX"))
+    print("----->", BlockNameDialog.popup(BLOCK_SID="Hu"))
+    print("----->", BlockNameDialog.popup(BLOCK_TAG="NoSubject"))

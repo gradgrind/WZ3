@@ -1,7 +1,7 @@
 """
 ui/modules/course_editor.py
 
-Last updated:  2023-03-05
+Last updated:  2023-03-06
 
 Edit course and blocks+lessons data.
 
@@ -129,7 +129,7 @@ from ui.dialogs.dialog_course_fields import CourseEditorForm
 from ui.dialogs.dialog_day_period import edit_time
 from ui.dialogs.dialog_room_choice import edit_room
 from ui.dialogs.dialog_workload import edit_workload
-from ui.dialogs.dialog_block_name import BlockNameDialog
+from ui.dialogs.dialog_block_name import edit_block
 from ui.dialogs.dialog_parallel_lessons import ParallelsDialog
 
 #?
@@ -691,10 +691,18 @@ class CourseEditorPage(Page):
             )
             if result is not None:
                 obj.setText(result)
-#TODO ...
         ### BLOCK (LESSON_GROUP)
         elif object_name == "block_name":
-            pass
+            result = edit_block(self.current_lesson.LESSON_GROUP_INFO)
+            if result is not None:
+                obj.setText(result)
+#TODO: This will need a redisplay, because of the entry in the lesson
+# table.
+# What about displaying the full block subject name (+ tag?)
+# The subject could appear in the lesson table?, short form + tag
+# in the "Kennung" field?
+
+#TODO ...
         ### NOTES (LESSON_GROUP)
         elif object_name == "notes":
             pass

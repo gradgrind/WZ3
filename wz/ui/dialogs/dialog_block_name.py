@@ -1,7 +1,7 @@
 """
-ui/dialogs/dialog_room_choice.py
+ui/dialogs/dialog_block_name.py
 
-Last updated:  2023-03-05
+Last updated:  2023-03-06
 
 Supporting "dialog" for the course editor – handle blocks.
 
@@ -45,9 +45,14 @@ from core.basic_data import (
     get_teachers,
     BlockTag,
 )
-from core.db_access import db_read_table, db_read_unique_entry
+from core.db_access import (
+    db_read_table, 
+    db_read_unique_entry,
+    db_update_field,
+)
 from ui.ui_base import (
     ### QtWidgets:
+    APP,
     QDialog,
     QDialogButtonBox,
     QHeaderView,
@@ -209,6 +214,45 @@ class BlockNameDialog(QDialog):
             self.result = btag
         super().accept()
         
+
+#TODO ...
+# Presumably it should not be possible to convert a block into a
+# normal lesson – or vice versa. So there must be some other
+# function for creating the initial db entry.
+# On the other hand, there is no structural reason why the switch
+# not be made ... as long as for block -> simple there is only one
+# COURSE_LESSONS record.
+# I would have to enable the block field on the simple lessons, add
+# a reset(?) button to the dialog, which would need to check that
+# there is only a single reference – and redisplay the course, to
+# handle icon changes. I would also need to check that the course
+# doesn't already have a simple lesson group! 
+
+# Used by course/lesson editor
+def edit_block(lesson_group):
+    """Pop up a block-tag dialog for the current lesson-group.
+    If the info is changed, update the database entry and return the
+    string representation of the new value.
+    Otherwise return <None>.
+    The parameter is the <dict> containing the fields of the
+    LESSON_GROUP record.
+    """
+    btresult = BlockNameDialog.popup(
+        start_value=lesson_group["BLOCK_NAME"],
+        parent=APP.activeWindow()
+    )
+    if btresult is None:
+        return None
+    result = str(btresult)
+    db_update_field(
+        "LESSON_GROUP",
+        "BLOCK_NAME",
+        result,
+        lesson_group=lesson_group["lesson_group"]
+    )
+    lesson_group["BLOCK_MAP"] = result
+    return result
+
 
 # --#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#
 

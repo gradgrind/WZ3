@@ -471,6 +471,7 @@ ui.dialogs.dialog_workload: {
 
 ui.dialogs.dialog_block_name: {
     SIMPLE_LESSONS_EXIST: "Dieser Kurs hat schon einfache Unterrichtsstunden."
+    BLOCK_EXISTS: "Dieser Block existiert schon."
 }
 
 ui.modules.grades_manager: {

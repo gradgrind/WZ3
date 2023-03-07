@@ -1,7 +1,7 @@
 """
 ui/dialogs/dialog_block_name.py
 
-Last updated:  2023-03-06
+Last updated:  2023-03-07
 
 Supporting "dialog" for the course editor – handle blocks.
 
@@ -137,6 +137,7 @@ class BlockNameDialog(QDialog):
             lesson_group=self.sid_block_map[btag]
         except KeyError:
             self.table_courses.setRowCount(0)
+            self.list_lessons.clear()
             self.pb_reset.setEnabled(False)
             return
         course_refs = db_read_fields(
@@ -146,6 +147,16 @@ class BlockNameDialog(QDialog):
         )
         # Enable the reset button if there is exactly one course:
         self.pb_reset.setEnabled(len(course_refs) == 1)
+#TODO: Enable the ok button if there is no LESSON_GROUP entry?
+# Surely not correct ... consider how this pop-up is used.
+# 1) initializing the block of a new lesson
+#      (with pre-choice add-to-existing-block or new-block)
+# 2) changing the block of a lesson-group – here it must not exist already
+# The difference is the existence of a LESSON_GROUP entry, which is not
+# clear if the start value is empty.
+        self.pb_accept.setEnabled(not self.lesson_group)
+            
+
         self.table_courses.setRowCount(len(course_refs))
         self.course_map = {}
         self.course_ids = []
@@ -195,7 +206,8 @@ class BlockNameDialog(QDialog):
     def activate(
         self, 
         BLOCK_SID="", 
-        BLOCK_TAG="", 
+        BLOCK_TAG="",
+        lesson_group=None,
         **xargs
     ) -> Optional[BlockTag]:
         """Open the dialog.
@@ -203,6 +215,7 @@ class BlockNameDialog(QDialog):
         self.result = None
         self.disable_triggers = True
         self.sid0, self.tag0 = "", ""
+        self.lesson_group = lesson_group
         if BLOCK_SID or BLOCK_TAG:
             try:
                 btag = BlockTag.build(BLOCK_SID, BLOCK_TAG)
@@ -252,6 +265,7 @@ class BlockNameDialog(QDialog):
             if not bsid:
                 REPORT("ERROR", T["SIMPLE_LESSONS_EXIST"])
                 return
+#TODO: Ask whether to do it ...
         self.result = BlockTag("", "", "")   # "illegal" value
         super().accept()
 
@@ -266,22 +280,33 @@ class BlockNameDialog(QDialog):
             return
         if s != self.sid0 or t != self.tag0:
             # Value has been modified and is valid
+#TODO: Actually, I can SEE that the group exists ... it should be
+# possible to disable the ok button! But the check is still a good idea,
+# it should, however, then raise a Bug exceotion.
+#?            # Check that the new value doesn't exist already in LESSON_GROUP
+#            if db_check_unique_entry(
+#                "LESSON_GROUP", 
+#                BLOCK_SID=s,
+#                BLOCK_TAG=t,
+#            ):
+#                REPORT("ERROR", T["BLOCK_EXISTS"])
+#                return
             self.result = btag
         super().accept()
         
 
 #TODO ...
-# Presumably it should not be possible to convert a block into a
-# normal lesson – or vice versa. So there must be some other
-# function for creating the initial db entry.
-# On the other hand, there is no structural reason why the switch
-# not be made ... as long as for block -> simple there is only one
-# COURSE_LESSONS record.
-# I would have to enable the block field on the simple lessons, add
-# a reset(?) button to the dialog, which would need to check that
-# there is only a single reference – and redisplay the course, to
-# handle icon changes. I would also need to check that the course
-# doesn't already have a simple lesson group! 
+# I am now supporting the conversion of a block into a normal lesson.
+# This is done via the reset-button. Check that the course editor
+# handles this correctly.
+# Also the reverse conversion should be possible, perhaps even easier?
+# In both cases there should probably be a dialog requesting confirmation.
+# For block -> simple, the confirmation dialog could be in the <reset>
+# function. For simple -> block, it may be better to have it in the
+# trigger code in the course editor.
+# In the course editor I would have to enable the block field on the
+# simple lessons. Any changes to the block require a course redisplay
+# to update the lessons table. 
 
 # Used by course/lesson editor
 def edit_block(lesson_group):

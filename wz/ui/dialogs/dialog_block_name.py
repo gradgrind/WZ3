@@ -133,6 +133,8 @@ class BlockNameDialog(QDialog):
         self.init_courses(text)
 
     def init_courses(self, btag):
+        self.course_map = {}
+        self.course_ids = []
         try:
             lesson_group=self.sid_block_map[btag]
         except KeyError:
@@ -158,8 +160,6 @@ class BlockNameDialog(QDialog):
             
 
         self.table_courses.setRowCount(len(course_refs))
-        self.course_map = {}
-        self.course_ids = []
         for r, c in enumerate(course_refs):
             cid = c[1]
             self.course_ids.append(cid)
@@ -222,6 +222,9 @@ class BlockNameDialog(QDialog):
                 self.sid0, self.tag0 = btag.sid, btag.tag
             except ValueError as e:
                 REPORT("ERROR", str(e))
+        else:
+#?
+            self.pb_reset.hide()
         ## Populate the subject chooser
         self.sid_list = []
         self.block_subject.clear()

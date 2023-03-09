@@ -458,7 +458,7 @@ class CourseEditorPage(Page):
 # perhaps some additional constraint could be added ...
 
 #?
-        self.course_lesson_map = {}
+#        self.course_lesson_map = {}
         # key = block name; value = display row
         self.course_lesson_payment = 0 # for payment-only entries
 
@@ -478,13 +478,13 @@ class CourseEditorPage(Page):
                 block_tag = lgdata["BLOCK_TAG"]
 
 #?
-                # Check uniqueness
-                if block_name in self.course_lesson_map:
-                    raise Bug("Multiple entries in COURSE_LESSONS"
-                        f"for block '{block_name}', course {course}"
-                    )
-                    self.course_lesson_map[block_name] = row
-                if block_name:
+#                # Check uniqueness
+#                if block_name in self.course_lesson_map:
+#                    raise Bug("Multiple entries in COURSE_LESSONS"
+#                        f"for block '{block_name}', course {course}"
+#                    )
+#                    self.course_lesson_map[block_name] = row
+                if block_sid:
                     etype = 1
                     icon = self.icons["BLOCK"]
                 else:
@@ -501,8 +501,9 @@ class CourseEditorPage(Page):
                     ln = ldata["LENGTH"]
                     w = QTableWidgetItem(str(ln))
                     self.lesson_table.setItem(row, 1, w)
-                    if block_name:
-                        w = QTableWidgetItem(block_name)
+                    if block_sid:
+#TODO: lesson name? Use BlockTag.build(block_sid, block_tag)?
+                        w = QTableWidgetItem(block_sid + '#' + block_tag)
                         self.lesson_table.setItem(row, 2, w)
                     self.course_lessons.append(
                         LessonRowData(etype, cldict, lgdata, ldata)
@@ -726,17 +727,36 @@ class CourseEditorPage(Page):
 
     @Slot()
     def on_lesson_new_clicked(self):
+#TODO
         print("§NEW LESSON")
+        """Add a simple lesson. If the course currently has no
+        simple lessons, also add the necessary LESSON_GROUP and
+        COURSE_LESSONS entries.
+        """
 
     @Slot()
     def on_lesson_block_clicked(self):
+#TODO
         print("§NEW BLOCK")
+        """Add a block course or a block lesson.
+        If no block entry is selected, add a new course reference.
+        This can be an existing course, in which case entries are added
+        for each lesson in the block. If it is a really new course,
+        add the necessary LESSON_GROUP and COURSE_LESSONS entries
+        before adding a lesson for this new block.
+        If a block entry is selected, add a lesson to the block.
+        """
+        if self.current_lesson.ROW_TYPE <= 0:
+            # No block entry selected
+            pass
 
     @Slot()
     def on_lesson_pay_clicked(self):
+#TODO
         print("§NEW PAYMENT")
 
     @Slot()
+#TODO
     def on_lesson_delete_clicked(self):
         print("§DELETE LESSON")
 

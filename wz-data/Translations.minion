@@ -39,6 +39,9 @@ core.basic_data: {
     UNKNOWN_GROUP:  "In Klasse {klass}, unbekannte Gruppe: {group}"
     UNKNOWN_CLASS:  "Unbekannte Klasse: {klass}"
     BAD_NOTES_INFO: "„Notizen-Info ungültig, '{item}' in '{info}'"
+    #
+    TAG_INVALID:    "Parallel-Kennung '{tag}' ist ungültig"
+    WEIGHT_NO_TAG:  "Parallel-Wichtigkeit ({weight}) ohne Kennung"
 }
 
 core.classes: {

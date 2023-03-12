@@ -66,6 +66,7 @@ from core.basic_data import (
     get_subjects,
     get_simultaneous_weighting,
     BlockTag,
+    ParallelTag,
 )
 from ui.ui_base import (
     ### QtWidgets:
@@ -547,9 +548,11 @@ class CourseEditorPage(Page):
                     lesson_id=self.current_lesson.LESSON_INFO["id"]
                 )
             except NoRecord:
+                self.current_parallel_tag = ParallelTag.build("", 0)
                 self.parallel.clear()
             else:
-                self.parallel.setText(f'{t} @ {w}')
+                self.current_parallel_tag = ParallelTag.build(t, w)
+                self.parallel.setText(str(self.current_parallel_tag))
             self.parallel.setEnabled(True)
             self.notes.setText(self.current_lesson.LESSON_GROUP_INFO["NOTES"])
             self.notes.setEnabled(True)
@@ -604,10 +607,18 @@ class CourseEditorPage(Page):
         elif object_name == "parallel":
 #TODO:
 #             pass
-            result = ParallelsDialog.popup(obj.text(), parent=self)
+            result = ParallelsDialog.popup(
+                self.current_parallel_tag, parent=self
+            )
             if result is not None:
                 print("->", result)
-                obj.setText(result)
+#TODO: I would need the id of any record which already references this
+# lesson, otherwise the lesson id for a new record.
+#                db_update_fields(
+#                    "PARALLEL_LESSONS", 
+#                    field_values,
+#                )
+                obj.setText(str(result))
         else:
             raise Bug(f"Click event on object {object_name}")
 

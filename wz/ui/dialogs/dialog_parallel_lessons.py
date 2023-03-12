@@ -39,9 +39,11 @@ if __name__ == "__main__":
 
 ### +++++
 
+from typing import Optional
 from core.basic_data import (
     TAG_FORMAT,
     BlockTag,
+    ParallelTag,
 )
 from core.db_access import (
     db_read_fields,
@@ -65,7 +67,7 @@ from ui.ui_base import (
 #   (id: primary key)
 #   lesson_id: foreign key -> LESSONS.id (unique, non-null)
 #   TAG: The tag used to join a group of lessons
-#   WEIGHTING: 0 – 10 (empty is like 10)
+#   WEIGHTING: 0 – 10
 
 class ParallelsDialog(QDialog):
     @classmethod
@@ -101,12 +103,12 @@ class ParallelsDialog(QDialog):
             lid = r[1]
             lg_id, ll, lt = db_read_unique(
                 "LESSONS",
-                ["lesson_group", "LENGTH", "TIME"], #?
+                ["lesson_group", "LENGTH", "TIME"],
                 id=lid,
             )
             bsid, btag = db_read_unique(
                 "LESSON_GROUP",
-                ["BLOCK_SID", "BLOCK_TAG"], #?
+                ["BLOCK_SID", "BLOCK_TAG"],
                 lesson_group=lg_id,
             )
             if bsid:
@@ -114,13 +116,13 @@ class ParallelsDialog(QDialog):
             else:
                 rlist = db_read_unique(
                     "COURSE_LESSONS",
-                    ["course"], #?
+                    ["course"],
                     lesson_group=lg_id,
                 )
                 course = rlist[0]
                 cdata = db_read_unique(
                     "COURSE",
-                    ["CLASS", "GRP", "SUBJECT", "TEACHER"], #?
+                    ["CLASS", "GRP", "SUBJECT", "TEACHER"],
                     course=course,
                 )
                 bname = f"{cdata[0]}.{cdata[1]}:{cdata[2]}/{cdata[3]}"
@@ -136,33 +138,22 @@ class ParallelsDialog(QDialog):
         t = self.tag.currentText()
         if t:
             w = self.weighting.value()
-            self.pb_accept.setEnabled(t != self.tag0 or w != self.weight0)
+            self.pb_accept.setEnabled(
+                t != self.value0.TAG or w != self.value0.WEIGHTING
+            )
         else:
             self.pb_accept.setEnabled(False) 
 
-#TODO: It might be better to pass tag and weight separately in and out ...
-    def activate(self, start_value:str) -> str:
+    def activate(self, start_value:ParallelTag) -> Optional[ParallelTag]:
         """Open the dialog.
         """
         self.result = None
         self.disable_triggers = True
-        if start_value:
-            try:
-                self.tag0, v = start_value.split('#', 1)
-            except ValueError:
-                self.tag0 = start_value
-                self.weight0 = 10
-            else:
-                try:
-                    w = int(v)
-                    if w < 0 or w > 10:
-                        raise ValueError
-                except ValueError:
-                    raise Bug(f"PARALLEL TAG+WEIGHTING: {start_value}")
-                self.weight0 = w
+        self.value0 = start_value
+        if start_value.TAG:
+            w = start_value.WEIGHTING
         else:
-            self.tag0 = ""
-            self.weight0 = 10
+            w = 10
             self.pb_reset.hide()
         ## Populate the tag chooser
         self.tag_map = {}
@@ -187,21 +178,21 @@ class ParallelsDialog(QDialog):
         self.tag.clear()
         self.tag.addItems(sorted(self.tag_map))
         self.tag.setCurrentIndex(-1)
-        self.weighting.setValue(self.weight0)
+        self.weighting.setValue(w)
         self.pb_accept.setEnabled(False)
         self.disable_triggers = False
-        self.tag.setCurrentText(self.tag0)
+        self.tag.setCurrentText(start_value.TAG)
         self.exec()
         return self.result
 
     def reset(self):
-        self.result = ""
+        self.result = ParallelTag("", 0)
         super().accept()
 
     def accept(self):
         t = self.tag.currentText()
         w = self.weighting.value()
-        self.result = f"{t}#{w}"
+        self.result = ParallelTag(t, w)
         super().accept()
 
 
@@ -210,5 +201,5 @@ class ParallelsDialog(QDialog):
 if __name__ == "__main__":
     from core.db_access import open_database
     open_database()
-    print("----->", ParallelsDialog.popup(""))
-    print("----->", ParallelsDialog.popup("TAG1#7"))
+    print("----->", ParallelsDialog.popup(ParallelTag("", 10)))
+    print("----->", ParallelsDialog.popup(ParallelTag("TAG1", 7)))

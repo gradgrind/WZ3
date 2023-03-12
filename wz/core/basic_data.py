@@ -1,5 +1,5 @@
 """
-core/basic_data.py - last updated 2023-03-05
+core/basic_data.py - last updated 2023-03-12
 
 Handle caching of the basic data sources
 
@@ -209,6 +209,34 @@ def sublessons(tag:str, reset:bool=False) -> list[Sublesson]:
         l = []
         slmap[tag] = l
     return l
+
+
+class ParallelTag(NamedTuple):
+    TAG: str
+    WEIGHTING: int
+
+    @classmethod
+    def build(cls, tag: str, weighting: int):
+        if tag:
+            if not TAG_FORMAT.match(tag).hasMatch():
+                REPORT("ERROR", T["TAG_INVALID"].format(tag=tag))
+                tag = ""
+                weighting = 0
+            elif weighting < 0 or weighting > 10:
+                REPORT(
+                    "ERROR", 
+                    T["WEIGHT_OUT_OF_RANGE"].format(weight=weighting)
+                )
+                weighting = 0
+        elif weighting:
+            REPORT("ERROR", T["WEIGHT_NO_TAG"].format(weight=weighting))
+            weighting = 0
+        return cls(tag, weighting)
+
+    def __str__(self):
+        if self.TAG:
+            return f"{self.TAG}%{self.WEIGHTING}"
+        return ""
 
 
 class BlockTag(NamedTuple):

@@ -1,7 +1,7 @@
 """
 ui/modules/course_editor.py
 
-Last updated:  2023-03-11
+Last updated:  2023-03-12
 
 Edit course and blocks+lessons data.
 
@@ -37,7 +37,6 @@ if __name__ == "__main__":
     from ui.ui_base import StandalonePage as Page
 
     # start.setup(os.path.join(basedir, 'TESTDATA'))
-    # start.setup(os.path.join(basedir, "DATA-2023"))
     start.setup(os.path.join(basedir, "DATA-2024"))
 else:
     from ui.ui_base import StackPage as Page
@@ -47,10 +46,8 @@ T = TRANSLATIONS("ui.modules.course_editor")
 ### +++++
 
 from typing import NamedTuple
-from importlib import import_module
 from core.db_access import (
     open_database,
-    db_read_fields,
     db_read_unique,
     db_read_full_table,
     db_update_field,
@@ -66,116 +63,32 @@ from core.classes import Classes
 from core.basic_data import (
     Workload,
     clear_cache,
-    get_payment_weights,
     get_subjects,
-    sublessons,
     get_simultaneous_weighting,
     BlockTag,
 )
-
 from ui.ui_base import (
-    HLine,
-    LoseChangesDialog,
-    KeySelector,
-    RowSelectTable,
-    FormLineEdit,
-    FormComboBox,
-    ForeignKeyItemDelegate,
     ### QtWidgets:
-    QSplitter,
-    QFrame,
-    QFormLayout,
-    QVBoxLayout,
-    QHBoxLayout,
-    QLabel,
     QLineEdit,
-    QPushButton,
-    QDialogButtonBox,
     QTableWidgetItem,
-    QTableView,
-    QDialog,
     QWidget,
-    QStackedLayout,
-    QAbstractItemView,
-    QCheckBox,
     QHeaderView,
     ### QtGui:
     QIcon,
     ### QtCore:
     Qt,
-    QObject,
     QEvent,
     Slot,
-    QPoint,
-    ### QtSql:
-    QSqlTableModel,
     ### uic
     uic,
 )
-
-IMPORTS = {
-#?
-    "course_fields": "ui.dialogs.dialog_course_fields",
-
-    "wish_time": "ui.dialogs.dialog_day_period",
-    "wish_room": "ui.dialogs.dialog_room_choice",
-    "payment": "ui.dialogs.dialog_workload",
-    "block_name": "ui.dialogs.dialog_block_name",
-    "parallel": "ui.dialogs.dialog_parallel_lessons",
-#?
-    "lesson_length": "",
-    "notes": "",
-}
 from ui.dialogs.dialog_course_fields import CourseEditorForm
 from ui.dialogs.dialog_day_period import edit_time
 from ui.dialogs.dialog_room_choice import edit_room
 from ui.dialogs.dialog_workload import edit_workload
-from ui.dialogs.dialog_block_name import edit_block
+from ui.dialogs.dialog_block_name import BlockNameDialog
 from ui.dialogs.dialog_parallel_lessons import ParallelsDialog
 
-#?
-#from ui.course_dialogs import (
-#    CourseEditorForm,
-#
-#
-#    set_coursedata,
-#    get_coursedata,
-#    GroupSelector,
-#    #    DurationSelector,
-#    #    DayPeriodSelector,
-#    #    PartnersSelector,
-#    PaymentSelector,
-#    RoomSelector,
-#    #    partners,
-#    #DayPeriodDelegate,
-#    DayPeriodDialog,
-#    DurationDelegate,
-#    #    PartnersDelegate,
-#    BlockTagSelector,
-#    BlockTagDialog,
-#    #    parse_time_field,
-#    #    get_time_entry,
-#    TableWidget,
-#    courses_with_lessontag,
-#)
-
-# Course table fields
-#TODO: still needed?
-COURSE_COLS = [
-    (f, T[f])
-    for f in (
-        "course",
-        "CLASS",
-        "GRP",
-        "SUBJECT",
-        "TEACHER",
-        "REPORT",
-        "GRADES",
-        "REPORT_SUBJECT",
-        "AUTHORS",
-        "NOTES",
-    )
-]
 # SUBJECT, CLASS and TEACHER are foreign keys with:
 #  on delete cascade + on update cascade
 FOREIGN_FIELDS = ("CLASS", "TEACHER", "SUBJECT")
@@ -199,36 +112,6 @@ COURSE_TABLE_FIELDS = ( # the fields shown in the course table
     ("INFO", 0, -1),
 )
 
-#FILTER_FIELDS = [cc for cc in COURSE_COLS if cc[0] in FOREIGN_FIELDS]
-
-# Group of fields which determines a course (the tuple must be unique)
-#class COURSE_KEY(NamedTuple):
-#    CLASS: str
-#    GRP: str
-#    SUBJECT: str
-#    TEACHER: str
-#
-#    def __str__(self):
-#        return f"({self.CLASS}:{self.GRP}:{self.SUBJECT}:{self.TEACHER})"
-#COURSE_KEY(*[record.value(f) for f in COURSE_KEY._fields])
-# print("§§§§§§§§§§§", COURSE_KEY._fields, str(COURSE_KEY("10G", "*", "Ma", "EA")))
-
-#TODO: deprecated?
-BLOCK_COLS = [
-    (f, T[f])
-    for f in (
-        "id",
-        "course",
-        "PAYMENT",
-        "ROOM",
-        "LESSON_TAG",
-        "NOTES",
-    )
-]
-
-#TODO: deprecated?
-BLOCKCOLS_SHOW = ("LESSON_TAG", "PAYMENT", "NOTES")
-
 class LessonRowData(NamedTuple):
     """ROW_TYPE:
         -2 – no item (all other fields <None>)
@@ -243,16 +126,10 @@ class LessonRowData(NamedTuple):
 
 ### -----
 
-
 def init():
     MAIN_WIDGET.add_tab(CourseEditorPage())
 
-
 class CourseEditorPage(Page):
-#?
-    name = T["MODULE_NAME"]
-    title = T["MODULE_TITLE"]
-
     def __init__(self):
         super().__init__()
         uic.loadUi(APPDATAPATH("ui/course_editor.ui"), self)
@@ -265,7 +142,7 @@ class CourseEditorPage(Page):
             QHeaderView.ResizeMode.ResizeToContents
         )
         # Set up activation for the editors for the read-only lesson/block
-        # fields: 
+        # fields:
         for w in (
             self.payment, self.wish_room, self.block_name,
             self.notes,
@@ -290,9 +167,8 @@ class CourseEditorPage(Page):
         else:
             # standard event processing
             return super().eventFilter(obj, event)
-        
+
     def enter(self):
-#TODO?
         open_database()
         clear_cache()
         self.init_data()
@@ -302,8 +178,6 @@ class CourseEditorPage(Page):
 # ++++++++++++++ The widget implementation fine details ++++++++++++++
 
     def  init_data(self):
-        print("§§§ init_data")
-
         teachers = Teachers()
         self.filter_list = {
             "CLASS": Classes().get_class_list(skip_null=False),
@@ -314,7 +188,7 @@ class CourseEditorPage(Page):
             ]
         }
         self.course_field_editor = None
- 
+
     @Slot(int)
     def on_combo_filter_currentIndexChanged(self, i):
         """Handle a change of filter field for the course table."""
@@ -341,8 +215,8 @@ class CourseEditorPage(Page):
         self.filter_value = self.select_list[select_index][0]
         self.suppress_handlers = True
         fields, records = db_read_full_table(
-            "COURSES", 
-            sort_field="SUBJECT", 
+            "COURSES",
+            sort_field="SUBJECT",
             **{self.filter_field: self.filter_value}
         )
         # Populate the course table
@@ -373,10 +247,11 @@ class CourseEditorPage(Page):
                             item.setText(v)
                             break
                     else:
-#TODO: T ...
                         REPORT(
                             "ERROR",
-                            f"UNKNOWN VALUE IN FIELD '{cid}': '{cell_value}'"
+                            T["UNKNOWN_VALUE_IN_FIELD"].format(
+                                cid=cid, cell_value=cell_value
+                            )
                         )
                 else:
                     item.setText(cell_value)
@@ -537,15 +412,11 @@ class CourseEditorPage(Page):
     @Slot()
     def on_pb_delete_course_clicked(self):
         """Delete the current course."""
-        print("§DELETE COURSE")
-#TODO
         row = self.course_table.currentRow()
         if row < 0:
-            SHOW_ERROR("BUG: No course, delete button should be disabled")
-            return
+            raise Bug("No course, delete button should be disabled")
         if not SHOW_CONFIRM(T["REALLY_DELETE"]):
             return
-        
         if db_delete_rows("COURSES", course=self.course_id):
 #TODO: Check that the db tidying really occurs:
             # The foreign key constraints should tidy up the database.
@@ -564,14 +435,12 @@ class CourseEditorPage(Page):
         """Activate the course field editor."""
         changes = self.edit_course_fields(self.course_dict)
         if changes:
-#TODO--
-            print("§COURSE CHANGED:", changes)
             self.update_course(row, changes)
 
     def update_course(self, row, changes):
         if db_update_fields(
-            "COURSES", 
-            [(f, v) for f, v in changes.items()], 
+            "COURSES",
+            [(f, v) for f, v in changes.items()],
             course=self.course_id,
         ):
             self.load_course_table(self.combo_class.currentIndex(), row)
@@ -605,7 +474,7 @@ class CourseEditorPage(Page):
             cdict.update(changes)
             db_new_row("COURSES", **cdict)
             self.load_course_table(
-                self.combo_class.currentIndex(), 
+                self.combo_class.currentIndex(),
                 self.course_table.currentRow()
             )
 
@@ -649,6 +518,14 @@ class CourseEditorPage(Page):
             self.notes.clear()
             self.notes.setEnabled(False)
         else:
+            if self.current_lesson.ROW_TYPE > 0:
+                self.block_name.setText(
+                    str(self.current_lesson.LESSON_GROUP_INFO["BlockTag"])
+                )
+                self.block_name.setEnabled(True)
+            else:
+                self.block_name.clear()
+                self.block_name.setEnabled(False)
             self.lesson_add.setEnabled(True)
             if self.current_lesson.LESSON_GROUP_INFO["nLessons"] > 1:
                 self.lesson_sub.setEnabled(True)
@@ -660,16 +537,12 @@ class CourseEditorPage(Page):
                 self.current_lesson.COURSE_LESSON_INFO["ROOM"]
             )
             self.wish_room.setEnabled(True)
-            self.block_name.setText(
-                str(self.current_lesson.LESSON_GROUP_INFO["BlockTag"])
-            )
-            self.block_name.setEnabled(True)
             self.wish_time.setText(self.current_lesson.LESSON_INFO["TIME"])
             self.wish_time.setEnabled(True)
             try:
                 t, w = db_read_unique(
                     "PARALLEL_LESSONS",
-                    ["TAG", "WEIGHTING"], 
+                    ["TAG", "WEIGHTING"],
                     lesson_id=self.current_lesson.LESSON_INFO["id"]
                 )
             except NoRecord:
@@ -679,7 +552,7 @@ class CourseEditorPage(Page):
             self.parallel.setEnabled(True)
             self.notes.setText(self.current_lesson.LESSON_GROUP_INFO["NOTES"])
             self.notes.setEnabled(True)
-            
+
     def field_editor(self, obj: QLineEdit):
         object_name = obj.objectName()
         print("EDIT", object_name)
@@ -700,14 +573,18 @@ class CourseEditorPage(Page):
                 obj.setText(result)
         ### BLOCK (LESSON_GROUP)
         elif object_name == "block_name":
-            result = edit_block(self.current_lesson.LESSON_GROUP_INFO)
+            lg = self.current_lesson.LESSON_GROUP_INFO
+            result = BlockNameDialog.popup(blocktag=lg["BlockTag"])
             if result is not None:
-                obj.setText(result)
-#TODO: This will need a redisplay, because of the entry in the lesson
-# table.
-# What about displaying the full block subject name (+ tag?)
-# The subject could appear in the lesson table?, short form + tag
-# in the "Kennung" field?
+                db_update_fields(
+                    "LESSON_GROUP",
+                    [("BLOCK_SID", result.sid), ("BLOCK_TAG", result.tag)],
+                    lesson_group=lg["lesson_group"]
+                )
+                # Redisplay lessons
+                lesson_select_id = self.current_lesson.LESSON_INFO["id"]
+                self.display_lessons(lesson_select_id)
+
 
 #TODO ...
         ### NOTES (LESSON_GROUP)
@@ -739,9 +616,24 @@ class CourseEditorPage(Page):
         before adding a lesson for this new block.
         If a block entry is selected, add a lesson to the block.
         """
-        if self.current_lesson.ROW_TYPE <= 0:
-            # No block entry selected
-            pass
+        workload = True
+        simple = True
+        blocks = []
+        for cl in self.course_lessons:
+            if cl.ROW_TYPE == -1:
+                workload = False
+            elif cl.ROW_TYPE == 0:
+                simple = False
+            elif cl.ROW_TYPE > 0:
+                blocks.append(cl.LESSON_GROUP_INFO["BlockTag"])
+        btag = BlockNameDialog.popup(
+            workload=workload,
+            simple=simple,
+            blocks=blocks,
+        )
+        if btag:
+            print("TODO->", btag)
+
 
     @Slot()
     def on_lesson_add_clicked(self):
@@ -752,7 +644,7 @@ class CourseEditorPage(Page):
         """
         li = self.current_lesson.LESSON_INFO
         newid = db_new_row(
-            "LESSONS", 
+            "LESSONS",
             lesson_group=li["lesson_group"],
             LENGTH=li["LENGTH"]
         )
@@ -774,21 +666,28 @@ class CourseEditorPage(Page):
             )
         db_delete_rows("LESSONS", id=lid)
         newid = db_values(
-            "LESSONS", 
-            "id", 
+            "LESSONS",
+            "id",
             lesson_group=li["lesson_group"]
         )[-1]
         self.display_lessons(newid)
 
     @Slot()
-#TODO
+#TODO: test
     def on_remove_element_clicked(self):
         """Remove the current element from the current course.
         If no other courses reference the element (which is always
         the case for simple lessons and workload/payment elements),
-        the element itself will be deleted.
+        the element (LESSON_GROUP entry) itself will be deleted.
         """
         print("§REMOVE ELEMENT")
+        cl = self.current_lesson.COURSE_LESSON_INFO["id"]
+        lg = self.current_lesson.COURSE_LESSON_INFO["lesson_group"]
+        db_delete_rows("COURSE_LESSONS", id=cl)
+        records = db_read_full_table("COURSE_LESSONS", lesson_group=lg)[1]
+        if len(records) == 0:
+            db_delete_rows("LESSON_GROUP", lesson_group=lg)
+        self.display_lessons(-1)
 
 
 # --#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#

@@ -20,7 +20,7 @@
    <bool>false</bool>
   </property>
   <property name="windowTitle">
-   <string>Form</string>
+   <string>Kurse und Stunden</string>
   </property>
   <layout class="QHBoxLayout" name="horizontalLayout_4">
    <item>

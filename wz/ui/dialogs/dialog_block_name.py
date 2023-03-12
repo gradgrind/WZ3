@@ -1,7 +1,7 @@
 """
 ui/dialogs/dialog_block_name.py
 
-Last updated:  2023-03-07
+Last updated:  2023-03-12
 
 Supporting "dialog" for the course editor – handle blocks.
 
@@ -34,7 +34,7 @@ if __name__ == "__main__":
     from core.base import start
     start.setup(os.path.join(basedir, 'TESTDATA'))
 
-T = TRANSLATIONS("ui.dialogs.dialog_block_name")
+#T = TRANSLATIONS("ui.dialogs.dialog_block_name")
 
 ### +++++
 
@@ -46,15 +46,11 @@ from core.basic_data import (
     BlockTag,
 )
 from core.db_access import (
-    db_read_fields, 
+    db_read_fields,
     db_read_unique_entry,
-    db_update_field,
-    db_values,
-    db_read_unique_field,
 )
 from ui.ui_base import (
     ### QtWidgets:
-    APP,
     QDialog,
     QDialogButtonBox,
     QHeaderView,
@@ -71,6 +67,28 @@ from ui.ui_base import (
 ### -----
 
 class BlockNameDialog(QDialog):
+    """This dialog is evoked from the course editor.
+    There are the following scenarios:
+
+    1) A new course/lesson_group connection is to be made.
+       In this no <BlockTag> is passed as argument.
+       In principle, also a workload/payment-only item can be specified,
+       but only if the course currently has no such item: the
+       parameter <workload> should in this case be true.
+       If the parameter <simple> is true, the accept-button
+       will also be enabled on entry, so that a null block-name can
+       be returned – allowing a simple lesson_group to be specified.
+       An existing block-name may be returned, so that the course is
+       added to the block – so long as the course is not already
+       connected to this lesson_group.
+       A new block-name will cause a new block lesson_group to be built
+       and a single lesson will be added to it.
+
+    2) A block lesson_group is to be renamed. This of course applies to
+       all courses connected to the lesson_group. The selected block-name
+       mustn't already be in use. The current block-name is passed in as
+       parameter <blocktag>.
+    """
     @classmethod
     def popup(cls, parent=None, **kargs):
         d = cls(parent)
@@ -79,10 +97,6 @@ class BlockNameDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent=parent)
         uic.loadUi(APPDATAPATH("ui/dialog_block_name.ui"), self)
-        self.pb_reset = self.buttonBox.button(
-            QDialogButtonBox.StandardButton.Reset
-        )
-        self.pb_reset.clicked.connect(self.reset)
         self.table_courses.horizontalHeader().setSectionResizeMode(
             QHeaderView.ResizeMode.ResizeToContents
         )
@@ -96,14 +110,14 @@ class BlockNameDialog(QDialog):
     def on_block_subject_currentIndexChanged(self, i):
         if self.disable_triggers:
             return
-        print("§SUBJECT:", i)
+        self.only_pay.hide()
+        self.disable_triggers = True
         sid = self.sid_list[i]
         self.set_sid(sid)
         if self.block_tag.count():
-            self.disable_triggers = True
             self.block_tag.setCurrentIndex(0)
-            self.disable_triggers = False
-            self.init_courses(self.block_tag.currentText())
+        self.disable_triggers = False
+        self.init_courses(self.block_tag.currentText())
 
     def set_sid(self, sid):
         self.sid = sid
@@ -111,10 +125,9 @@ class BlockNameDialog(QDialog):
         self.block_tag.clearEditText()
         self.sid_block_map = {}
         if sid:
-            self.pb_accept.setEnabled(True)
             self.block_tag.setEnabled(True)
             tags = db_read_fields(
-                "LESSON_GROUP", 
+                "LESSON_GROUP",
                 ["lesson_group", "BLOCK_TAG"],
                 sort_field="BLOCK_TAG",
                 BLOCK_SID=sid,
@@ -123,14 +136,18 @@ class BlockNameDialog(QDialog):
                 self.sid_block_map[t] = i
                 self.block_tag.addItem(t)
         else:
-            self.pb_accept.setEnabled(False)
             self.block_tag.setEnabled(False)
-        
+
     @Slot(str)
     def on_block_tag_currentTextChanged(self, text): # show courses
         if self.disable_triggers:
             return
         self.init_courses(text)
+
+    @Slot()
+    def on_only_pay_clicked(self):
+        self.result = BlockTag("$", "", "") # an illegal value
+        super().accept()
 
     def init_courses(self, btag):
         self.course_map = {}
@@ -138,27 +155,31 @@ class BlockNameDialog(QDialog):
         try:
             lesson_group=self.sid_block_map[btag]
         except KeyError:
+            # No courses, a new block-name (always acceptable)
             self.table_courses.setRowCount(0)
             self.list_lessons.clear()
-            self.pb_reset.setEnabled(False)
+            self.pb_accept.setEnabled(True)
             return
         course_refs = db_read_fields(
-            "COURSE_LESSONS", 
+            "COURSE_LESSONS",
             ["id", "course", "ROOM"],
             lesson_group=lesson_group
         )
-        # Enable the reset button if there is exactly one course:
-        self.pb_reset.setEnabled(len(course_refs) == 1)
-#TODO: Enable the ok button if there is no LESSON_GROUP entry?
-# Surely not correct ... consider how this pop-up is used.
-# 1) initializing the block of a new lesson
-#      (with pre-choice add-to-existing-block or new-block)
-# 2) changing the block of a lesson-group – here it must not exist already
-# The difference is the existence of a LESSON_GROUP entry, which is not
-# clear if the start value is empty.
-        self.pb_accept.setEnabled(not self.lesson_group)
-            
-
+        # A block-name change to an existing value is not permitted,
+        # otherwise an existing lesson_group is acceptable as long as
+        # it is not in <self.blocks>.
+        if self.blocktag:
+            # Disable the accept button.
+            self.pb_accept.setEnabled(False)
+        else:
+            # Disable the accept button if the block-name is in
+            # the <self.blocks> list.
+            for bt in self.blocks:
+                if bt.sid == self.sid and bt.tag == btag:
+                    self.pb_accept.setEnabled(False)
+                    break
+            else:
+                self.pb_accept.setEnabled(True)
         self.table_courses.setRowCount(len(course_refs))
         for r, c in enumerate(course_refs):
             cid = c[1]
@@ -204,27 +225,33 @@ class BlockNameDialog(QDialog):
             self.list_lessons.addItem(text)
 
     def activate(
-        self, 
-        BLOCK_SID="", 
-        BLOCK_TAG="",
-        lesson_group=None,
-        **xargs
+        self,
+        blocktag: BlockTag=None,
+        workload: bool=False,
+        simple: bool=False,
+        blocks: list[BlockTag]=None
     ) -> Optional[BlockTag]:
         """Open the dialog.
         """
         self.result = None
         self.disable_triggers = True
-        self.sid0, self.tag0 = "", ""
-        self.lesson_group = lesson_group
-        if BLOCK_SID or BLOCK_TAG:
-            try:
-                btag = BlockTag.build(BLOCK_SID, BLOCK_TAG)
-                self.sid0, self.tag0 = btag.sid, btag.tag
-            except ValueError as e:
-                REPORT("ERROR", str(e))
+        self.blocktag = blocktag
+        if blocktag:
+            if simple:
+                raise Bug("BlockNameDialog: simple=True with block-tag")
+            if workload:
+                raise Bug("BlockNameDialog: workload=True with block-tag")
+            if blocks:
+                raise Bug("BlockNameDialog: blocks supplied with block-tag")
+            sid0 = blocktag.sid
+            tag0 = blocktag.tag
+            self.only_pay.hide()
         else:
-#?
-            self.pb_reset.hide()
+            sid0 = ""
+            tag0 = ""
+            if not workload:
+                self.only_pay.hide()
+            self.blocks = blocks or []
         ## Populate the subject chooser
         self.sid_list = []
         self.block_subject.clear()
@@ -233,108 +260,34 @@ class BlockNameDialog(QDialog):
                 continue
             self.sid_list.append(sid)
             self.block_subject.addItem(name)
-        if self.sid0:
-            i = self.sid_list.index(self.sid0)
+        if blocktag:
+            i = self.sid_list.index(sid0)
             self.block_subject.setCurrentIndex(i)
         else:
             self.block_subject.setCurrentIndex(-1)
-        self.set_sid(self.sid0)
-        self.block_tag.setCurrentText(self.tag0)
+        self.set_sid(sid0)
+        self.block_tag.setCurrentText(tag0)
+        self.table_courses.setRowCount(0)
+        self.list_lessons.clear()
         self.disable_triggers = False
-        self.init_courses(self.tag0)
+        self.pb_accept.setEnabled(simple)
+        if blocktag:
+            self.init_courses(tag0)
         self.exec()
         return self.result
 
-    def reset(self):
-        """If there is only one course, and this does not already have
-        simple lessons, offer to convert the group to a simple group.
-        If the conditions are not fulfilled, report this as an error
-        and return to the dialog.
-        """
-        if len(self.course_ids) != 1:
-            raise Bug("reset: expected exactly one course!")
-        # Check for simple lesson-group
-        lesson_refs = db_values(
-            "COURSE_LESSONS", 
-            "lesson_group",
-            course=self.course_ids[0]
-        )
-        for l in lesson_refs:
-            bsid = db_read_unique_field(
-                "LESSON_GROUP", 
-                "BLOCK_SID",
-                lesson_group=l
-            )
-            if not bsid:
-                REPORT("ERROR", T["SIMPLE_LESSONS_EXIST"])
-                return
-#TODO: Ask whether to do it ...
-        self.result = BlockTag("", "", "")   # "illegal" value
-        super().accept()
-
     def accept(self):
         i = self.block_subject.currentIndex()
-        s = self.sid_list[i] if i >= 0 else ""
-        t = self.block_tag.currentText()
-        try:
-            btag = BlockTag.build(s, t)
-        except ValueError as e:
-            REPORT("ERROR", str(e))
-            return
-        if s != self.sid0 or t != self.tag0:
-            # Value has been modified and is valid
-#TODO: Actually, I can SEE that the group exists ... it should be
-# possible to disable the ok button! But the check is still a good idea,
-# it should, however, then raise a Bug exceotion.
-#?            # Check that the new value doesn't exist already in LESSON_GROUP
-#            if db_check_unique_entry(
-#                "LESSON_GROUP", 
-#                BLOCK_SID=s,
-#                BLOCK_TAG=t,
-#            ):
-#                REPORT("ERROR", T["BLOCK_EXISTS"])
-#                return
-            self.result = btag
+        if i < 0:
+            # The "accept" button should only be enabled when this is
+            # an acceptable result ...
+            self.result = BlockTag("", "", "")
+        else:
+            s = self.sid_list[i]
+            t = self.block_tag.currentText()
+            # Invalid values should not be possible here ...
+            self.result = BlockTag.build(s, t)
         super().accept()
-        
-
-#TODO ...
-# I am now supporting the conversion of a block into a normal lesson.
-# This is done via the reset-button. Check that the course editor
-# handles this correctly.
-# Also the reverse conversion should be possible, perhaps even easier?
-# In both cases there should probably be a dialog requesting confirmation.
-# For block -> simple, the confirmation dialog could be in the <reset>
-# function. For simple -> block, it may be better to have it in the
-# trigger code in the course editor.
-# In the course editor I would have to enable the block field on the
-# simple lessons. Any changes to the block require a course redisplay
-# to update the lessons table. 
-
-# Used by course/lesson editor
-def edit_block(lesson_group):
-    """Pop up a block-tag dialog for the current lesson-group.
-    If the info is changed, update the database entry and return the
-    string representation of the new value.
-    Otherwise return <None>.
-    The parameter is the <dict> containing the fields of the
-    LESSON_GROUP record.
-    """
-    btresult = BlockNameDialog.popup(
-        start_value=lesson_group["BLOCK_NAME"],
-        parent=APP.activeWindow()
-    )
-    if btresult is None:
-        return None
-    result = str(btresult)
-    db_update_field(
-        "LESSON_GROUP",
-        "BLOCK_NAME",
-        result,
-        lesson_group=lesson_group["lesson_group"]
-    )
-    lesson_group["BLOCK_MAP"] = result
-    return result
 
 
 # --#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#
@@ -343,8 +296,17 @@ if __name__ == "__main__":
     from core.db_access import open_database
     open_database()
     print("----->", BlockNameDialog.popup())
-    print("----->", BlockNameDialog.popup(BLOCK_SID="KoRa"))
-    print("----->", BlockNameDialog.popup(BLOCK_SID="ZwE", BLOCK_TAG="09G10G"))
-    print("----->", BlockNameDialog.popup(BLOCK_SID="XXX"))
-    print("----->", BlockNameDialog.popup(BLOCK_SID="Hu"))
-    print("----->", BlockNameDialog.popup(BLOCK_TAG="NoSubject"))
+    print("----->", BlockNameDialog.popup(workload=True))
+    print("----->", BlockNameDialog.popup(
+        simple=True,
+        blocks=[BlockTag.build("KoRa", "")]
+    ))
+    print("----->", BlockNameDialog.popup(workload=True, simple=True))
+    print("----->", BlockNameDialog.popup(
+        blocktag=BlockTag.build("KoRa", "")
+    ))
+    print("----->", BlockNameDialog.popup(
+        blocktag=BlockTag.build("ZwE", "09G10G")
+    ))
+    print("----->", BlockNameDialog.popup(BlockTag.build("Hu", "")))
+    print("----->", BlockNameDialog.popup(BlockTag.build("XXX", "")))

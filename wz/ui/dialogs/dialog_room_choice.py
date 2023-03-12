@@ -1,7 +1,7 @@
 """
 ui/dialogs/dialog_room_choice.py
 
-Last updated:  2023-03-05
+Last updated:  2023-03-12
 
 Supporting "dialog" for the course editor – select room(s).
 
@@ -218,7 +218,7 @@ class RoomDialog(QDialog):
     def add2choices(self, roomid):
         e = self.checkroom(roomid, self.choices)
         if e:
-            SHOW_ERROR(e)
+            REPORT("ERROR", e)
             return
         self.add_valid_room_choice(roomid)
         self.write_choices()
@@ -282,7 +282,7 @@ class RoomDialog(QDialog):
             key = event.text()
             if key.isalnum():
                 ilist = self.roomlist.findItems(
-                    key, 
+                    key,
                     Qt.MatchFlag.MatchStartsWith
                 )
                 if ilist:

@@ -1,7 +1,7 @@
 """
 ui/dialogs/dialog_parallel_lessons.py
 
-Last updated:  2023-03-05
+Last updated:  2023-03-12
 
 Supporting "dialog" for the course editor – handle wishes for lessons
 starting at the same time.
@@ -39,14 +39,12 @@ if __name__ == "__main__":
 
 ### +++++
 
-from typing import Optional
 from core.basic_data import (
     TAG_FORMAT,
 )
 from core.db_access import (
-    db_read_table, 
+    db_read_table,
     db_read_unique,
-    db_read_unique_entry,
 )
 from ui.ui_base import (
     ### QtWidgets:
@@ -54,7 +52,6 @@ from ui.ui_base import (
     QDialogButtonBox,
     ### QtGui:
     ### QtCore:
-    Qt,
     QRegularExpressionValidator,
     Slot,
     ### other
@@ -85,7 +82,7 @@ class ParallelsDialog(QDialog):
 #        )
         validator = QRegularExpressionValidator(TAG_FORMAT)
         self.tag.setValidator(validator)
-        
+
     @Slot(str)
     def on_tag_currentTextChanged(self, text): # show courses
 #        if self.disable_triggers:
@@ -99,32 +96,32 @@ class ParallelsDialog(QDialog):
         for r in ref_list:
             lid = r[1]
             rlist = db_read_unique(
-                "LESSONS", 
-                ["lesson_group", "LENGTH", "TIME"], #? 
+                "LESSONS",
+                ["lesson_group", "LENGTH", "TIME"], #?
                 id=lid,
             )
             lg_id, ll, lt = rlist
             rlist = db_read_unique(
-                "LESSON_GROUP", 
-                ["BLOCK_NAME"], #? 
+                "LESSON_GROUP",
+                ["BLOCK_NAME"], #?
                 lesson_group=lg_id,
             )
             bname = rlist[0]
             if not bname:
                 rlist = db_read_unique(
-                    "COURSE_LESSONS", 
-                    ["course"], #? 
+                    "COURSE_LESSONS",
+                    ["course"], #?
                     lesson_group=lg_id,
                 )
                 course = rlist[0]
                 cdata = db_read_unique(
-                    "COURSE", 
-                    ["CLASS", "GRP", "SUBJECT", "TEACHER"], #? 
+                    "COURSE",
+                    ["CLASS", "GRP", "SUBJECT", "TEACHER"], #?
                     course=course,
                 )
                 bname = f"{cdata[0]}.{cdata[1]}: {cdata[2]} / {cdata[3]}"
             self.lesson_list.addItem(bname)
-                  
+
     def activate(self, start_value:str) -> str:
         """Open the dialog.
         """
@@ -134,7 +131,7 @@ class ParallelsDialog(QDialog):
         ## Populate the tag chooser
         self.tag_map = {}
         f, records = db_read_table(
-            "PARALLEL_LESSONS", 
+            "PARALLEL_LESSONS",
             ["TAG", "id", "lesson_id", "WEIGHTING"]
         )
 #TODO--  just for testing!
@@ -154,7 +151,7 @@ class ParallelsDialog(QDialog):
         self.tag.clear()
         self.tag.addItems(sorted(self.tag_map))
         self.tag.setCurrentText(start_value)
-        
+
         self.exec()
         return self.result
 
@@ -167,7 +164,7 @@ class ParallelsDialog(QDialog):
         if t and t != self.value0:
             self.result = t
         super().accept()
-        
+
 
 # --#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#
 

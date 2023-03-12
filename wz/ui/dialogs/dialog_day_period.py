@@ -1,7 +1,7 @@
 """
 ui/dialogs/dialog_day_period.py
 
-Last updated:  2023-03-01
+Last updated:  2023-03-12
 
 Supporting "dialog" for the course editor – select day & period.
 
@@ -42,7 +42,11 @@ from core.db_access import (
     db_values, db_update_field
 )
 from core.basic_data import (
-    get_days, get_periods, timeslot2index,index2timeslot
+    get_days,
+    get_periods,
+    timeslot2index,
+    index2timeslot,
+    get_simultaneous_weighting,
 )
 from ui.ui_base import (
     ### QtWidgets:
@@ -172,7 +176,7 @@ def edit_time(lesson):
         )
         lesson["TIME"] = result
     return result
-    
+
 
 # --#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#
 

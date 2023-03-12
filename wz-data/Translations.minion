@@ -337,121 +337,8 @@ ui.modules.classes: {
 }
 
 ui.modules.course_editor: {
-    # Messages
-#    PAYMENT_ENTRY:  "Dieser Eintrag ist kein „Kurs“, gibt aber Deputatsstunden an, die keinen Unterrichtsstunden direkt entsprechen."
-    NO_ENTRIES_FOR_COURSE: "Dieser Kurs hat keine Aktivitäten"
-#    COURSE_EXISTS:  "Der geänderte „Kurs“ existiert schon"
+    UNKNOWN_VALUE_IN_FIELD: "{cid}': '{cell_value}"
     REALLY_DELETE:  "Soll dieser „Kurs“ wirklich gelöscht werden?"
-    COURSE_ADDED:   "„Kurs“ in Klasse {klass} eingefügt"
-    Add_to_choices: "Zu Auswahl hinzufügen"
-    Remove_from_choices: "Von Auswahl entfernen"
-    Move_up:        "Nach oben verschieben"
-    Move_down:      "Nach unten verschieben"
-    INVALID_BLOCK_TAG: "Ungültiges Block-Kennzeichen"
-    UNKNOWN_SUBJECT_TAG: "Unbekanntes Fachkürzel: {sid}"
-    EMPTY_PARTNER_TAG: "Leeres „Partner-Kennzeichen“"
-    SELECT_TO_COPY_LENGTH: "Wenn eine Zeile ausgewählt ist, wird deren Länge kopiert, sonst 1"
-    DELETE_SELECTED: "Die zu löschende Zeile muss ausgewählt sein"
-    NO_COURSE_SO_NO_LESSONS: "Kein Kurs => Keine Stunden"
-    BLOCK_TAG_CLASH: "Block-Kennzeichen ({tag}) wird schon im Kurs verwendet"
-    NO_CLASSROOM:   "„Klassenraum“ ($) ist hier nicht zulässig, da die aktuelle Klasse keinen Klassenraum hat"
-    BLOCK_NO_SUBJECT: "Block-Kennzeichen ohne Blocknamen"
-    BLOCK_WITH_NO_TAG: "Mit leerem Block-Kennzeichen kann es keine Unterrichtsstunden geben"
-    PAYTAG_WITH_NO_NUMBER: "Ohne „Anzahl“ darf es keine Deputatskennung geben"
-    NULL_FACTOR_NOT_CLEAN: "Faktor 0: Die anderen Felder müssen leer sein"
-
-#    PAYMENT_VALID_ENTRY: "* oder Dezimalzahl"
-#    INVALID_PAYMENT: "Ungültiger Wert"
-
-    # Labels
-    MODULE_NAME:    "Kurse/Stunden"
-    MODULE_TITLE:   "Unterrichtskurse und -stunden verwalten"
-
-    CLASSROOM:      "Klassenraum"
-    NO_ROOM:        "kein Raum"
-    SOME_ROOM:      "irgendein Raum"
-    OTHER_ROOMS:    "auch andere Räume"
-    TIME_FIXED:     "Feste Startzeit"
-    SIMULTANEOUS_TAG: "Parallel-Kennung"
-    WEIGHTING:      "Gewichtung"
-
-    # Dialog buttons
-    Clear:          Verwerfen
-
-    # Course field editor buttons
-#    EDIT_COURSE:    "Kursdaten bearbeiten"
-    EDIT:           Bearbeiten
-#    DELETE_COURSE:  "Kurs löschen"
-    DELETE:         Löschen
-    CANCEL:         Abbrechen
-    APPLY:          Anwenden
-    NEW:            Hinzufügen
-    NEW_PLAIN:      "Neue Unterrichtsstunde"
-    NEW_BLOCK:      "Neues Blockfach bzw. Neue Epoche"
-    NEW_EXTRA:      "Neuer Deputatseintrag"
-
-    # Course table title line
-    COURSE_TITLE:   Kurse
-    FILTER:         "Filter:"
-
-    # COURSES table fields
-    course:         KursNr
-    CLASS:          Klasse
-    GRP:            Gruppe
-    SUBJECT:        Fach
-    TEACHER:        Lehrkraft
-    REPORT:         Zeugnis
-    GRADES:         Noten
-    REPORT_SUBJECT: Fach-Überschrift
-    AUTHORS:        Verantwortliche
-
-    # Lesson table
-    LESSONS:        "Unterricht usw."
-#    BLOCK_MEMBER:   Blockmitglied
-
-    # BLOCKS table fields
-    id:             ID
-    #course:         KursNr         # (siehe oben)
-    PAYMENT:        Deputat
-    ROOM:           Raum
-    LESSON_TAG:     Kennzeichen
-    NOTES:          Notizen
-
-#?
-    # LESSONS table fields
-    #id:             ID             # (siehe oben)
-    TAG:            Kennzeichen    # (siehe oben)
-    LENGTH:         Dauer
-    TIME:           Zeit
-    PLACEMENT:      Stunde
-    ROOMS:          Räume
-
-    Partners:       Partner-id
-
-#?
-    Block_subject:  Block/Epoche
-    Block_name:     Blockname
-    Block_tag:      Kennung
-#?
-    PARALLEL_TAG:   Partner-Kennzeichen
-#    PLACE:          Ort
-#    PLACE_NOT_EDITABLE: "Der Ort wird im Stundenplanmodul gesetzt"
-
-#    EDIT_LESSON:    "Bearbeiten"
-
-# new
-    PARALLEL_GROUPS: "mit Gruppen"
-    PARALLEL_TEACHERS: "mit Lehrkräften"
-}
-
-ui.dialogs.dialog_course_fields: {
-    EDIT_COURSE_FIELDS: "Kursfelder bearbeiten"
-    NEW_COURSE:     "Neuer Kurs"
-    COURSE_NOT_UNIQUE:  "Dieser Kurs (Klasse+Gruppe+Fach+Lehrkraft) existiert schon"
-    NO_CHANGES_TITLE: "Keine Änderungen"
-    NO_CHANGES:     "Die Daten sind unverändert ... trotzdem schließen?"
-    LOSE_CHANGES_TITLE: "Ungespeicherte Änderungen"
-    LOSE_CHANGES:   "Die Änderungen werden verworfen ... trotzdem schließen?"
 }
 
 ui.dialogs.dialog_day_period: {
@@ -466,8 +353,8 @@ ui.dialogs.dialog_room_choice: {
     UNKNOWN_ROOM_ID: "Unbekanntes Raumkürzel"
 }
 
-ui.dialogs.dialog_workload: {
-}
+#ui.dialogs.dialog_workload: {
+#}
 
 ui.dialogs.dialog_block_name: {
     SIMPLE_LESSONS_EXIST: "Dieser Kurs hat schon einfache Unterrichtsstunden."

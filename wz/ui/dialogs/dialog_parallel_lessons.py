@@ -41,9 +41,10 @@ if __name__ == "__main__":
 
 from core.basic_data import (
     TAG_FORMAT,
+    BlockTag,
 )
 from core.db_access import (
-    db_read_table,
+    db_read_fields,
     db_read_unique,
 )
 from ui.ui_base import (
@@ -64,7 +65,7 @@ from ui.ui_base import (
 #   (id: primary key)
 #   lesson_id: foreign key -> LESSONS.id (unique, non-null)
 #   TAG: The tag used to join a group of lessons
-#   WEIGHTING: 0 – 10 (empty is like 0?)
+#   WEIGHTING: 0 – 10 (empty is like 10)
 
 class ParallelsDialog(QDialog):
     @classmethod
@@ -75,39 +76,42 @@ class ParallelsDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent=parent)
         uic.loadUi(APPDATAPATH("ui/dialog_parallel_lessons.ui"), self)
-        pb = self.buttonBox.button(QDialogButtonBox.StandardButton.Reset)
-        pb.clicked.connect(self.reset)
-#        self.pb_accept = self.buttonBox.button(
-#            QDialogButtonBox.StandardButton.Ok
-#        )
+        self.pb_reset = self.buttonBox.button(
+            QDialogButtonBox.StandardButton.Reset
+        )
+        self.pb_reset.clicked.connect(self.reset)
+        self.pb_accept = self.buttonBox.button(
+            QDialogButtonBox.StandardButton.Ok
+        )
         validator = QRegularExpressionValidator(TAG_FORMAT)
         self.tag.setValidator(validator)
 
     @Slot(str)
     def on_tag_currentTextChanged(self, text): # show courses
-#        if self.disable_triggers:
-#            return
+        if self.disable_triggers:
+            return
+        self.value_changed()
+        self.lesson_list.clear()
         try:
             ref_list = self.tag_map[text]
         except KeyError:
             # no references
             return
-        self.lesson_list.clear()
         for r in ref_list:
             lid = r[1]
-            rlist = db_read_unique(
+            lg_id, ll, lt = db_read_unique(
                 "LESSONS",
                 ["lesson_group", "LENGTH", "TIME"], #?
                 id=lid,
             )
-            lg_id, ll, lt = rlist
-            rlist = db_read_unique(
+            bsid, btag = db_read_unique(
                 "LESSON_GROUP",
-                ["BLOCK_NAME"], #?
+                ["BLOCK_SID", "BLOCK_TAG"], #?
                 lesson_group=lg_id,
             )
-            bname = rlist[0]
-            if not bname:
+            if bsid:
+                bname = str(BlockTag.build(bsid, btag))
+            else:
                 rlist = db_read_unique(
                     "COURSE_LESSONS",
                     ["course"], #?
@@ -119,18 +123,50 @@ class ParallelsDialog(QDialog):
                     ["CLASS", "GRP", "SUBJECT", "TEACHER"], #?
                     course=course,
                 )
-                bname = f"{cdata[0]}.{cdata[1]}: {cdata[2]} / {cdata[3]}"
-            self.lesson_list.addItem(bname)
+                bname = f"{cdata[0]}.{cdata[1]}:{cdata[2]}/{cdata[3]}"
+            self.lesson_list.addItem(bname + f" || {ll}@{lt} #{r[2]}")
 
+    @Slot(int)
+    def on_weighting_valueChanged(self, i):
+        if self.disable_triggers:
+            return
+        self.value_changed()
+
+    def value_changed(self):
+        t = self.tag.currentText()
+        if t:
+            w = self.weighting.value()
+            self.pb_accept.setEnabled(t != self.tag0 or w != self.weight0)
+        else:
+            self.pb_accept.setEnabled(False) 
+
+#TODO: It might be better to pass tag and weight separately in and out ...
     def activate(self, start_value:str) -> str:
         """Open the dialog.
         """
         self.result = None
-#        self.disable_triggers = True
-        self.value0 = start_value
+        self.disable_triggers = True
+        if start_value:
+            try:
+                self.tag0, v = start_value.split('#', 1)
+            except ValueError:
+                self.tag0 = start_value
+                self.weight0 = 10
+            else:
+                try:
+                    w = int(v)
+                    if w < 0 or w > 10:
+                        raise ValueError
+                except ValueError:
+                    raise Bug(f"PARALLEL TAG+WEIGHTING: {start_value}")
+                self.weight0 = w
+        else:
+            self.tag0 = ""
+            self.weight0 = 10
+            self.pb_reset.hide()
         ## Populate the tag chooser
         self.tag_map = {}
-        f, records = db_read_table(
+        records = db_read_fields(
             "PARALLEL_LESSONS",
             ["TAG", "id", "lesson_id", "WEIGHTING"]
         )
@@ -150,8 +186,11 @@ class ParallelsDialog(QDialog):
                 self.tag_map[tag] = [data]
         self.tag.clear()
         self.tag.addItems(sorted(self.tag_map))
-        self.tag.setCurrentText(start_value)
-
+        self.tag.setCurrentIndex(-1)
+        self.weighting.setValue(self.weight0)
+        self.pb_accept.setEnabled(False)
+        self.disable_triggers = False
+        self.tag.setCurrentText(self.tag0)
         self.exec()
         return self.result
 
@@ -161,8 +200,8 @@ class ParallelsDialog(QDialog):
 
     def accept(self):
         t = self.tag.currentText()
-        if t and t != self.value0:
-            self.result = t
+        w = self.weighting.value()
+        self.result = f"{t}#{w}"
         super().accept()
 
 
@@ -172,4 +211,4 @@ if __name__ == "__main__":
     from core.db_access import open_database
     open_database()
     print("----->", ParallelsDialog.popup(""))
-    print("----->", ParallelsDialog.popup("TAG1"))
+    print("----->", ParallelsDialog.popup("TAG1#7"))

@@ -367,8 +367,7 @@ ui.dialogs.dialog_room_choice: {
 #}
 
 ui.dialogs.dialog_block_name: {
-    SIMPLE_LESSONS_EXIST: "Dieser Kurs hat schon einfache Unterrichtsstunden."
-    BLOCK_EXISTS: "Dieser Block existiert schon."
+    NEW_ITEM:       "Unterricht, Block oder Deputat"
 }
 
 ui.modules.grades_manager: {

@@ -34,7 +34,7 @@ if __name__ == "__main__":
     from core.base import start
     start.setup(os.path.join(basedir, 'TESTDATA'))
 
-#T = TRANSLATIONS("ui.dialogs.dialog_block_name")
+T = TRANSLATIONS("ui.dialogs.dialog_block_name")
 
 ### +++++
 
@@ -252,6 +252,8 @@ class BlockNameDialog(QDialog):
             if not workload:
                 self.only_pay.hide()
             self.blocks = blocks or []
+            self.setWindowTitle(T["NEW_ITEM"])
+
         ## Populate the subject chooser
         self.sid_list = []
         self.block_subject.clear()

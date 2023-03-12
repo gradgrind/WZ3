@@ -146,7 +146,8 @@ class CourseEditorPage(Page):
         for w in (
             self.payment, self.wish_room, self.block_name,
             self.notes,
-            self.lesson_length, self.wish_time, self.parallel,
+            #self.lesson_length, 
+            self.wish_time, self.parallel,
         ):
             w.installEventFilter(self)
 
@@ -505,7 +506,7 @@ class CourseEditorPage(Page):
             self.payment.setText(str(wd))
         if self.current_lesson.ROW_TYPE < 0:
             # payment entry or nothing selected
-            self.lesson_length.clear()
+            self.lesson_length.setCurrentIndex(-1)
             self.lesson_length.setEnabled(False)
             self.wish_room.clear()
             self.wish_room.setEnabled(False)
@@ -529,7 +530,7 @@ class CourseEditorPage(Page):
             self.lesson_add.setEnabled(True)
             if self.current_lesson.LESSON_GROUP_INFO["nLessons"] > 1:
                 self.lesson_sub.setEnabled(True)
-            self.lesson_length.setText(
+            self.lesson_length.setCurrentText(
                 str(self.current_lesson.LESSON_INFO["LENGTH"])
             )
             self.lesson_length.setEnabled(True)
@@ -574,7 +575,10 @@ class CourseEditorPage(Page):
         ### BLOCK (LESSON_GROUP)
         elif object_name == "block_name":
             lg = self.current_lesson.LESSON_GROUP_INFO
-            result = BlockNameDialog.popup(blocktag=lg["BlockTag"])
+            result = BlockNameDialog.popup(
+                blocktag=lg["BlockTag"],
+                parent=self
+            )
             if result is not None:
                 db_update_fields(
                     "LESSON_GROUP",
@@ -590,10 +594,7 @@ class CourseEditorPage(Page):
         ### NOTES (LESSON_GROUP)
         elif object_name == "notes":
             pass
-        ### LENGTH (LESSONS)
-        elif object_name == "lesson_length":
-            pass
-#redisplay?
+        ### LENGTH (LESSONS) --- own handler: on_lesson_length_ ...
         ### TIME (LESSONS)
         elif object_name == "wish_time":
             result = edit_time(self.current_lesson.LESSON_INFO)
@@ -601,7 +602,27 @@ class CourseEditorPage(Page):
                 obj.setText(result)
         ### PARALLEL (LESSONS)
         elif object_name == "parallel":
-            pass
+#TODO:
+#             pass
+            result = ParallelsDialog.popup(obj.text(), parent=self)
+            if result is not None:
+                print("->", result)
+                obj.setText(result)
+        else:
+            raise Bug(f"Click event on object {object_name}")
+
+    @Slot(str)
+    def on_lesson_length_textActivated(self, i):
+        ival = int(i)
+        if self.current_lesson.LESSON_INFO["LENGTH"] != ival:
+            lesson_select_id = self.current_lesson.LESSON_INFO["id"]
+            db_update_field(
+                "LESSONS", 
+                "LENGTH", ival, 
+                id=lesson_select_id
+            )
+            # Redisplay lessons
+            self.display_lessons(lesson_select_id)
 
     @Slot()
     def on_new_element_clicked(self):
@@ -626,6 +647,7 @@ class CourseEditorPage(Page):
             workload=workload,
             simple=simple,
             blocks=blockset,
+            parent=self,
         )
         if btag:
             if btag.sid:

@@ -603,37 +603,65 @@ class CourseEditorPage(Page):
         elif object_name == "parallel":
             pass
 
-
     @Slot()
     def on_new_element_clicked(self):
-#TODO
-        print("§NEW ELEMENT")
-        """Add a block course or a block lesson.
-        If no block entry is selected, add a new course reference.
-        This can be an existing course, in which case entries are added
-        for each lesson in the block. If it is a really new course,
-        add the necessary LESSON_GROUP and COURSE_LESSONS entries
-        before adding a lesson for this new block.
-        If a block entry is selected, add a lesson to the block.
+        """Add an item type: block, simple lesson or workload/payment.
+        The item can only be added when its type is not already present
+        for the course. A block may already exist (just add a reference
+        to this course) or may be completely new. If a simple lesson or
+        a new completely new course is added, a single lesson is also
+        added, together with the other necessary db table entries.
         """
         workload = True
         simple = True
-        blocks = []
+        blockset = set()
         for cl in self.course_lessons:
             if cl.ROW_TYPE == -1:
                 workload = False
             elif cl.ROW_TYPE == 0:
                 simple = False
             elif cl.ROW_TYPE > 0:
-                blocks.append(cl.LESSON_GROUP_INFO["BlockTag"])
+                blockset.add(cl.LESSON_GROUP_INFO["BlockTag"])
         btag = BlockNameDialog.popup(
             workload=workload,
             simple=simple,
-            blocks=blocks,
+            blocks=blockset,
         )
         if btag:
-            print("TODO->", btag)
-
+            if btag.sid:
+                lg = db_new_row(
+                    "LESSON_GROUP", 
+                    BLOCK_SID=btag.sid, 
+                    BLOCK_TAG=btag.tag,
+                    NOTES="",
+                )
+            elif btag.tag == "$":
+                # Workload/payment, no lesson_group
+                cl = db_new_row(
+                    "COURSE_LESSONS",
+                    course=self.course_id,
+                )
+                # Redisplay lessons
+                self.display_lessons(0)
+                return
+            else:
+                # "Simple" lesson_group
+                lg = db_new_row(
+                    "LESSON_GROUP", 
+                    NOTES="",
+                )
+            l = db_new_row(
+                "LESSONS",
+                lesson_group=lg,
+                LENGTH=1,
+            )
+            cl = db_new_row(
+                "COURSE_LESSONS",
+                course=self.course_id,
+                lesson_group=lg,
+            )
+            # Redisplay lessons
+            self.display_lessons(l)
 
     @Slot()
     def on_lesson_add_clicked(self):
@@ -653,9 +681,9 @@ class CourseEditorPage(Page):
     @Slot()
     def on_lesson_sub_clicked(self):
         """Remove a lesson from the current element. If this is a block,
-        that of course applies to the other participating courses as well.
-        If no element, a workload element or an element with only one
-        lesson is selected, this button should be disabled.
+        the removal of course applies to the other participating courses
+        as well. If no element, a workload element or an element with
+        only one lesson is selected, this button should be disabled.
         """
         li = self.current_lesson.LESSON_INFO
         lid = li["id"]
@@ -673,14 +701,12 @@ class CourseEditorPage(Page):
         self.display_lessons(newid)
 
     @Slot()
-#TODO: test
     def on_remove_element_clicked(self):
         """Remove the current element from the current course.
         If no other courses reference the element (which is always
         the case for simple lessons and workload/payment elements),
         the element (LESSON_GROUP entry) itself will be deleted.
         """
-        print("§REMOVE ELEMENT")
         cl = self.current_lesson.COURSE_LESSON_INFO["id"]
         lg = self.current_lesson.COURSE_LESSON_INFO["lesson_group"]
         db_delete_rows("COURSE_LESSONS", id=cl)

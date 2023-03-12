@@ -418,7 +418,7 @@ def sql_insert_from_dict(table, field_dict):
 
 def db_new_row(table, **values):
     qtext = sql_insert_from_dict(table, values)
-  # print("§§§", qtext)
+    print("§§§", qtext)
     query = QSqlQuery()
     if query.exec(qtext):
         newid = query.lastInsertId()

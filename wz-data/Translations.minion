@@ -341,6 +341,16 @@ ui.modules.course_editor: {
     REALLY_DELETE:  "Soll dieser „Kurs“ wirklich gelöscht werden?"
 }
 
+ui.dialogs.dialog_course_fields: {
+    EDIT_COURSE_FIELDS: "Kursfelder bearbeiten"
+    NEW_COURSE:     "Neuer Kurs"
+    COURSE_NOT_UNIQUE:  "Dieser Kurs (Klasse+Gruppe+Fach+Lehrkraft) existiert schon"
+    NO_CHANGES_TITLE: "Keine Änderungen"
+    NO_CHANGES:     "Die Daten sind unverändert ... trotzdem schließen?"
+    LOSE_CHANGES_TITLE: "Ungespeicherte Änderungen"
+    LOSE_CHANGES:   "Die Änderungen werden verworfen ... trotzdem schließen?"
+}
+
 ui.dialogs.dialog_day_period: {
     TAG_WITH_DOT_OR_AT: "Parallel-Kennung darf kein '.' oder '@' enthalten"
 }

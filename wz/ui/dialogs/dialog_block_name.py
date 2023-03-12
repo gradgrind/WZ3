@@ -146,7 +146,7 @@ class BlockNameDialog(QDialog):
 
     @Slot()
     def on_only_pay_clicked(self):
-        self.result = BlockTag("$", "", "") # an illegal value
+        self.result = BlockTag("", "$", "") # an illegal value
         super().accept()
 
     def init_courses(self, btag):
@@ -229,7 +229,7 @@ class BlockNameDialog(QDialog):
         blocktag: BlockTag=None,
         workload: bool=False,
         simple: bool=False,
-        blocks: list[BlockTag]=None
+        blocks: set[BlockTag]=None
     ) -> Optional[BlockTag]:
         """Open the dialog.
         """

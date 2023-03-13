@@ -1,7 +1,7 @@
 """
 ui/modules/course_editor.py
 
-Last updated:  2023-03-12
+Last updated:  2023-03-13
 
 Edit course and blocks+lessons data.
 
@@ -89,6 +89,7 @@ from ui.dialogs.dialog_room_choice import edit_room
 from ui.dialogs.dialog_workload import edit_workload
 from ui.dialogs.dialog_block_name import BlockNameDialog
 from ui.dialogs.dialog_parallel_lessons import ParallelsDialog
+from ui.dialogs.dialog_text_line import TextLineDialog
 
 # SUBJECT, CLASS and TEACHER are foreign keys with:
 #  on delete cascade + on update cascade
@@ -591,12 +592,18 @@ class CourseEditorPage(Page):
                 # Redisplay lessons
                 lesson_select_id = self.current_lesson.LESSON_INFO["id"]
                 self.display_lessons(lesson_select_id)
-
-
-#TODO ...
         ### NOTES (LESSON_GROUP)
         elif object_name == "notes":
-            pass
+            lg = self.current_lesson.LESSON_GROUP_INFO
+            result = TextLineDialog.popup(lg["NOTES"])
+            if result is not None:
+                db_update_field(
+                    "LESSON_GROUP",
+                    "NOTES",
+                    result,
+                    lesson_group=lg["lesson_group"]
+                )
+                obj.setText(result)
         ### LENGTH (LESSONS) --- own handler: on_lesson_length_ ...
         ### TIME (LESSONS)
         elif object_name == "wish_time":
@@ -605,19 +612,38 @@ class CourseEditorPage(Page):
                 obj.setText(result)
         ### PARALLEL (LESSONS)
         elif object_name == "parallel":
-#TODO:
-#             pass
             result = ParallelsDialog.popup(
                 self.current_parallel_tag, parent=self
             )
             if result is not None:
-                print("->", result)
-#TODO: I would need the id of any record which already references this
-# lesson, otherwise the lesson id for a new record.
-#                db_update_fields(
-#                    "PARALLEL_LESSONS", 
-#                    field_values,
-#                )
+                lid=self.current_lesson.LESSON_INFO["id"]
+                if self.current_parallel_tag.TAG:
+                    # There is already a parallel record
+                    if result.TAG:
+                        # Change the tag and/or weighting
+                        db_update_fields(
+                            "PARALLEL_LESSONS", 
+                            [
+                                ("TAG", result.TAG), 
+                                ("WEIGHTING", result.WEIGHTING),
+                            ],
+                            lesson_id = lid,
+                        )
+                    else:
+                        # Remove the record
+                        db_delete_rows(
+                            "PARALLEL_LESSONS",
+                            lesson_id = lid,
+                        )
+                else:
+                    assert(result.TAG)
+                    # Make a new parallel record
+                    db_new_row(
+                        "PARALLEL_LESSONS",
+                        lesson_id = lid,
+                        TAG=result.TAG,
+                        WEIGHTING=result.WEIGHTING,
+                    )
                 obj.setText(str(result))
         else:
             raise Bug(f"Click event on object {object_name}")

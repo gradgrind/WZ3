@@ -1,7 +1,7 @@
 """
 ui/modules/course_editor.py
 
-Last updated:  2023-03-13
+Last updated:  2023-03-14
 
 Edit course and blocks+lessons data.
 
@@ -85,8 +85,8 @@ from ui.ui_base import (
 )
 from ui.dialogs.dialog_course_fields import CourseEditorForm
 from ui.dialogs.dialog_day_period import edit_time
-from ui.dialogs.dialog_room_choice import edit_room
-from ui.dialogs.dialog_workload import edit_workload
+from ui.dialogs.dialog_room_choice import RoomDialog
+from ui.dialogs.dialog_workload import WorkloadDialog
 from ui.dialogs.dialog_block_name import BlockNameDialog
 from ui.dialogs.dialog_parallel_lessons import ParallelsDialog
 from ui.dialogs.dialog_text_line import TextLineDialog
@@ -563,18 +563,40 @@ class CourseEditorPage(Page):
         print("EDIT", object_name)
         ### PAYMENT (COURSE_LESSONS)
         if object_name == "payment":
-            result = edit_workload(self.current_lesson.COURSE_LESSON_INFO)
+            cl = self.current_lesson.COURSE_LESSON_INFO
+            result = WorkloadDialog.popup(start_value=cl, parent=self)
             if result is not None:
-                obj.setText(result)
+                # Update the db, no redisplay necessary
+                udmap = [
+                    (f, getattr(result, f))
+                    for f in ("WORKLOAD", "PAY_FACTOR", "WORK_GROUP")
+                ]
+                db_update_fields(
+                    "COURSE_LESSONS",
+                    udmap,
+                    id=cl["id"]
+                )
+                cl.update(dict(udmap))
+                obj.setText(str(result))
         ### ROOM (COURSE_LESSONS)
         elif object_name == "wish_room":
-            result = edit_room(
-                self.current_lesson.COURSE_LESSON_INFO,
-                Classes().get_classroom(
-                    self.course_dict["CLASS"], null_ok=True
-                )
+            cl = self.current_lesson.COURSE_LESSON_INFO
+            classroom = Classes().get_classroom(
+                self.course_dict["CLASS"], null_ok=True
+            )
+            result = RoomDialog.popup(
+                start_value=cl["ROOM"],
+                classroom=classroom,
+                parent=self
             )
             if result is not None:
+                db_update_field(
+                    "COURSE_LESSONS",
+                    "ROOM",
+                    result,
+                    id=cl["id"]
+                )
+                cl["ROOM"] = result
                 obj.setText(result)
         ### BLOCK (LESSON_GROUP)
         elif object_name == "block_name":
@@ -595,7 +617,7 @@ class CourseEditorPage(Page):
         ### NOTES (LESSON_GROUP)
         elif object_name == "notes":
             lg = self.current_lesson.LESSON_GROUP_INFO
-            result = TextLineDialog.popup(lg["NOTES"])
+            result = TextLineDialog.popup(lg["NOTES"], parent=self)
             if result is not None:
                 db_update_field(
                     "LESSON_GROUP",

@@ -1,7 +1,7 @@
 """
 ui/dialogs/dialog_room_choice.py
 
-Last updated:  2023-03-12
+Last updated:  2023-03-14
 
 Supporting "dialog" for the course editor – select room(s).
 
@@ -70,8 +70,13 @@ class RoomDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent=parent)
         uic.loadUi(APPDATAPATH("ui/dialog_room_choice.ui"), self)
-        pb = self.buttonBox.button(QDialogButtonBox.StandardButton.Reset)
-        pb.clicked.connect(self.reset)
+        self.pb_reset = self.buttonBox.button(
+            QDialogButtonBox.StandardButton.Reset
+        )
+        self.pb_reset.clicked.connect(self.reset)
+        self.pb_accept = self.buttonBox.button(
+            QDialogButtonBox.StandardButton.Ok
+        )
 # This would be an alternative to the built-in table search.
 #        self.roomlist.installEventFilter(self)
 
@@ -294,31 +299,6 @@ class RoomDialog(QDialog):
                 return True
         return False
     '''
-
-
-# Used by course/lesson editor
-def edit_room(course_lesson, classroom):
-    """Pop up a room choice dialog for the current course.
-    If the room is changed, update the database entry and return the
-    new value.
-    Otherwise return <None>.
-    The parameters are the <dict> containing the fields of the
-    COURSE_LESSONS record and the classroom.
-    """
-    result = RoomDialog.popup(
-        start_value=course_lesson["ROOM"],
-        classroom=classroom,
-        parent=APP.activeWindow()
-    )
-    if result is not None:
-        db_update_field(
-            "COURSE_LESSONS",
-            "ROOM",
-            result,
-            id=course_lesson["id"]
-        )
-        course_lesson["ROOM"] = result
-    return result
 
 
 # --#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#

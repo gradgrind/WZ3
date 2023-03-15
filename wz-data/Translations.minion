@@ -354,9 +354,8 @@ ui.dialogs.dialog_course_fields: {
     LOSE_CHANGES:   "Die Änderungen werden verworfen ... trotzdem schließen?"
 }
 
-ui.dialogs.dialog_day_period: {
-    TAG_WITH_DOT_OR_AT: "Parallel-Kennung darf kein '.' oder '@' enthalten"
-}
+#ui.dialogs.dialog_day_period: {
+#}
 
 ui.dialogs.dialog_room_choice: {
     INVALID_ROOM_IDS: "Ungültige Raumkürzel"

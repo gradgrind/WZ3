@@ -1,7 +1,7 @@
 """
 ui/modules/course_editor.py
 
-Last updated:  2023-03-14
+Last updated:  2023-03-15
 
 Edit course and blocks+lessons data.
 
@@ -84,7 +84,7 @@ from ui.ui_base import (
     uic,
 )
 from ui.dialogs.dialog_course_fields import CourseEditorForm
-from ui.dialogs.dialog_day_period import edit_time
+from ui.dialogs.dialog_day_period import DayPeriodDialog
 from ui.dialogs.dialog_room_choice import RoomDialog
 from ui.dialogs.dialog_workload import WorkloadDialog
 from ui.dialogs.dialog_block_name import BlockNameDialog
@@ -148,7 +148,7 @@ class CourseEditorPage(Page):
         for w in (
             self.payment, self.wish_room, self.block_name,
             self.notes,
-            #self.lesson_length, 
+            #self.lesson_length,
             self.wish_time, self.parallel,
         ):
             w.installEventFilter(self)
@@ -629,7 +629,19 @@ class CourseEditorPage(Page):
         ### LENGTH (LESSONS) --- own handler: on_lesson_length_ ...
         ### TIME (LESSONS)
         elif object_name == "wish_time":
-            result = edit_time(self.current_lesson.LESSON_INFO)
+            l = self.current_lesson.LESSON_INFO
+            result = DayPeriodDialog.popup(
+                start_value=l["TIME"],
+                parent=self
+            )
+            if result is not None:
+                db_update_field(
+                    "LESSONS",
+                    "TIME",
+                    result,
+                    id=l["id"]
+                )
+                l["TIME"] = result
             if result is not None:
                 obj.setText(result)
         ### PARALLEL (LESSONS)
@@ -644,9 +656,9 @@ class CourseEditorPage(Page):
                     if result.TAG:
                         # Change the tag and/or weighting
                         db_update_fields(
-                            "PARALLEL_LESSONS", 
+                            "PARALLEL_LESSONS",
                             [
-                                ("TAG", result.TAG), 
+                                ("TAG", result.TAG),
                                 ("WEIGHTING", result.WEIGHTING),
                             ],
                             lesson_id = lid,
@@ -676,8 +688,8 @@ class CourseEditorPage(Page):
         if self.current_lesson.LESSON_INFO["LENGTH"] != ival:
             lesson_select_id = self.current_lesson.LESSON_INFO["id"]
             db_update_field(
-                "LESSONS", 
-                "LENGTH", ival, 
+                "LESSONS",
+                "LENGTH", ival,
                 id=lesson_select_id
             )
             # Redisplay lessons
@@ -711,8 +723,8 @@ class CourseEditorPage(Page):
         if btag:
             if btag.sid:
                 lg = db_new_row(
-                    "LESSON_GROUP", 
-                    BLOCK_SID=btag.sid, 
+                    "LESSON_GROUP",
+                    BLOCK_SID=btag.sid,
                     BLOCK_TAG=btag.tag,
                     NOTES="",
                 )
@@ -728,7 +740,7 @@ class CourseEditorPage(Page):
             else:
                 # "Simple" lesson_group
                 lg = db_new_row(
-                    "LESSON_GROUP", 
+                    "LESSON_GROUP",
                     NOTES="",
                 )
             l = db_new_row(

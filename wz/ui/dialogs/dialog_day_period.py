@@ -100,29 +100,33 @@ class DayPeriodDialog(QDialog):
 
     def activate(self, start_value):
         self.result = None
-        self.value0 = start_value
+        self.suppress_events = True
         self.pb_reset.setVisible(bool(start_value))
         try:
             d, p = timeslot2index(start_value)
+            self.dp0 = (d, p)
             if d < 0:
                 d, p = 0, 0
-                self.pb_accept.setEnabled(True)
-            else:
-                self.pb_accept.setEnabled(False)
         except ValueError as e:
             REPORT("ERROR", str(e))
+            self.dp0 = (-1, -1)
             d, p = 0, 0
-            self.pb_accept.setEnabled(True)
         self.daylist.setCurrentRow(d)
         self.periodlist.setCurrentRow(p)
+        self.acceptable()
+        self.suppress_events = False
         self.exec()
         return self.result
 
     def on_daylist_currentRowChanged(self, i):
-        pass
+        self.acceptable()
 
     def on_periodlist_currentRowChanged(self, i):
-        pass
+        self.acceptable()
+
+    def acceptable(self):
+        dp = (self.daylist.currentRow(), self.periodlist.currentRow())
+        self.pb_accept.setEnabled(dp != self.dp0)
 
 
 # --#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#

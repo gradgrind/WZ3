@@ -1,7 +1,7 @@
 """
 ui/dialogs/dialog_room_choice.py
 
-Last updated:  2023-03-14
+Last updated:  2023-03-16
 
 Supporting "dialog" for the course editor – select room(s).
 
@@ -90,9 +90,7 @@ class RoomDialog(QDialog):
             self.roomlist.setCurrentCell(item.row(), 0)
 
     def accept(self):
-        val = self.roomtext.text()
-        if val != self.value0:
-            self.result = val
+        self.result = self.roomtext.text()
         super().accept()
 
     def reset(self):
@@ -183,6 +181,7 @@ class RoomDialog(QDialog):
         if self.extra.isChecked():
             text += "+"
         self.roomtext.setText(text)
+        self.pb_accept.setEnabled(text != self.value0)
 
     def checkroom(self, roomid, choice_list):
         """Check that the given room-id is valid.

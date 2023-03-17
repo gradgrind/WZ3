@@ -1,7 +1,7 @@
 """
 ui/modules/course_editor.py
 
-Last updated:  2023-03-15
+Last updated:  2023-03-17
 
 Edit course and blocks+lessons data.
 
@@ -127,9 +127,6 @@ class LessonRowData(NamedTuple):
     LESSON_INFO: dict
 
 ### -----
-
-def init():
-    MAIN_WIDGET.add_tab(CourseEditorPage())
 
 class CourseEditorPage(Page):
     def __init__(self):

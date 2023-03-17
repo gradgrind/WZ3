@@ -1,7 +1,7 @@
 """
-ui/dialogs/dialog_room_choice.py
+ui/dialogs/dialog_workload.py
 
-Last updated:  2023-03-14
+Last updated:  2023-03-17
 
 Supporting "dialog" for the course editor – set workload/pay.
 
@@ -58,6 +58,7 @@ from ui.ui_base import (
     QRegularExpressionValidator,
     ### other
     uic,
+    Slot,
 )
 
 ### -----
@@ -70,9 +71,14 @@ class WorkloadDialog(QDialog):
 
     def __init__(self, parent=None):
         super().__init__(parent=parent)
+        self.val0 = None
+        self.suppress_events = True
         uic.loadUi(APPDATAPATH("ui/dialog_workload.ui"), self)
-        pb = self.buttonBox.button(QDialogButtonBox.StandardButton.Reset)
-        pb.clicked.connect(self.reset)
+        self.pb_reset = self.buttonBox.button(QDialogButtonBox.StandardButton.Reset)
+        self.pb_reset.clicked.connect(self.reset)
+        self.pb_accept = self.buttonBox.button(
+            QDialogButtonBox.StandardButton.Ok
+        )
         v = QRegularExpressionValidator(PAYMENT_FORMAT)
         self.workload.setValidator(v)
         self.factor_list = []
@@ -89,10 +95,12 @@ class WorkloadDialog(QDialog):
         Return a <Workload> instance if the data is changed.
         """
         self.result = None
+        self.suppress_events = True
         self.val0 = Workload(**start_value)
-        w = self.val0.WORKLOAD
-        self.workload.setText(w)
-        self.nlessons.setChecked(bool(w))
+        self.pb_reset.setVisible(not self.val0.isNone())
+        self.field_w = self.val0.WORKLOAD
+        self.workload.setText(self.field_w)
+        self.nlessons.setChecked(bool(self.field_w))
         if self.val0.isValid():
             try:
                 i = self.factor_list.index(self.val0.PAY_FACTOR)
@@ -100,17 +108,57 @@ class WorkloadDialog(QDialog):
                 raise Bug(f"Unknown PAY_FACTOR: {self.val0.PAY_FACTOR}")
         else:
             i = 0
+        self.field_wg = self.val0.WORK_GROUP
+        self.work_group.setText(self.field_wg)
         self.pay_factor.setCurrentIndex(i)
-        self.work_group.setText(self.val0.WORK_GROUP)
+        self.field_pf = self.factor_list[i]
+        self.suppress_events = False
+        self.set_nlessons(bool(self.field_w))
         self.exec()
         return self.result
 
+    @Slot(bool)
     def on_nlessons_toggled(self, state):
+        if self.suppress_events:
+            return
+        self.set_nlessons(state)
+
+    def set_nlessons(self, state):
         if state:
-            self.workload.setText("1")
+            self.field_w = "1"
+            self.field_wg = self.work_group.text()
         else:
-            self.workload.setText("")
-            self.work_group.setText("")
+            self.field_w = ""
+            self.field_wg = ""
+            self.work_group.setText(self.field_wg)
+        self.workload.setText(self.field_w)
+        self.acceptable()
+
+    @Slot(int)
+    def on_pay_factor_currentIndexChanged(self, i):
+        if self.suppress_events:
+            return
+        self.field_pf = self.factor_list[i]
+        self.acceptable()
+
+    @Slot(str)
+    def on_workload_textEdited(self, w):
+        self.field_w = w
+        self.acceptable()
+
+    @Slot(str)
+    def on_work_group_textEdited(self, wg):
+        self.field_wg = wg
+        self.acceptable()
+
+    def acceptable(self):
+        self.pb_accept.setEnabled(
+            self.field_pf != '!' and (
+                self.field_w != self.val0.WORKLOAD
+                or self.field_wg != self.val0.WORK_GROUP
+                or self.field_pf != self.val0.PAY_FACTOR
+            )
+        )
 
     def reset(self):
         """Return an "empty" value."""
@@ -118,15 +166,10 @@ class WorkloadDialog(QDialog):
         super().accept()
 
     def accept(self):
-        w = self.workload.text()
-        wg = self.work_group.text()
-        pf = self.factor_list[self.pay_factor.currentIndex()]
-        r = Workload(w, pf, wg)
-        if r.PAY_FACTOR == '!':
-            return  # invalid data
-        if r != self.val0:
-            self.result = r
-        super().accept()
+        wl = Workload(self.field_w, self.field_pf, self.field_wg)
+        if wl.PAY_FACTOR != '!':
+            self.result = wl
+            super().accept()
         
 
 # --#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#
@@ -134,6 +177,9 @@ class WorkloadDialog(QDialog):
 if __name__ == "__main__":
     from core.db_access import open_database
     open_database()
+    print("----->", WorkloadDialog.popup(
+        {"WORKLOAD": "", "PAY_FACTOR": "", "WORK_GROUP": ""}
+    ))
     print("----->", WorkloadDialog.popup(
         {"WORKLOAD": "", "PAY_FACTOR": "HuKl", "WORK_GROUP": ""}
     ))

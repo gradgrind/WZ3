@@ -74,6 +74,14 @@ from ui.ui_base import (
 )
 from ui.dialogs.dialog_text_line import TextLineDialog
 
+TEACHER_FIELDS = (
+    "TID",
+    "FIRSTNAMES",
+    "LASTNAMES",
+    "SIGNED",
+    "SORTNAME",
+)
+
 ### -----
 
 class TeacherEditorPage(Page):
@@ -113,102 +121,54 @@ class TeacherEditorPage(Page):
 
     def enter(self):
         open_database()
-        clear_cache()
+#?
+#         clear_cache()
         self.init_data()
-        self.combo_filter.setCurrentIndex(-1)
-        self.combo_filter.setCurrentIndex(0)
 
 # ++++++++++++++ The widget implementation fine details ++++++++++++++
 
     def  init_data(self):
-        teachers = Teachers()
-        self.filter_list = {
-            "CLASS": Classes().get_class_list(skip_null=False),
-            "SUBJECT": get_subjects(),
-            "TEACHER": [
-                (tid, teachers.name(tid))
-                for tid, tiddata in teachers.items()
-            ]
-        }
-        self.course_field_editor = None
+        self.load_teacher_table(0)
 
-    @Slot(int)
-    def on_combo_filter_currentIndexChanged(self, i):
-        """Handle a change of filter field for the course table."""
-        if i < 0:
-            return
-        # class, subject, teacher
-        self.filter_field = FOREIGN_FIELDS[i]
-        # print("§§§ on_combo_filter_currentIndexChanged", i, self.filter_field)
-        self.select_list = self.filter_list[self.filter_field]
-        self.combo_class.clear()
-        for kv in self.select_list:
-            self.combo_class.addItem(kv[1])
-
-    @Slot(int)
-    def on_combo_class_currentIndexChanged(self, i):
-        """View selection changed, reload the course table.
-        The method name is a bit of a misnomer, as the selector can be
-        class, teacher or subject.
-        """
-        if i >= 0:
-            self.load_course_table(i, 0)
-
-    def load_course_table(self, select_index, table_row):
-        self.filter_value = self.select_list[select_index][0]
+    def load_teacher_table(self, table_row):
+#?
         self.suppress_handlers = True
+
         fields, records = db_read_full_table(
-            "COURSES",
-            sort_field="SUBJECT",
-            **{self.filter_field: self.filter_value}
+            "TEACHERS",
+            sort_field="SORTNAME",
         )
-        # Populate the course table
-        self.course_table.setRowCount(len(records))
-        self.courses = []
+        # Populate the teachers table
+        self.teacher_table.setRowCount(len(records))
+        self.teacher_list = []
         for r, rec in enumerate(records):
             rdict = {fields[i]: val for i, val in enumerate(rec)}
-            self.courses.append(rdict)
+            self.teacher_list.append(rdict)
             # print("  --", rdict)
             c = 0
-            for cid, ctype, align in COURSE_TABLE_FIELDS:
-                cell_value = rdict[cid]
-                item = self.course_table.item(r, c)
+            for field in TEACHER_FIELDS:
+                cell_value = rdict[field]
+                item = self.teacher_table.item(r, c)
                 if not item:
                     item = QTableWidgetItem()
-                    if align == -1:
-                        a = Qt.AlignmentFlag.AlignLeft
-                    elif align == 1:
-                        a = Qt.AlignmentFlag.AlignRight
-                    else:
-                        a = Qt.AlignmentFlag.AlignHCenter
-                    item.setTextAlignment(a | Qt.AlignmentFlag.AlignVCenter)
-                    self.course_table.setItem(r, c, item)
-                if ctype == 1:
-#TODO: rather use a map?
-                    for k, v in self.filter_list[cid]:
-                        if k == cell_value:
-                            item.setText(v)
-                            break
-                    else:
-                        REPORT(
-                            "ERROR",
-                            T["UNKNOWN_VALUE_IN_FIELD"].format(
-                                cid=cid, cell_value=cell_value
-                            )
-                        )
-                else:
-                    item.setText(cell_value)
+#                    if align == -1:
+#                        a = Qt.AlignmentFlag.AlignLeft
+#                    elif align == 1:
+#                        a = Qt.AlignmentFlag.AlignRight
+#                    else:
+#                        a = Qt.AlignmentFlag.AlignHCenter
+#                    item.setTextAlignment(a | Qt.AlignmentFlag.AlignVCenter)
+                    self.teacher_table.setItem(r, c, item)
+                item.setText(cell_value)
                 c += 1
+#?
         self.suppress_handlers = False
-        self.course_table.setCurrentCell(-1, 0)
-        self.course_dict = None
-        self.pb_delete_course.setEnabled(False)
-        self.pb_edit_course.setEnabled(False)
-        self.frame_r.setEnabled(False)
+
+        self.teacher_table.setCurrentCell(-1, 0)
         if len(records) > 0:
             if table_row >= len(records):
                 table_row = len(records) - 1
-            self.course_table.setCurrentCell(table_row, 0)
+            self.teacher_table.setCurrentCell(table_row, 0)
 
     def on_course_table_itemSelectionChanged(self):
         row = self.course_table.currentRow()
@@ -755,7 +715,7 @@ class TeacherEditorPage(Page):
 if __name__ == "__main__":
     from ui.ui_base import run
 
-    widget = CourseEditorPage()
+    widget = TeacherEditorPage()
     widget.enter()
     widget.resize(1000, 550)
     run(widget)

@@ -275,16 +275,13 @@ ui.modules.pupils_manager: {
     NO_CHANGES:     "Keine Änderungen!"
 }
 
-ui.modules.teachers: {
+ui.modules.teacher_editor: {
+#?
     # Messages
     INVALID_AVAILABILITY:   "Gültig sind '+', '-' und '*', nicht '{val}'"
     INVALID_PERIOD_VALUES:  "Die Verfügbarkeitsdaten mussten {n}-mal angepasst werden.\n  Ursprünglich:\n{val}"
     UNIQUE_FIELDS:  "Die Hauptfelder müssen einmalig sein."
     
-    # Labels
-    MODULE_NAME:    Lehrkräfte
-    MODULE_TITLE:   "Lehrerdaten verwalten"
-
     # Teacher field editor buttons
     DELETE:         Löschen
     UPDATE:         Übernehmen

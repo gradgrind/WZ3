@@ -1,7 +1,7 @@
 """
 core/db_access.py
 
-Last updated:  2023-03-05
+Last updated:  2023-03-18
 
 Helper functions for accessing the database.
 
@@ -277,7 +277,7 @@ def db_read_table(
     while query.next():
         value_list.append([query.value(i) for i in range(nfields)])
     if fields:
-        if len(fields) != nfields:
+        if value_list and len(fields) != nfields:
             raise Bug(f"Wrong number of fields in record: {nfields} ≠ {len(fields)}")
         return fields, value_list
     else:

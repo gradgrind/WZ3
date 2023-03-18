@@ -140,6 +140,79 @@
          </column>
         </widget>
        </item>
+       <item>
+        <layout class="QHBoxLayout" name="horizontalLayout_2">
+         <item>
+          <spacer name="horizontalSpacer_3">
+           <property name="orientation">
+            <enum>Qt::Horizontal</enum>
+           </property>
+           <property name="sizeHint" stdset="0">
+            <size>
+             <width>40</width>
+             <height>20</height>
+            </size>
+           </property>
+          </spacer>
+         </item>
+         <item>
+          <widget class="QToolButton" name="pb_remove">
+           <property name="toolTip">
+            <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;aktuelle Lehrperson aus der Datenbank entfernen&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+           </property>
+           <property name="text">
+            <string>...</string>
+           </property>
+           <property name="icon">
+            <iconset>
+             <normaloff>../icons/icon_remove.svg</normaloff>../icons/icon_remove.svg</iconset>
+           </property>
+           <property name="iconSize">
+            <size>
+             <width>30</width>
+             <height>30</height>
+            </size>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <spacer name="horizontalSpacer">
+           <property name="orientation">
+            <enum>Qt::Horizontal</enum>
+           </property>
+           <property name="sizeType">
+            <enum>QSizePolicy::Fixed</enum>
+           </property>
+           <property name="sizeHint" stdset="0">
+            <size>
+             <width>40</width>
+             <height>20</height>
+            </size>
+           </property>
+          </spacer>
+         </item>
+         <item>
+          <widget class="QToolButton" name="pb_new">
+           <property name="toolTip">
+            <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;neue Lehrperson&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+           </property>
+           <property name="text">
+            <string>...</string>
+           </property>
+           <property name="icon">
+            <iconset>
+             <normaloff>../icons/icon_new.svg</normaloff>../icons/icon_new.svg</iconset>
+           </property>
+           <property name="iconSize">
+            <size>
+             <width>30</width>
+             <height>30</height>
+            </size>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </item>
       </layout>
      </widget>
      <widget class="QFrame" name="frame_r">
@@ -169,7 +242,7 @@
           </widget>
          </item>
          <item row="0" column="1">
-          <widget class="QLineEdit" name="tid">
+          <widget class="QLineEdit" name="TID">
            <property name="readOnly">
             <bool>true</bool>
            </property>
@@ -183,7 +256,7 @@
           </widget>
          </item>
          <item row="1" column="1">
-          <widget class="QLineEdit" name="firstnames">
+          <widget class="QLineEdit" name="FIRSTNAMES">
            <property name="readOnly">
             <bool>true</bool>
            </property>
@@ -197,7 +270,7 @@
           </widget>
          </item>
          <item row="2" column="1">
-          <widget class="QLineEdit" name="lastnames">
+          <widget class="QLineEdit" name="LASTNAMES">
            <property name="text">
             <string/>
            </property>
@@ -217,7 +290,7 @@
           </widget>
          </item>
          <item row="3" column="1">
-          <widget class="QLineEdit" name="signature">
+          <widget class="QLineEdit" name="SIGNED">
            <property name="text">
             <string/>
            </property>
@@ -234,7 +307,7 @@
           </widget>
          </item>
          <item row="4" column="1">
-          <widget class="QLineEdit" name="sortname">
+          <widget class="QLineEdit" name="SORTNAME">
            <property name="text">
             <string/>
            </property>
@@ -260,7 +333,7 @@
         </widget>
        </item>
        <item>
-        <widget class="QTableWidget" name="tableWidget"/>
+        <widget class="QTableWidget" name="AVAILABLE"/>
        </item>
        <item>
         <widget class="Line" name="line_2">
@@ -279,7 +352,7 @@
           </widget>
          </item>
          <item row="0" column="1">
-          <widget class="QLineEdit" name="min_lessons_per_day"/>
+          <widget class="QLineEdit" name="MIN_LESSONS_PER_DAY"/>
          </item>
          <item row="1" column="0">
           <widget class="QLabel" name="label_3">
@@ -289,7 +362,7 @@
           </widget>
          </item>
          <item row="1" column="1">
-          <widget class="QLineEdit" name="max_free_per_day"/>
+          <widget class="QLineEdit" name="MAX_GAPS_PER_DAY"/>
          </item>
          <item row="2" column="0">
           <widget class="QLabel" name="label_4">
@@ -299,7 +372,7 @@
           </widget>
          </item>
          <item row="2" column="1">
-          <widget class="QLineEdit" name="max_free_per_week"/>
+          <widget class="QLineEdit" name="MAX_GAPS_PER_WEEK"/>
          </item>
          <item row="3" column="0">
           <widget class="QLabel" name="label_5">
@@ -309,7 +382,7 @@
           </widget>
          </item>
          <item row="3" column="1">
-          <widget class="QLineEdit" name="max_consecutive"/>
+          <widget class="QLineEdit" name="MAX_CONSECUTIVE_LESSONS"/>
          </item>
         </layout>
        </item>
@@ -321,11 +394,11 @@
  </widget>
  <tabstops>
   <tabstop>teacher_table</tabstop>
-  <tabstop>tid</tabstop>
-  <tabstop>firstnames</tabstop>
-  <tabstop>lastnames</tabstop>
-  <tabstop>signature</tabstop>
-  <tabstop>sortname</tabstop>
+  <tabstop>TID</tabstop>
+  <tabstop>FIRSTNAMES</tabstop>
+  <tabstop>LASTNAMES</tabstop>
+  <tabstop>SIGNED</tabstop>
+  <tabstop>SORTNAME</tabstop>
  </tabstops>
  <resources/>
  <connections/>

@@ -82,6 +82,14 @@ TEACHER_FIELDS = (
     "SORTNAME",
 )
 
+TT_FIELDS = (
+    "AVAILABLE",
+    "MIN_LESSONS_PER_DAY",
+    "MAX_GAPS_PER_DAY",
+    "MAX_GAPS_PER_WEEK",
+    "MAX_CONSECUTIVE_LESSONS",
+)
+
 ### -----
 
 class TeacherEditorPage(Page):
@@ -94,10 +102,10 @@ class TeacherEditorPage(Page):
         # Set up activation for the editors for the read-only lesson/block
         # fields:
         for w in (
-            self.tid, self.firstnames, self.lastnames,
-            self.signature, self.sortname,
-            self.min_lessons_per_day, self.max_free_per_day,
-            self.max_free_per_week,self.max_consecutive,
+            self.TID, self.FIRSTNAMES, self.LASTNAMES,
+            self.SIGNED, self.SORTNAME,
+            self.MIN_LESSONS_PER_DAY, self.MAX_GAPS_PER_DAY,
+            self.MAX_GAPS_PER_WEEK, self.MAX_CONSECUTIVE_LESSONS,
         ):
             w.installEventFilter(self)
 
@@ -130,7 +138,9 @@ class TeacherEditorPage(Page):
     def  init_data(self):
         self.load_teacher_table(0)
 
-    def load_teacher_table(self, table_row):
+    def load_teacher_table(self, table_row=None, tid=None):
+        if tid is not None and table_row is not None:
+            raise Bug("load_teacher_table: both table_row and tid supplied")
 #?
         self.suppress_handlers = True
 
@@ -143,6 +153,8 @@ class TeacherEditorPage(Page):
         self.teacher_list = []
         for r, rec in enumerate(records):
             rdict = {fields[i]: val for i, val in enumerate(rec)}
+            if tid is not None and rdict["TID"] == tid:
+                table_row = r
             self.teacher_list.append(rdict)
             # print("  --", rdict)
             c = 0
@@ -151,194 +163,81 @@ class TeacherEditorPage(Page):
                 item = self.teacher_table.item(r, c)
                 if not item:
                     item = QTableWidgetItem()
-#                    if align == -1:
-#                        a = Qt.AlignmentFlag.AlignLeft
-#                    elif align == 1:
-#                        a = Qt.AlignmentFlag.AlignRight
-#                    else:
-#                        a = Qt.AlignmentFlag.AlignHCenter
-#                    item.setTextAlignment(a | Qt.AlignmentFlag.AlignVCenter)
                     self.teacher_table.setItem(r, c, item)
                 item.setText(cell_value)
                 c += 1
+        self.teacher_dict = None
 #?
         self.suppress_handlers = False
 
         self.teacher_table.setCurrentCell(-1, 0)
         if len(records) > 0:
+            if table_row is None:
+                table_row = 0
             if table_row >= len(records):
                 table_row = len(records) - 1
             self.teacher_table.setCurrentCell(table_row, 0)
 
-    def on_course_table_itemSelectionChanged(self):
-        row = self.course_table.currentRow()
+    def on_teacher_table_itemSelectionChanged(self):
+#        if self.suppress_handlers:
+#            return
+        row = self.teacher_table.currentRow()
         print("§§§ on_course_table_itemSelectionChanged", row)
         if row >= 0:
-            self.pb_delete_course.setEnabled(True)
-            self.pb_edit_course.setEnabled(True)
-            self.course_dict = self.courses[row]
-            self.set_course(self.course_dict["course"])
-            self.frame_r.setEnabled(True)
+            self.teacher_dict = self.teacher_list[row]
+            self.set_teacher()
+            self.pb_remove.setEnabled(row > 0)
+            self.frame_r.setEnabled(row > 0)
         else:
             # e.g. when entering an empty table
-            print("EMPTY TABLE")
+            raise Bug("No teachers")
 
-    def set_course(self, course: int):
-        print("SET COURSE:", repr(course))
-        self.course_id = course
-        self.display_lessons(-1)
-
-    def display_lessons(self, lesson_select_id: int):
-        """Fill the lesson table for the current course (<self.course_id>).
-        If <lesson_select_id> is 0, select the workload/payment element.
-        If <lesson_select_id> is above 0, select the lesson with the given id.
-        Otherwise select no element.
-        """
-        fields, records = db_read_full_table(
-            "COURSE_LESSONS", course=self.course_id
-        )
-        print("§§§ COURSE_LESSONS:", fields)
-
-        ### Build a list of entries
-        ## First loop through entries in COURSE_LESSONS
-        self.lesson_table_suppress_update = True
-        self.lesson_table.setRowCount(0)
-        self.course_lessons = []
-        row = 0
-
-#NOTE: There should be only one COURSE_LESSONS entry for "simple lesson"
-# types and "workload/payment" types. For "block lesson" types there can
-# be more than one entry, but they should be connected with LESSON_GROUP
-# entries with distinct (non-empty) BLOCK_x values.
-# If violations are discovered, there should be an error report. It
-# might be helpful to delete the offending entries, but as they are
-# really not expected – and should not be possible – it is perhaps
-# better to report the offending entries and not to delete them, so
-# that they are available for debugging purposes – the report could
-# be via a bug exception?
-
-# Also note how the parameters are set in various tables. The room
-# wish and pay details apply to all lesson components as they are set in
-# COURSE_LESSONS. Only the time wish is set in the lesson component.
-# This may be a bit restrictive, but is perhaps reasonable for most
-# cases. If it is really essential to have a particular room for a
-# particular lesson (and another one, or a choice, for another lesson),
-# perhaps some additional constraint could be added ...
-
-        workload_element = False
-        simple_element = False
-        row_to_select = -1
-        for rec in records:
-            cldict = {fields[i]: val for i, val in enumerate(rec)}
-            # <cldict> contains workload/payment and room-wish fields
-            lg = cldict["lesson_group"]
-            if lg:
-                lgfields, lgrecord = db_read_unique_entry(
-                    "LESSON_GROUP", lesson_group=lg
-                )
-                lgdata = {
-                    lgfields[i]: val for i, val in enumerate(lgrecord)
-                }
-                # This contains the block-name, if any
-                block_sid = lgdata["BLOCK_SID"]
-                block_tag = lgdata["BLOCK_TAG"]
-                # The uniqueness of a block name should be enforced by
-                # the UNIQUE constraint on the LESSON_GROUP table
-                # ("BLOCK_SID" + "BLOCK_TAG" fields).
-                # The uniqueness of a course/lesson_group connection
-                # should be enforced by the UNIQUE constraint on the
-                # COURSE_LESSONS table ("course" + "lesson_group" fields).
-                if block_sid:
-                    etype = 1
-                    icon = self.icons["BLOCK"]
-                    bt = BlockTag.build(block_sid, block_tag)
-                    lgdata["BlockTag"] = bt
-                else:
-                    if simple_element:
-                        raise Bug(
-                            "Multiple entries in COURSE_LESSONS"
-                            f"for simple lesson item, course {self.course_id}"
-                        )
-                    simple_element = True
-                    etype = 0
-                    icon = self.icons["LESSON"]
-                lfields, lrecords = db_read_full_table(
-                    "LESSONS", lesson_group=lg
-                )
-                lgdata["nLessons"] = len(lrecords)
-                for lrec in lrecords:
-                    self.lesson_table.insertRow(row)
-                    ldata = {lfields[i]: val for i, val in enumerate(lrec)}
-                    w = QTableWidgetItem(icon, "")
-                    self.lesson_table.setItem(row, 0, w)
-                    ln = ldata["LENGTH"]
-                    w = QTableWidgetItem(str(ln))
-                    self.lesson_table.setItem(row, 1, w)
-                    if etype == 1:
-                        w = QTableWidgetItem(bt.subject)
-                        self.lesson_table.setItem(row, 2, w)
-                    self.course_lessons.append(
-                        LessonRowData(etype, cldict, lgdata, ldata)
-                    )
-                    if ldata["id"] == lesson_select_id:
-                        row_to_select = row
-                    row += 1
-            else:
-                # payment/workload item
-                if workload_element:
-                    raise Bug("Multiple entries in COURSE_LESSONS"
-                        f"for workload item, course {self.course_id}"
-                    )
-                workload_element = True
-                if lesson_select_id == 0:
-                    row_to_select = row
-                self.lesson_table.insertRow(row)
-                w = QTableWidgetItem(self.icons["PAY"], "")
-                self.lesson_table.setItem(row, 0, w)
-                w = QTableWidgetItem("–")
-                self.lesson_table.setItem(row, 1, w)
-                self.course_lessons.append(
-                    LessonRowData(-1, cldict, None, None)
-                )
-                row += 1
-        self.lesson_table.setCurrentCell(row_to_select, 0)
-        self.lesson_table_suppress_update = False
-        self.on_lesson_table_itemSelectionChanged()
-
-#TODO: Is something like this needed?
-# Toggle the stretch on the last section because of a possible bug in
-# Qt, where the stretch can be lost when repopulating.
-#        hh = table.horizontalHeader()
-#        hh.setStretchLastSection(False)
-#        hh.setStretchLastSection(True)
+    def set_teacher(self):
+        self.teacher_id = self.teacher_dict["TID"]
+        for k, v in self.teacher_dict.items():
+            getattr(self, k).setText(v)
+        try:
+            record = db_read_unique(
+                "TT_TEACHER",
+                TT_FIELDS,
+                TID=self.teacher_id
+            )
+            ttdict = {f: record[i] for i, f in enumerate(TT_FIELDS)}
+        except NoRecord:
+            ttdict = {f: "" for f in TT_FIELDS}
+        self.tt_available = ttdict.pop("AVAILABLE")
+        for k, v in ttdict.items():
+            getattr(self, k).setText(v)
 
     @Slot()
-    def on_pb_delete_course_clicked(self):
-        """Delete the current course."""
-        row = self.course_table.currentRow()
+    def on_pb_new_clicked(self):
+        """Add a new teacher.
+        The fields will initially have dummy values.
+        """
+        tid = db_new_row(
+            "TEACHERS",
+            **{f: "?" for f in TEACHER_FIELDS}
+        )
+        print("$NEW", tid)
+        self.load_teacher_table(tid=tid)
+
+    @Slot()
+    def on_pb_remove_clicked(self):
+        """Remove the current teacher."""
+        row = self.teacher_table.currentRow()
         if row < 0:
-            raise Bug("No course, delete button should be disabled")
-        if not SHOW_CONFIRM(T["REALLY_DELETE"]):
+            raise Bug("No teacher selected")
+        if not SHOW_CONFIRM(T["REALLY_DELETE"].format(**self.teacher_dict)):
             return
-        if db_delete_rows("COURSES", course=self.course_id):
+        if db_delete_rows("TEACHERS", TID=self.teacher_id):
 #TODO: Check that the db tidying really occurs:
             # The foreign key constraints should tidy up the database.
-            # Reload the course table
-            self.load_course_table(self.combo_class.currentIndex(), row)
+            # Reload the teacher table
+            self.load_teacher_table(row)
 
-    @Slot(int,int)
-    def on_course_table_cellDoubleClicked(self, r, c):
-        self.edit_course(r)
 
-    @Slot()
-    def on_pb_edit_course_clicked(self):
-        self.edit_course(self.course_table.currentRow())
 
-    def edit_course(self, row):
-        """Activate the course field editor."""
-        changes = self.edit_course_fields(self.course_dict)
-        if changes:
-            self.update_course(row, changes)
+
 
     def update_course(self, row, changes):
         if db_update_fields(
@@ -350,36 +249,8 @@ class TeacherEditorPage(Page):
         else:
             raise Bug(f"Course update ({self.course_id}) failed: {changes}")
 
-    @Slot()
-    def on_pb_new_course_clicked(self):
-        """Add a new course.
-        The fields of the current course, if there is one, will be taken
-        as "template".
-        """
-        if self.course_dict:
-            cdict = self.course_dict.copy()
-        else:
-            cdict = {
-                "CLASS": "",
-                "GRP": "",
-                "SUBJECT": "",
-                "TEACHER": "",
-                "REPORT": "",
-                "GRADES": "",
-                "REPORT_SUBJECT": "",
-                "AUTHORS": "",
-                "INFO": "",
-            }
-            cdict[self.filter_field] = self.filter_value
-        cdict["course"] = 0
-        changes = self.edit_course_fields(cdict)
-        if changes:
-            cdict.update(changes)
-            db_new_row("COURSES", **cdict)
-            self.load_course_table(
-                self.combo_class.currentIndex(),
-                self.course_table.currentRow()
-            )
+
+
 
     def edit_course_fields(self, course_dict):
         if not self.course_field_editor:

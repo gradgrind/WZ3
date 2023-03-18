@@ -276,6 +276,7 @@ ui.modules.pupils_manager: {
 }
 
 ui.modules.teacher_editor: {
+    REALLY_DELETE:  "Soll {FIRSTNAMES} {LASTNAMES} wirklich aus der Datenbank entfernt werden?"
 #?
     # Messages
     INVALID_AVAILABILITY:   "Gültig sind '+', '-' und '*', nicht '{val}'"

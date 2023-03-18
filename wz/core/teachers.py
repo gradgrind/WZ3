@@ -59,7 +59,6 @@ class Teachers(dict):
     mapping: {tid -> <TeacherData> instance}.
     The dictionary is ordered by SORTNAME.
     """
-
     def __init__(self):
         super().__init__()
         for (

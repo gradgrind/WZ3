@@ -1,10 +1,10 @@
 """
-core/teachers.py - last updated 2022-07-10
+core/teachers.py - last updated 2023-03-18
 
 Manage teacher data.
 
 =+LICENCE=================================
-Copyright 2022 Michael Towers
+Copyright 2023 Michael Towers
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -31,11 +31,7 @@ if __name__ == "__main__":
     sys.path[0] = appdir
     basedir = os.path.dirname(appdir)
     from core.base import start
-
-    #    start.setup(os.path.join(basedir, 'TESTDATA'))
-    # start.setup(os.path.join(basedir, "DATA"))
-    # start.setup(os.path.join(basedir, "NEXT"))
-    start.setup(os.path.join(basedir, "DATA-2023"))
+    start.setup(os.path.join(basedir, 'TESTDATA'))
 
 # T = TRANSLATIONS("core.teachers")
 
@@ -66,7 +62,6 @@ class Teachers(dict):
 
     def __init__(self):
         super().__init__()
-        # ?        open_database()
         for (
             tid,
             firstname,

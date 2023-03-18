@@ -1,7 +1,7 @@
 """
 ui/modules/course_editor.py
 
-Last updated:  2023-03-17
+Last updated:  2023-03-18
 
 Edit course and blocks+lessons data.
 
@@ -269,7 +269,7 @@ class CourseEditorPage(Page):
 
     def on_course_table_itemSelectionChanged(self):
         row = self.course_table.currentRow()
-        print("§§§ on_course_table_itemSelectionChanged", row)
+        # print("§§§ on_course_table_itemSelectionChanged", row)
         if row >= 0:
             self.pb_delete_course.setEnabled(True)
             self.pb_edit_course.setEnabled(True)
@@ -277,11 +277,12 @@ class CourseEditorPage(Page):
             self.set_course(self.course_dict["course"])
             self.frame_r.setEnabled(True)
         else:
+            pass
             # e.g. when entering an empty table
-            print("EMPTY TABLE")
+            # print("EMPTY TABLE")
 
     def set_course(self, course: int):
-        print("SET COURSE:", repr(course))
+        # print("SET COURSE:", repr(course))
         self.course_id = course
         self.display_lessons(-1)
 
@@ -294,8 +295,6 @@ class CourseEditorPage(Page):
         fields, records = db_read_full_table(
             "COURSE_LESSONS", course=self.course_id
         )
-        print("§§§ COURSE_LESSONS:", fields)
-
         ### Build a list of entries
         ## First loop through entries in COURSE_LESSONS
         self.lesson_table_suppress_update = True
@@ -488,7 +487,7 @@ class CourseEditorPage(Page):
         row = self.lesson_table.currentRow()
         if self.lesson_table_suppress_update:
             return
-        print("§§§ on_lesson_table_itemSelectionChanged", row)
+        # print("§§§ on_lesson_table_itemSelectionChanged", row)
         # Populate the form fields
         self.lesson_sub.setEnabled(False)
         if row < 0:
@@ -557,7 +556,7 @@ class CourseEditorPage(Page):
 
     def field_editor(self, obj: QLineEdit):
         object_name = obj.objectName()
-        print("EDIT", object_name)
+        # print("EDIT", object_name)
         ### PAYMENT (COURSE_LESSONS)
         if object_name == "payment":
             cl = self.current_lesson.COURSE_LESSON_INFO
@@ -676,6 +675,7 @@ class CourseEditorPage(Page):
                         WEIGHTING=result.WEIGHTING,
                     )
                 obj.setText(str(result))
+                self.current_parallel_tag = result
         else:
             raise Bug(f"Click event on object {object_name}")
 

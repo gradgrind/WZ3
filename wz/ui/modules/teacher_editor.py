@@ -1,7 +1,7 @@
 """
 ui/modules/teacher_editor.py
 
-Last updated:  2023-03-18
+Last updated:  2023-03-19
 
 Edit teacher data.
 
@@ -44,6 +44,7 @@ T = TRANSLATIONS("ui.modules.teacher_editor")
 ### +++++
 
 #from typing import NamedTuple
+from core.basic_data import clear_cache
 from core.db_access import (
     open_database,
     db_read_unique,
@@ -74,6 +75,7 @@ from ui.ui_base import (
 )
 from ui.dialogs.dialog_text_line import TextLineDialog
 from ui.dialogs.dialog_text_line_offer import TextLineOfferDialog
+from ui.week_table import WeekTable
 from local.name_support import asciify, tvSplit
 
 TEACHER_FIELDS = (
@@ -111,6 +113,11 @@ class TeacherEditorPage(Page):
         ):
             w.installEventFilter(self)
 
+    def wfmod(self, field, mod):
+        """Handle changes to the week table.
+        """
+        print(field, mod)
+
     def eventFilter(self, obj: QWidget, event: QEvent) -> bool:
         """Event filter for the text-line fields.
         Activate the appropriate editor on mouse-left-press or return-key.
@@ -131,9 +138,11 @@ class TeacherEditorPage(Page):
 
     def enter(self):
         open_database()
-#?
-#         clear_cache()
+        clear_cache()
+        self.week_table = WeekTable(self.AVAILABLE, "WEEKFIELD", self.wfmod)
         self.init_data()
+#TODO ...
+        self.week_table.setup()
 
 # ++++++++++++++ The widget implementation fine details ++++++++++++++
 
@@ -209,6 +218,7 @@ class TeacherEditorPage(Page):
         self.tt_available = ttdict.pop("AVAILABLE")
         for k, v in ttdict.items():
             getattr(self, k).setText(v)
+        self.week_table.setText(self.tt_available)
 
     @Slot()
     def on_pb_new_clicked(self):

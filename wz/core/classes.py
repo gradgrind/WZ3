@@ -31,10 +31,8 @@ if __name__ == "__main__":
     basedir = os.path.dirname(appdir)
     from core.base import start
 
-    #    start.setup(os.path.join(basedir, 'TESTDATA'))
-    #    start.setup(os.path.join(basedir, 'DATA'))
-    start.setup(os.path.join(basedir, "DATA-2023"))
-
+    start.setup(os.path.join(basedir, 'TESTDATA'))
+    
 T = TRANSLATIONS("core.classes")
 
 ### +++++
@@ -52,7 +50,6 @@ class ClassData(NamedTuple):
     name: str
     divisions: list[list[str]]
     classroom: str
-    tt_data: dict
 
 
 class Classes(dict):
@@ -60,9 +57,9 @@ class Classes(dict):
         super().__init__()
         self.__group_info = {}
         # ?    open_database()
-        for klass, name, divisions, classroom, tt_data in db_read_fields(
+        for klass, name, classroom, divisions in db_read_fields(
             "CLASSES",
-            ("CLASS", "NAME", "DIVISIONS", "CLASSROOM", "TT_DATA"),
+            ("CLASS", "NAME", "CLASSROOM", "DIVISIONS"),
             sort_field="CLASS",
         ):
             # Parse groups
@@ -83,7 +80,6 @@ class Classes(dict):
                 name=name,
                 divisions=divlist,
                 classroom=classroom,
-                tt_data=dict(read_pairs(tt_data)),
             )
 
     def get_class_list(self, skip_null=True):

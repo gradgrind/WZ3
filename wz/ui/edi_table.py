@@ -1,12 +1,15 @@
 """
 ui/edi_table.py
 
-Last updated:  2023-03-19
+Last updated:  2023-03-20
 
 An editable table widget using QTableWidget as base class. Only text
 cells are handled.
-Originally inspired by "TableWidget.py" from the "silx" project (www.silx.org),
-thanks to P. Knobel, but it is now very different.
+Originally inspired by "TableWidget.py" from the "silx" project
+(www.silx.org), thanks to P. Knobel, but it is now very different.
+Little attention has been paid to efficiency, and especially the
+undo-redo mechanism could consume a lot of space – it stacks
+complete snapshots of the table (as lists of lists). 
 
 =+LICENCE=================================
 Copyright 2023 Michael Towers
@@ -152,21 +155,6 @@ except:
     print("Fallback to English messages")
     T = Messages["en"]
 
-#######################################################################
-
-# Types of changes which are to be recorded by undo/redo function.
-Change_CELL = 1
-Change_BLOCK = 2
-Change_ADD_ROW = 3
-Change_DEL_ROW = 4
-Change_ADD_COL = 5
-Change_DEL_COL = 6
-# For multiple row/column changes:
-Change_GROUP = 7
-Change_END_GROUP = 8
-# As a starting number for extensions:
-Change_X = 9
-
 ### -----
 
 
@@ -231,7 +219,7 @@ class EdiTableWidget(QTableWidget):
         # action.setIcon(
         if shortcut:
             action.setShortcut(shortcut)
-        #            action.setShortcutContext(Qt.WidgetShortcut)
+        # action.setShortcutContext(Qt.WidgetShortcut)
         if function:
             action.triggered.connect(function)
         self.addAction(action)
@@ -262,6 +250,7 @@ class EdiTableWidget(QTableWidget):
         self.align_centre = False
         self.on_selection_state_change = self.__on_selection_state_change
         self.undo_stack = []
+        self.redo_stack = []
 
         ### Actions
         # QAction to select all cells.
@@ -436,6 +425,7 @@ class EdiTableWidget(QTableWidget):
         """
         self.clearContents()
         self.undo_stack.clear()
+        self.redo_stack.clear()
         if self.colheaders:
             if columns != len(self.colheaders):
                 raise Bug("Number of columns doesn't match header list")
@@ -501,7 +491,6 @@ class EdiTableWidget(QTableWidget):
         data_model.setData(data_model.index(row, col), text)
 
     def read_block(self, top, left, width, height):
-#TODO: Use stack-stored values instead of reading widget?
         """Read a block of data from the table.
         Return list of rows, each row is a list of cell values.
         """
@@ -718,6 +707,7 @@ class EdiTableWidget(QTableWidget):
         if n == 0:
             return None
         changed = False
+        self.suppress_change_report = True
         if n == 1:
             text = self.get_text(t, l)
             if text:
@@ -737,6 +727,7 @@ class EdiTableWidget(QTableWidget):
                     c += 1
                 t += 1
             text = table2tsv(block)
+        self.suppress_change_report = False
         if changed:
             self.data_modified()
         return text
@@ -813,7 +804,10 @@ class EdiTableWidget(QTableWidget):
         if protected_cells:
             QMessageBox.warning(self, T["WARNING"], T["PASTE_PROTECTED"])
         # Do the pasting
-        self.paste_block(r0, c0, paste_data)
+        self.suppress_change_report = True
+        if self.paste_block(r0, c0, paste_data):
+            self.data_modified()
+        self.suppress_change_report = False
 
     def paste_block(self, top, left, block):
         """The block must be a list of lists of strings."""
@@ -827,29 +821,39 @@ class EdiTableWidget(QTableWidget):
                     self.set_text(top, c, cell)
                 c += 1
             top += 1
-        if changed:
-            self.data_modified()
+        return changed
 
-#TODO
     def data_modified(self):
-        self.table_data = self.read_all()
-        print("& -->", self.table_data)
+        """Handle changes to the table data.
+        The new state is added to the undo-stack, if undo/redo is
+        enabled. The redo-stack is cleared.
+        Call <on_change> function.
+        """
+        newdata = self.read_all()
         if self.undoredo_enabled:
+            self.redo_stack.clear()
+            self.redoAction.setEnabled(False)
+            if not self.undo_stack:
+                self.undoAction.setEnabled(True)
             self.undo_stack.append(self.table_data)
-            self.undoAction.setEnabled(True)
-        else:
-            pass
-
+        self.table_data = newdata
         if self.on_change:
             self.on_change()
 
     def undo(self):
-        print("TODO: undo", len(self.undo_stack))
+        """Undo the last change.
+        This should be "disabled", via its associated "action",
+        when there are no changes to undo.
+        """
         self.suppress_change_report = True
         try:
             data = self.undo_stack.pop()
+            if not self.redo_stack:
+                self.redoAction.setEnabled(True)
+            self.redo_stack.append(self.table_data)
         except IndexError:
-            data = self.table_data0
+            raise Bug("No undo-data, undo not disabled ...")
+        if not self.undo_stack:
             self.undoAction.setEnabled(False)
         rc = self.rowCount()
         cc = self.columnCount()
@@ -860,10 +864,35 @@ class EdiTableWidget(QTableWidget):
         if cc != dcc:
             self.setColumnCount(dcc)
         self.paste_block(0, 0, data)
+        self.table_data = data
         self.suppress_change_report = False
+        if self.on_change:
+            self.on_change()
 
     def redo(self):
-        print("TODO: redo")
+        self.suppress_change_report = True
+        try:
+            data = self.redo_stack.pop()
+            if not self.undo_stack:
+                self.undoAction.setEnabled(True)
+            self.undo_stack.append(self.table_data)
+        except IndexError:
+            raise Bug("No redo-data, redo not disabled ...")
+        if not self.redo_stack:
+            self.redoAction.setEnabled(False)
+        rc = self.rowCount()
+        cc = self.columnCount()
+        drc = len(data)
+        dcc = len(data[0])
+        if rc != drc:
+            self.setRowCount(drc)
+        if cc != dcc:
+            self.setColumnCount(dcc)
+        self.paste_block(0, 0, data)
+        self.table_data = data
+        self.suppress_change_report = False
+        if self.on_change:
+            self.on_change()
 
     def selectionChanged(self, selected, deselected):
         """Override the slot. The parameters are <QItemSelection> items."""
@@ -905,26 +934,28 @@ class ValidatingWidgetItem(QTableWidgetItem):
         return ValidatingWidgetItem()
 
     def setData(self, role, value):
-        if role == Qt.EditRole:
-            if self.__validate:
-                v = self.__validate(value)
-                if v:
-                    QMessageBox.warning(
-                        self.tableWidget(),
-                        T["WARNING"],
-                        T["VALIDATION_ERROR"] +
-                        f" @({self.row()}, {self.column()}): {value}",
-                    )
-                    return
-            v0 = self.data(role)
-            if v0 == value:
+        if role != Qt.EditRole:
+            super().setData(role, value)
+            return
+        if self.__validate:
+            v = self.__validate(value)
+            if v:
+                QMessageBox.warning(
+                    self.tableWidget(),
+                    T["WARNING"],
+                    T["VALIDATION_ERROR"] +
+                    f" @({self.row()}, {self.column()}): {value}",
+                )
                 return
-            tw = self.tableWidget()
-            if tw:
-                r, c = self.row(), self.column()
-                #print(f"CHANGED @({r}, {c}): {v0} -> {value}")
-                tw.cell_value_changed(r, c, value, v0)
+        v0 = self.data(role)
+        if v0 == value:
+            return
+        tw = self.tableWidget()
+        assert(tw)
+        r, c = self.row(), self.column()
+        #print(f"CHANGED @({r}, {c}): {v0} -> {value}")
         super().setData(role, value)
+        tw.cell_value_changed(r, c, value, v0)
 
 
 class VerticalTextDelegate(QStyledItemDelegate):

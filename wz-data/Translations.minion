@@ -309,7 +309,7 @@ ui.modules.teacher_editor: {
     AVAILABLE:      "Verfügbarkeit"
 }
 
-ui.modules.classes: {
+ui.modules.class_editor: {
     # Messages
     INVALID_PERIOD_VALUES:  "Die Verfügbarkeitsdaten mussten {n}-mal angepasst werden.\n  Ursprünglich:\n{val}"
     UNIQUE_FIELDS:  "Die Hauptfelder müssen einmalig sein."

@@ -128,13 +128,16 @@ class ClassGroupsDialog(QDialog):
         print(divs)
         group_data = build_group_data(divs)
         divisions = group_data["INDEPENDENT_DIVISIONS"]
+        self.independent_divisions.clear()
         for d in divisions:
-            print("  ", d)
+            self.independent_divisions.addItem('+'.join(d))
         group_map = group_data["GROUP_MAP"]
         atoms = group_data["MINIMAL_SUBGROUPS"]
         self.atomic_groups.clear()
         self.atomic_groups.addItems(atoms)
-#        print("\n ... Atoms:", atoms)
+# add a table(?) for group-map
+#    for g, l in group_map.items():
+
 
 # --#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#
 

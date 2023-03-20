@@ -1,7 +1,7 @@
 """
 core/db_access.py
 
-Last updated:  2023-03-18
+Last updated:  2023-03-20
 
 Helper functions for accessing the database.
 
@@ -418,7 +418,7 @@ def sql_insert_from_dict(table, field_dict):
 
 def db_new_row(table, **values):
     qtext = sql_insert_from_dict(table, values)
-    print("§§§", qtext)
+    # print("§§§", qtext)
     query = QSqlQuery()
     if query.exec(qtext):
         newid = query.lastInsertId()

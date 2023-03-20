@@ -1,7 +1,7 @@
 """
 ui/week_table.py
 
-Last updated:  2023-03-19
+Last updated:  2023-03-20
 
 A manager for the weekly availability tables.
 
@@ -24,7 +24,7 @@ Copyright 2023 Michael Towers
 =-LICENCE========================================
 """
 
-T = TRANSLATIONS("ui.modules.teacher_editor")
+T = TRANSLATIONS("ui.week_table")
 
 ### +++++
 
@@ -40,8 +40,11 @@ from ui.ui_base import (
 
 class WeekTable:
     """Manager for the week-table, an EdiTableWidget.
+    <table> is the EdiTableWidget.
+    <modified> is a parameterless function to be called whenever
+    the table's content changes.
     """
-    def __init__(self, table, field, modified):
+    def __init__(self, table, modified):
         self.__table = table
         self.__table.set_align_centre()
         self.__table.setStyleSheet(
@@ -54,10 +57,6 @@ class WeekTable:
             }
             """
         )
-        self.__modified = modified
-        self.__field = field
-
-    def setup(self):
         tt_days = db_key_value_list("TT_DAYS", "N", "NAME", "N")
         tt_periods = db_key_value_list("TT_PERIODS", "N", "TAG", "N")
         self.__table.setup(
@@ -68,13 +67,15 @@ class WeekTable:
             paste=True,
             row_add_del=False,
             column_add_del=False,
-            on_changed=self.table_changed,
+            on_change=modified,
         )
+        # A rather messy attempt to find an appropriate size for the table
         Hhd = self.__table.horizontalHeader()
         Hhd.setMinimumSectionSize(20)
         self.__table.resizeColumnsToContents()
-        # A rather messy attempt to find an appropriate size for the table
+        self.__table.resizeRowsToContents()
         Vhd = self.__table.verticalHeader()
+        Vhd.setMinimumSectionSize(30)
         Hw = Hhd.length()
         Hh = Hhd.sizeHint().height()
         Vw = Vhd.sizeHint().width()
@@ -91,11 +92,12 @@ class WeekTable:
 
     def setText(self, text):
         # Set up table
+        text = text.strip()
         table = self.__table
         tdata = []
         daysdata = text.split("_")
-        nrows = table.row_count()
-        ncols = table.col_count()
+        nrows = table.rowCount()
+        ncols = table.columnCount()
         if len(daysdata) > nrows:
             errors = len(daysdata) - nrows
         else:
@@ -121,30 +123,25 @@ class WeekTable:
                         errors += 1
                         v = "+"
                 ddata.append(v)
-        print("???tdata", tdata)
         table.init_data(tdata)
-        self.block_unchanged = bool(errors)
         if errors:
             REPORT(
                 "WARNING",
-                T["INVALID_PERIOD_VALUES"].format(n=errors, val=text)
+                T["INVALID_PERIOD_VALUES"].format(
+                    n=errors,
+                    val=text or T["none"]
+                )
             )
-            self.__modified(self.__field, True)
+            table.on_change()
         # Add cell validators
         for r in range(nrows):
             for c in range(ncols):
                 table.set_validator(r, c, period_validator)
 
-    def table_changed(self, mod):
-        print("???", mod, self.__table.table_changes)
-        self.__table.reset_modified()
-        if not self.block_unchanged:
-            self.__modified(self.__field, mod)
-
 
 def period_validator(value):
-    """Validator for teacher period availabilöity table.
+    """Validator for teaching period availability table.
     """
-    if value in ("+", "-", "*"):
+    if value in "-123456789+":
         return None
     return T["INVALID_AVAILABILITY"].format(val=value)

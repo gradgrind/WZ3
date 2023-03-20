@@ -235,6 +235,12 @@ ui.simple_table: {
     BAD_PASTE_RANGE: "Die Dimensionen der einzufügenden Daten sind nicht kompatibel mit dem ausgewählten Bereich: {h0}x{w0} -> {h1}x{w1}"
 }
 
+ui.week_table: {
+    INVALID_AVAILABILITY:   "Ungültig: '{val}'\n  Gültig sind: +, - und 1..9"
+    INVALID_PERIOD_VALUES:  "Die Verfügbarkeitsdaten mussten {n}-mal angepasst werden.\n  Ursprünglich: {val}"
+    none:           "(keine)"
+}
+
 ui.modules.year_manager: {
     # Labels
     MODULE_NAME:    Jahre
@@ -279,8 +285,6 @@ ui.modules.teacher_editor: {
     REALLY_DELETE:  "Soll {FIRSTNAMES} {LASTNAME} wirklich aus der Datenbank entfernt werden?"
 #?
     # Messages
-    INVALID_AVAILABILITY:   "Gültig sind '+', '-' und '*', nicht '{val}'"
-    INVALID_PERIOD_VALUES:  "Die Verfügbarkeitsdaten mussten {n}-mal angepasst werden.\n  Ursprünglich:\n{val}"
     UNIQUE_FIELDS:  "Die Hauptfelder müssen einmalig sein."
     
     # Teacher field editor buttons

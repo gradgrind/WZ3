@@ -1,7 +1,7 @@
 """
 ui/modules/teacher_editor.py
 
-Last updated:  2023-03-19
+Last updated:  2023-03-20
 
 Edit teacher data.
 
@@ -113,11 +113,6 @@ class TeacherEditorPage(Page):
         ):
             w.installEventFilter(self)
 
-    def wfmod(self, field, mod):
-        """Handle changes to the week table.
-        """
-        print(field, mod)
-
     def eventFilter(self, obj: QWidget, event: QEvent) -> bool:
         """Event filter for the text-line fields.
         Activate the appropriate editor on mouse-left-press or return-key.
@@ -139,21 +134,14 @@ class TeacherEditorPage(Page):
     def enter(self):
         open_database()
         clear_cache()
-        self.week_table = WeekTable(self.AVAILABLE, "WEEKFIELD", self.wfmod)
+        self.week_table = WeekTable(self.AVAILABLE, self.week_table_changed)
         self.init_data()
-#TODO ...
-        self.week_table.setup()
-
-# ++++++++++++++ The widget implementation fine details ++++++++++++++
 
     def  init_data(self):
         self.load_teacher_table()
         self.set_row(0)
 
     def load_teacher_table(self):
-#?
-        self.suppress_handlers = True
-
         fields, records = db_read_full_table(
             "TEACHERS",
             sort_field="SORTNAME",
@@ -177,8 +165,6 @@ class TeacherEditorPage(Page):
                 item.setText(cell_value)
                 c += 1
         self.teacher_dict = None
-#?
-        self.suppress_handlers = False
 
     def set_tid(self, tid):
         self.set_row(self.tid2row[tid])
@@ -192,10 +178,8 @@ class TeacherEditorPage(Page):
             self.teacher_table.setCurrentCell(row, 0)
 
     def on_teacher_table_itemSelectionChanged(self):
-#        if self.suppress_handlers:
-#            return
         row = self.teacher_table.currentRow()
-        print("§§§ on_course_table_itemSelectionChanged", row)
+        # print("§§§ on_course_table_itemSelectionChanged", row)
         if row >= 0:
             self.teacher_dict = self.teacher_list[row]
             self.set_teacher()
@@ -208,13 +192,14 @@ class TeacherEditorPage(Page):
             getattr(self, k).setText(v)
         try:
             record = db_read_unique(
-                "TT_TEACHER",
+                "TT_TEACHERS",
                 TT_FIELDS,
                 TID=self.teacher_id
             )
             ttdict = {f: record[i] for i, f in enumerate(TT_FIELDS)}
         except NoRecord:
             ttdict = {f: "" for f in TT_FIELDS}
+            db_new_row("TT_TEACHERS", TID=self.teacher_id)
         self.tt_available = ttdict.pop("AVAILABLE")
         for k, v in ttdict.items():
             getattr(self, k).setText(v)
@@ -298,7 +283,16 @@ class TeacherEditorPage(Page):
             else:
                 Bug(f"unknown field: {object_name}")
 
-#TODO: AVAILABILITY ...
+    def week_table_changed(self):
+        """Handle changes to the week table.
+        """
+        result = self.week_table.text()
+        db_update_field(
+            "TT_TEACHERS",
+            "AVAILABLE",
+            result,
+            TID=self.teacher_id
+        )
 
 
 # --#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#

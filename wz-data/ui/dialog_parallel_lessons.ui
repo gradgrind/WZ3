@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>400</width>
-    <height>194</height>
+    <width>402</width>
+    <height>203</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -50,18 +50,73 @@
          <item>
           <widget class="QLabel" name="label_2">
            <property name="text">
-            <string>Wichtigkeit:</string>
+            <string>Gewicht:</string>
            </property>
           </widget>
          </item>
          <item>
-          <widget class="QSpinBox" name="weighting">
-           <property name="maximum">
-            <number>10</number>
+          <widget class="QComboBox" name="weight">
+           <property name="currentText">
+            <string>+</string>
            </property>
-           <property name="value">
-            <number>10</number>
+           <property name="maxVisibleItems">
+            <number>12</number>
            </property>
+           <item>
+            <property name="text">
+             <string>-</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>1</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>2</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>3</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>4</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>5</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>6</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>7</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>8</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>9</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>+</string>
+            </property>
+           </item>
           </widget>
          </item>
         </layout>

@@ -92,6 +92,7 @@ TT_FIELDS = (
     "MAX_GAPS_PER_DAY",
     "MAX_GAPS_PER_WEEK",
     "MAX_CONSECUTIVE_LESSONS",
+    "LUNCHBREAK",
 )
 
 ### -----
@@ -201,9 +202,21 @@ class TeacherEditorPage(Page):
             ttdict = {f: "" for f in TT_FIELDS}
             db_new_row("TT_TEACHERS", TID=self.teacher_id)
         self.tt_available = ttdict.pop("AVAILABLE")
+        self.week_table.setText(self.tt_available)
+        lb = ttdict.pop("LUNCHBREAK")
+        lbi = self.LUNCHBREAK.findText(lb)
+        if lbi < 0:
+            if lb:
+                db_update_field(
+                    "TT_TEACHERS",
+                    "LUNCHBREAK",
+                    '',
+                    TID=self.teacher_id
+                )
+        self.current_lunchbreak = lb
+        self.LUNCHBREAK.setCurrentIndex(lbi)
         for k, v in ttdict.items():
             getattr(self, k).setText(v)
-        self.week_table.setText(self.tt_available)
 
     @Slot()
     def on_pb_new_clicked(self):
@@ -272,14 +285,24 @@ class TeacherEditorPage(Page):
                 self.set_row(row)
         else:
             # The timetable-constraint fields
-            if object_name == "MIN_LESSONS_PER_DAY":
-                pass
-            elif object_name == "MAX_GAPS_PER_DAY":
-                pass
-            elif object_name == "MAX_GAPS_PER_WEEK":
-                pass
-            elif object_name == "MAX_CONSECUTIVE_LESSONS":
-                pass
+            if object_name in (
+                "MIN_LESSONS_PER_DAY",
+                "MAX_GAPS_PER_DAY",
+                "MAX_GAPS_PER_WEEK",
+                "MAX_CONSECUTIVE_LESSONS",
+            ):
+                result = NumberConstraintDialog.popup(
+                    obj.text(),
+                    parent=self
+                )
+                if result is not None:
+                    db_update_field(
+                        "TT_TEACHERS",
+                        object_name,
+                        result,
+                        TID=self.teacher_id
+                    )
+                    obj.setText(result)
             else:
                 Bug(f"unknown field: {object_name}")
 
@@ -293,6 +316,21 @@ class TeacherEditorPage(Page):
             result,
             TID=self.teacher_id
         )
+
+    @Slot(str)
+    def on_LUNCHBREAK_currentTextChanged(self, weight):
+        if weight == '-':
+            self.LUNCHBREAK.setCurrentIndex(-1)
+            return
+        if self.current_lunchbreak != weight:
+            print("§UPDATE LUNCHBREAK:", weight)
+            db_update_field(
+                "TT_TEACHERS",
+                "LUNCHBREAK",
+                weight,
+                TID=self.teacher_id
+            )
+            self.current_lunchbreak = weight
 
 
 # --#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#

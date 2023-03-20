@@ -1,7 +1,7 @@
 """
 ui/dialogs/dialog_parallel_lessons.py
 
-Last updated:  2023-03-12
+Last updated:  2023-03-20
 
 Supporting "dialog" for the course editor – handle wishes for lessons
 starting at the same time.
@@ -67,7 +67,7 @@ from ui.ui_base import (
 #   (id: primary key)
 #   lesson_id: foreign key -> LESSONS.id (unique, non-null)
 #   TAG: The tag used to join a group of lessons
-#   WEIGHTING: 0 – 10
+#   WEIGHTING: -, 1, 2, 3, ... 9, +
 
 class ParallelsDialog(QDialog):
     @classmethod
@@ -128,8 +128,8 @@ class ParallelsDialog(QDialog):
                 bname = f"{cdata[0]}.{cdata[1]}:{cdata[2]}/{cdata[3]}"
             self.lesson_list.addItem(bname + f" || {ll}@{lt} #{r[2]}")
 
-    @Slot(int)
-    def on_weighting_valueChanged(self, i):
+    @Slot(str)
+    def on_weight_currentTextChanged(self, i):
         if self.disable_triggers:
             return
         self.value_changed()
@@ -137,7 +137,7 @@ class ParallelsDialog(QDialog):
     def value_changed(self):
         t = self.tag.currentText()
         if t:
-            w = self.weighting.value()
+            w = self.weight.currentText()
             self.pb_accept.setEnabled(
                 t != self.value0.TAG or w != self.value0.WEIGHTING
             )
@@ -153,7 +153,7 @@ class ParallelsDialog(QDialog):
         if start_value.TAG:
             w = start_value.WEIGHTING
         else:
-            w = 10
+            w = '+'
             self.pb_reset.hide()
         ## Populate the tag chooser
         self.tag_map = {}
@@ -178,7 +178,7 @@ class ParallelsDialog(QDialog):
         self.tag.clear()
         self.tag.addItems(sorted(self.tag_map))
         self.tag.setCurrentIndex(-1)
-        self.weighting.setValue(w)
+        self.weight.setCurrentText(w)
         self.pb_accept.setEnabled(False)
         self.disable_triggers = False
         self.tag.setCurrentText(start_value.TAG)
@@ -191,7 +191,7 @@ class ParallelsDialog(QDialog):
 
     def accept(self):
         t = self.tag.currentText()
-        w = self.weighting.value()
+        w = self.weight.currentText()
         self.result = ParallelTag(t, w)
         super().accept()
 
@@ -201,5 +201,5 @@ class ParallelsDialog(QDialog):
 if __name__ == "__main__":
     from core.db_access import open_database
     open_database()
-    print("----->", ParallelsDialog.popup(ParallelTag("", 10)))
-    print("----->", ParallelsDialog.popup(ParallelTag("TAG1", 7)))
+    print("----->", ParallelsDialog.popup(ParallelTag("", '+')))
+    print("----->", ParallelsDialog.popup(ParallelTag("TAG1", '7')))

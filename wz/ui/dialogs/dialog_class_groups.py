@@ -39,6 +39,7 @@ T = TRANSLATIONS("ui.dialogs.dialog_class_groups")
 
 ### +++++
 
+import itertools
 from typing import Optional
 from ui.ui_base import (
     ### QtWidgets:
@@ -71,11 +72,12 @@ class ClassGroups:
         g = "[A-Za-z0-9]+"
         self.regex = QRegularExpression(f"^{g}(?:[+]{g})+$")
         divs = source.replace(' ', '')
+        print("$$$", divs)
         # Split off empty subgroups
         try:
-            divs, self.empty_subgroups = divs.split('-', 1)
+            divs, self.subgroup_equalities = divs.split('/', 1)
         except ValueError:
-            self.empty_subgroups = ""
+            self.subgroup_equalities = ""
         self.basic_groups = set()
         self.divisions = []
         if divs:
@@ -88,6 +90,9 @@ class ClassGroups:
                     )
                 else:
                     self.divisions.append(gset)
+        self.atomic_groups = [
+            set(ag) for ag in itertools.product(*self.divisions)
+        ]
 
     def check_division(
         self,
@@ -110,21 +115,69 @@ class ClassGroups:
         # Invalid division text
         return (set(), T["DIVISION_SYNTAX_ERROR"].format(div=div))
                 
-    def atomic_groups(self):
-        if len(self.divisions) < 2:
-            return []
-        cross_terms = [[g] for g in self.divisions[0]]
-        for d in self.divisions[1:]:
-            nct = []
-            for ct in cross_terms:
-                for g in d:
-                    nct.append(ct + [g])
-            cross_terms = nct
-        return cross_terms        
+    def filter_atomic_groups(self):
+        self.filtered_atomic_groups = [
+            set(ag) for ag in self.atomic_groups
+        ]
+        geqlist = []
+        for geq in self.subgroup_equalities.split('/'):
+            try:
+                l, r = geq.split('=', 1)
+            except ValueError:
+                print("???", self.subgroup_equalities, ":", geq)
+                REPORT(
+                    "ERROR",
+#TODO
+                    T["BAD_GROUP_EQUALITY"].format(text=geq)
+                )
+                continue
+            lset, e = self.read_dot_group(l)
+            if e:
+                REPORT(
+                    "ERROR",
+#TODO
+                    T["BAD_GROUP_EQUALITY_PART"].format(text=geq, e=e)
+                )
+                continue
+            rset, e = self.read_dot_group(r)
+            if e:
+                REPORT(
+                    "ERROR",
+#TODO
+                    T["BAD_GROUP_EQUALITY_PART"].format(text=geq, e=e)
+                )
+                continue
+            if not rset < lset:
+                REPORT(
+                    "ERROR",
+#TODO
+                    T["NOT_SUBSET"].format(text=geq)
+                )
+                continue
+            # Perform the substitutions
+            for ag in self.filtered_atomic_groups:
+                if lset <= ag:
+                    ag -= lset
+                    ag |= rset
 
-    def filter_atomic_groups(self, atomic_groups:list[list[str]]):
-        aset = {".".join(sorted(g)) for g in atomic_groups}
-        print("\n§-->" + " | ".join(sorted(aset)))
+
+#        aset = {".".join(sorted(g)) for g in atomic_groups}
+#        print("\n§-->" + " | ".join(sorted(aset)))
+
+#TODO: Dynamic editing could be very tricky!
+
+#TODO: I am not catching the empty groups (e.g. A.R) here. Can I
+# work this out? Or would it indeed be easier to specify empty
+# groups and from these work out the equalities? Or would
+# specifying both explicitly be the best approach?
+
+    def read_dot_group(self, text:str) -> tuple[set, str]:
+        s = set(text.split('.'))
+        for ag in self.atomic_groups:
+            if s <= ag:
+                return (s, "")
+#TODO
+        return (set(), T["BAD_DOT_GROUP"].format(text=text))
 
 
 
@@ -439,19 +492,19 @@ if __name__ == "__main__":
 #    from core.db_access import open_database
 #    open_database()
     cg = ClassGroups(t:="")
-    print(f"{t} ->", cg.atomic_groups())
+    print(f"{t} ->", cg.atomic_groups)
     cg = ClassGroups(t:="A+B;G+R;B+A")
-    print(f"{t} ->", cg.atomic_groups())
+    print(f"{t} ->", cg.atomic_groups)
     cg = ClassGroups(t:="A+B;G+r:I+II+III")
-    print(f"{t} ->", cg.atomic_groups())
-    cg = ClassGroups(t:="G+R;A+B;I+II+III-A.R")
-    cga = cg.atomic_groups()
-    print(f"{t} ->", cga)
-    cg.filter_atomic_groups(cga)
+    print(f"{t} ->", cg.atomic_groups)
+    cg = ClassGroups(t:="G+R;A+B;I+II+III/A.G=A/B.R=R")
+    cg.filter_atomic_groups()
+    print(f"{t} ->", cg.filtered_atomic_groups)
+
     quit(0)
     print("----->", ClassGroupsDialog.popup("A+B;G+R;B+A"))
     print("----->", ClassGroupsDialog.popup("A+B;G+r:I+II+III"))
-    print("----->", ClassGroupsDialog.popup("G+R;A+B;I+II+III-A.R"))
+    print("----->", ClassGroupsDialog.popup("G+R;A+B;I+II+III/A.G=A/B.R=R"))
     print("----->", ClassGroupsDialog.popup(""))
 
 

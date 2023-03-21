@@ -374,6 +374,20 @@ ui.dialogs.dialog_block_name: {
     NEW_ITEM:       "Unterricht, Block oder Deputat"
 }
 
+#ui.dialogs.dialog_number_constraint: {
+#}
+
+ui.dialogs.dialog_class_groups: {
+    REPEATED_DIVISION:  "Klassenteilung (Division) mehrfach vorhanden: {div}\n – in {groups}"
+    INVALID_DIVISION:   "Ungültige Klassenteilung (Division): {div}\n – in {groups}"
+
+    INVALID_GROUP:  "Ungültige Schülergruppenbezeichnung: {g}"
+    REPEATED_GROUP: "Wiederholte Schülergruppenbezeichnung: {g}"
+    TOO_MANY_DOTS:  "Schülergruppenbezeichnung {g}: zu viele Teile"
+    SUBSET:         "Von Schülergruppe {g} ist auch die Untergruppe {sub} angegeben"
+    SINGLE_SUBGROUP: "Von Schülergruppe {g} ist nur Untergruppe {sub} angegeben"
+}
+
 ui.modules.grades_manager: {
     # Labels
     MODULE_NAME:    "Noten"

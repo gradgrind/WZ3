@@ -378,6 +378,10 @@ ui.dialogs.dialog_block_name: {
 #}
 
 ui.dialogs.dialog_class_groups: {
+    CLASS_GROUPS_ERROR: "Fehler in Klassengruppen: {text}\n\n{e}"
+    REPEATED_GROUPS: "Wiederholte Schülergruppenbezeichnung: {g}\nin Teilung {div}"
+    DIVISION_SYNTAX_ERROR: "Ungültige Klassenteilung (Division): {div}"
+
     REPEATED_DIVISION:  "Klassenteilung (Division) mehrfach vorhanden: {div}\n – in {groups}"
     INVALID_DIVISION:   "Ungültige Klassenteilung (Division): {div}\n – in {groups}"
 

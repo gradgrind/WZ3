@@ -48,11 +48,6 @@
          </property>
          <item>
           <property name="text">
-           <string>A+B.G+R</string>
-          </property>
-         </item>
-         <item>
-          <property name="text">
            <string>A+B</string>
           </property>
          </item>
@@ -149,6 +144,38 @@
          <property name="selectionMode">
           <enum>QAbstractItemView::NoSelection</enum>
          </property>
+         <item>
+          <property name="text">
+           <string>A.G</string>
+          </property>
+          <property name="checkState">
+           <enum>Checked</enum>
+          </property>
+         </item>
+         <item>
+          <property name="text">
+           <string>A.R</string>
+          </property>
+          <property name="checkState">
+           <enum>Unchecked</enum>
+          </property>
+         </item>
+         <item>
+          <property name="text">
+           <string>B.G</string>
+          </property>
+          <property name="checkState">
+           <enum>Checked</enum>
+          </property>
+         </item>
+         <item>
+          <property name="text">
+           <string>B.R</string>
+          </property>
+          <property name="checkState">
+           <enum>Checked</enum>
+          </property>
+         </item>
         </widget>
        </item>
       </layout>

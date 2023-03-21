@@ -65,11 +65,69 @@ NO_ITEM = "–––"
 
 ### -----
 
-# The data is stored in fields with permitted values n%w, where
-#   n is an integer from 0 to 9 (?) and
-#   w is the weight: -, 1, 2, 3, ... 9, +
-# Such a field may also be empty, indicating no constraint (if the
-# weight is '-', that also corresponds to "no constraint").
+class ClassGroups:
+    def __init__(self, source:str):
+        # Validator for class divisions
+        g = "[A-Za-z0-9]+"
+        self.regex = QRegularExpression(f"^{g}(?:[+]{g})+$")
+        divs = source.replace(' ', '')
+        # Split off empty subgroups
+        try:
+            divs, self.empty_subgroups = divs.split('-', 1)
+        except ValueError:
+            self.empty_subgroups = ""
+        self.basic_groups = set()
+        self.divisions = []
+        if divs:
+            for div in divs.split(';'):
+                gset, e = self.check_division(div, self.basic_groups)
+                if e:
+                    REPORT(
+                        "ERROR",
+                        T["CLASS_GROUPS_ERROR"].format(text=source, e=e)
+                    )
+                else:
+                    self.divisions.append(gset)
+
+    def check_division(
+        self,
+        div:str,
+        all_groups:set[str]
+    ) -> tuple[set[str],str]:
+        if self.regex.match(div).hasMatch():
+            gset = set(div.split('+'))
+            clashes = gset & all_groups
+            if clashes:
+                return (
+                    set(),
+                    T["REPEATED_GROUPS"].format(
+                        div=div,
+                        g=", ".join(sorted(clashes))
+                    )
+                )
+            all_groups.update(gset)
+            return (gset, "")
+        # Invalid division text
+        return (set(), T["DIVISION_SYNTAX_ERROR"].format(div=div))
+                
+    def atomic_groups(self):
+        if len(self.divisions) < 2:
+            return []
+        cross_terms = [[g] for g in self.divisions[0]]
+        for d in self.divisions[1:]:
+            nct = []
+            for ct in cross_terms:
+                for g in d:
+                    nct.append(ct + [g])
+            cross_terms = nct
+        return cross_terms        
+
+    def filter_atomic_groups(self, atomic_groups:list[list[str]]):
+        aset = {".".join(sorted(g)) for g in atomic_groups}
+        print("\n§-->" + " | ".join(sorted(aset)))
+
+
+
 
 class ClassGroupsDialog(QDialog):
     @classmethod
@@ -88,11 +146,8 @@ class ClassGroupsDialog(QDialog):
             QDialogButtonBox.StandardButton.Ok
         )
         # Add a validator for the line entry
-        w = "[A-Za-z0-9]+"
-        g = f"{w}(?:[.]{w})*"
+        g = "[A-Za-z0-9]+"
         self.regex = QRegularExpression(f"^{g}(?:[+]{g})+$")
-#        validator = QRegularExpressionValidator(self.regex, self)
-#        self.edit_division.setValidator(validator)
 
 # I should be able to assume that (apart from the dummy "new" entry) all
 # lines in the list are somehow "valid". That doesn't mean that the
@@ -291,8 +346,15 @@ class ClassGroupsDialog(QDialog):
             item.setText("; ".join(l))
             i += 1
 
-def test_division(glist:list[str]):
-    print("§Test division:", glist)
+def test_division(self, groups:str):
+    print("§Test division:", groups)
+    if self.regex.match(groups).hasMatch():
+        glist = groups.split('+')
+
+    else:
+        # bad pattern
+        return (None, )
+
     gsets = set()
 # There shouldn't be a superset of any member here
 # It might also be possible to check for incomplete divisions, e.g.
@@ -376,9 +438,20 @@ def test_division(glist:list[str]):
 if __name__ == "__main__":
 #    from core.db_access import open_database
 #    open_database()
+    cg = ClassGroups(t:="")
+    print(f"{t} ->", cg.atomic_groups())
+    cg = ClassGroups(t:="A+B;G+R;B+A")
+    print(f"{t} ->", cg.atomic_groups())
+    cg = ClassGroups(t:="A+B;G+r:I+II+III")
+    print(f"{t} ->", cg.atomic_groups())
+    cg = ClassGroups(t:="G+R;A+B;I+II+III-A.R")
+    cga = cg.atomic_groups()
+    print(f"{t} ->", cga)
+    cg.filter_atomic_groups(cga)
+    quit(0)
     print("----->", ClassGroupsDialog.popup("A+B;G+R;B+A"))
-    print("----->", ClassGroupsDialog.popup("A+B;G+r:A+B.G+R;I+II+III"))
-    print("----->", ClassGroupsDialog.popup("A+B;G+R;A+B.G+R;I+II+III"))
+    print("----->", ClassGroupsDialog.popup("A+B;G+r:I+II+III"))
+    print("----->", ClassGroupsDialog.popup("G+R;A+B;I+II+III-A.R"))
     print("----->", ClassGroupsDialog.popup(""))
 
 

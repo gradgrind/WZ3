@@ -88,10 +88,8 @@ class ClassGroupsDialog(QDialog):
         self.pb_accept = self.buttonBox.button(
             QDialogButtonBox.StandardButton.Ok
         )
-        # Add a validator for the line entry
-        g = "[A-Za-z0-9]+"
-        self.regex = QRegularExpression(f"^{g}(?:[+]{g})+$")
 
+#TODO ...?
 # I should be able to assume that (apart from the dummy "new" entry) all
 # lines in the list are somehow "valid". That doesn't mean that the
 # collection is valid as a whole (according to the <analyse> function).
@@ -108,6 +106,13 @@ class ClassGroupsDialog(QDialog):
 #TODO: rather react to textEdited?
 
         current_line = self.divisions.currentItem().text()
+
+# Get all primary groups, excluding the current line.
+
+#        self.class_groups.check_division(text,  all_groups:set[str]
+#        ) -> tuple[set[str],str]
+
+
         if self.regex.match(text).hasMatch():
             glist = text.split('+')
             norm = '+'.join(sorted(glist))
@@ -254,6 +259,7 @@ class ClassGroupsDialog(QDialog):
         self.result = self.value
         super().accept()
 
+#?
     def clear_results(self):
         self.independent_divisions.clear()
         self.atomic_groups.clear()
@@ -293,14 +299,14 @@ class ClassGroupsDialog(QDialog):
         agstr, ag = self.atomic_groups_list[row]
         if item.checkState() == Qt.CheckState.Unchecked:
             self.class_groups.subgroup_empties[ag] = agstr
-#            self.class_groups.filtered_atomic_groups.remove(ag)
         else:
             del(self.class_groups.subgroup_empties[ag])
-#            self.class_groups.filtered_atomic_groups.add(ag)
-        # Update group table
+        ## Update group table
         # print("§§§§1:", self.class_groups.subgroup_empties.values())
         self.class_groups.filter_atomic_groups()
         self.fill_group_table()
+
+
 
 
     def analyse(self):

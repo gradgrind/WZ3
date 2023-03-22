@@ -137,16 +137,31 @@ class ClassGroups:
         self.subgroup_empties = {
             self.group2set(s): s for s in empty_subgroups[1:]
         }
+        if divs:
+            self.init_divisions(divs.split(';'))
+        else:
+            self.init_divisions([])
+
+    def init_divisions(
+        self,
+        divlist:list[str],
+        report_errors:bool=True
+    ) -> str:
         self.primary_groups = set()
         self.divisions = []
-        if divs:
-            for div in divs.split(';'):
+        if divlist:
+            for div in divlist:
                 gset, e = self.check_division(div, self.primary_groups)
                 if e:
-                    REPORT(
-                        "ERROR",
-                        T["CLASS_GROUPS_ERROR"].format(text=source, e=e)
-                    )
+                    if report_errors:
+                        REPORT(
+                            "ERROR",
+                            T["CLASS_GROUPS_ERROR"].format(
+                                text=self.source, e=e
+                            )
+                        )
+                    else:
+                        return e
                 else:
                     self.divisions.append(gset)
             self.atomic_groups = frozenset(
@@ -154,6 +169,7 @@ class ClassGroups:
             )
         else:
             self.atomic_groups = frozenset()
+        return ""
 
     def check_division(
         self,

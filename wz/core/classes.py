@@ -1,5 +1,5 @@
 """
-core/classes.py - last updated 2023-03-05
+core/classes.py - last updated 2023-03-22
 
 Manage class data.
 
@@ -38,7 +38,7 @@ T = TRANSLATIONS("core.classes")
 ### +++++
 
 from typing import NamedTuple, Optional
-from itertools import combinations
+from itertools import combinations, product
 
 from core.db_access import open_database, db_read_fields, read_pairs
 
@@ -113,6 +113,153 @@ class Classes(dict):
         self.__group_info[klass] = info
         return info
 
+
+class ClassGroups:
+    """Manage the groups of pupils within a class.
+    A primary group is designated by an alphanumeric string.
+    A class may be divided in several ways, each division being a list
+    of primary groups. Each group may only occur in a single division.
+    Also subgroups are possible, combining groups from various divisions.
+    To avoid confusion, subgroup names order the primary group names
+    according to their divisions. If there are two divisions, "A+Z"
+    and "P+Q", the subgroup "Z.P" will be chosen rather than "P.Z".
+    The cartesian product of all the divisions gives the smallest
+    independent subgroups. Some of these may be empty (no pupils). It
+    is possible to specify which of these minimal subgroups ("atomic"
+    groups) are empty, which can simplify (well, shorten ...) group naming.
+    """
+    def __init__(self, source:str):
+        self.source = source
+        divs = source.replace(' ', '')
+        # Split off empty subgroups
+        self.subgroup_empties = divs.split('-')
+        divs = self.subgroup_empties.pop(0)
+        self.primary_groups = set()
+        self.divisions = []
+        if divs:
+            for div in divs.split(';'):
+                gset, e = self.check_division(div, self.primary_groups)
+                if e:
+                    REPORT(
+                        "ERROR",
+                        T["CLASS_GROUPS_ERROR"].format(text=source, e=e)
+                    )
+                else:
+                    self.divisions.append(gset)
+            self.atomic_groups = [
+                set(ag) for ag in product(*self.divisions)
+            ]
+        else:
+            self.atomic_groups = []
+
+    def check_division(
+        self,
+        div:str,
+        all_groups:set[str]
+    ) -> tuple[set[str],str]:
+        divset = set()
+        for g in div.split('+'):
+            if not g.isalnum():
+                return (
+                    divset,
+                    T["INVALID_GROUP_TAG"].format(
+                        div=div,
+                        g=g
+                    )
+                )
+            if g in all_groups:
+                return (
+                    divset,
+                    T["REPEATED_GROUP"].format(
+                        div=div,
+                        g=g
+                    )
+                )
+            divset.add(g)
+            all_groups.add(g)
+        return (divset, "")
+
+    def group2set(self, g:str) -> frozenset[str]:
+        return frozenset(g.split('.'))
+
+    def set2group(self, s:set) -> str:
+        glist = []
+        for d in self.divisions:
+            isct = s & d
+            if len(isct) == 1:
+                for g in isct: break
+                glist.append(g)
+            elif len(isct) != 0:
+                raise Bug(f"Invalid class-group: '{s}'")
+        if len(glist) != len(s):
+            raise Bug(f"Invalid class-group: '{s}'")
+        return ".".join(glist)
+
+    def filter_atomic_groups(self):
+        self.filtered_atomic_groups = {
+            frozenset(ag) for ag in self.atomic_groups
+        }
+        if self.subgroup_empties:
+            # Remove the specified empty atomic groups
+            for sub in self.subgroup_empties:
+                fs = self.group2set(sub)
+                try:
+                    self.filtered_atomic_groups.remove(fs)
+                except KeyError:
+                    REPORT(
+                        "ERROR",
+                        T["FILTER_NOT_ATOM"].format(
+                            text=self.source,
+                            sub=sub
+                        )
+                    )
+        # Get the (filtered) atomic groups for the primary groups
+        gdict = {}
+        for bg in self.primary_groups:
+            faglist = []
+            for fag in self.filtered_atomic_groups:
+                if bg in fag:
+                    faglist.append(fag)
+            if faglist:
+                gdict[frozenset(faglist)] = frozenset([bg])
+            else:
+                REPORT(
+                    "ERROR",
+                    T["EMPTY_GROUP"].format(
+                        text=self.source,
+                        g=bg
+                    )
+                )
+        # Add the atomic groups for all possible subgroups, starting
+        # with the shortest
+        for l in range(2, len(self.divisions)):
+            c_set = set()
+            for fag in self.filtered_atomic_groups:
+                for c in combinations(fag, l):
+                    c_set.add(frozenset(c))
+            xrsg = {}
+            for c in c_set:
+                cs = frozenset(c)
+                faglist = []
+                for fag in self.filtered_atomic_groups:
+                    if cs < fag:
+                        faglist.append(fag)
+                if faglist:
+                    fs = frozenset(faglist)
+                    if fs not in gdict:
+                        gdict[fs] = cs
+        # Add atomic groups, if they are not already represented by
+        # shorter group tags
+        for fag in self.filtered_atomic_groups:
+            fs = frozenset([fag])
+            if fs not in gdict:
+                gdict[fs] = fag
+        # Reverse the mapping to get the group -> atoms mapping
+        self.group2atoms = {v: k for k, v in gdict.items()}
+
+
+#*************************************************************************
+#TODO: Some of the stuff below is deprecated, some may still be needed ...
 
 def build_group_data(divisions):
     """Process the class divisions to get a list of groups,
@@ -401,6 +548,28 @@ def atoms2groups(divisions, group2atoms, with_divisions=False):
 # --#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#
 
 if __name__ == "__main__":
+
+    for cglist in (
+        "G+R;A+B;I+II+III-A.R.I-A.R.II-A.R.III-B.G.I-B.G.II",
+        "",
+        "A+B;G+R;B+A-A.R",
+        "A+B;G+r:I+II+III",
+    ):
+        cg = ClassGroups(cglist)
+        cg.filter_atomic_groups()
+        print(f"\n{cglist} ->", cg.filtered_atomic_groups)
+        print("divisions:", cg.divisions)
+        for g, alist in cg.group2atoms.items():
+            print(
+                cg.set2group(g),
+                "::",
+                [cg.set2group(a) for a in alist]
+            )
+
+    quit(0)
+
+# old stuff ...
+
     # _divs = [("A", "B"), ("G", "R"), ("A", "X", "Y")]
     # _divs = [("A", "B"), ("G", "R"), ("A", "G")]
     # _divs = [("A", "B", "C"), ("A", "R"), ("B", "S")]

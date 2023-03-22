@@ -46,8 +46,13 @@ core.basic_data: {
 
 core.classes: {
     INVALID_GROUP_FIELD: "Die Gruppenangabe (Feld DIVISIONS) für Klasse {klass} ist fehlerhaft"
-    GROUP_INFO_ERROR: "Klasse {klass}, Gruppenangabe (Feld DIVISIONS): {e}"
+    GROUP_INFO_ERROR:  "Klasse {klass}, Gruppenangabe (Feld DIVISIONS): {e}"
     INDEPENDENT_GROUPS_MISMATCH: "Untergruppe {group} fehlt"
+    INVALID_GROUP_TAG:  "Klassenteilung „{div}“:\n  ungültige Gruppenbezeichnung: „{g}“"
+    REPEATED_GROUP:     "Klassenteilung „{div}“:\n  wiederholte Gruppenbezeichnung: „{g}“"
+    CLASS_GROUPS_ERROR: "Fehler in Klassengruppen: {text}\n\n{e}"
+    FILTER_NOT_ATOM:    "Fehler in Klassengruppen: {text}\n\n„{sub}“ ist keine Elementargruppe"
+    EMPTY_GROUP:        "Fehler in Klassengruppen: {text}\n\nSchülergruppe „{g}“ ist als leer konfiguriert"
 }
 
 core.pupils: {
@@ -381,6 +386,7 @@ ui.dialogs.dialog_class_groups: {
     CLASS_GROUPS_ERROR: "Fehler in Klassengruppen: {text}\n\n{e}"
     REPEATED_GROUPS: "Wiederholte Schülergruppenbezeichnung: {g}\nin Teilung {div}"
     DIVISION_SYNTAX_ERROR: "Ungültige Klassenteilung (Division): {div}"
+    USELESS_FILTER:     "Leere Gruppe „{sub}“ existiert nicht bzw. nicht mehr"
 
     REPEATED_DIVISION:  "Klassenteilung (Division) mehrfach vorhanden: {div}\n – in {groups}"
     INVALID_DIVISION:   "Ungültige Klassenteilung (Division): {div}\n – in {groups}"

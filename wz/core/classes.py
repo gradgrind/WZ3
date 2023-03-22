@@ -132,8 +132,11 @@ class ClassGroups:
         self.source = source
         divs = source.replace(' ', '')
         # Split off empty subgroups
-        self.subgroup_empties = divs.split('-')
-        divs = self.subgroup_empties.pop(0)
+        empty_subgroups = divs.split('-')
+        divs = empty_subgroups[0]
+        self.subgroup_empties = {
+            self.group2set(s): s for s in empty_subgroups[1:]
+        }
         self.primary_groups = set()
         self.divisions = []
         if divs:
@@ -146,11 +149,11 @@ class ClassGroups:
                     )
                 else:
                     self.divisions.append(gset)
-            self.atomic_groups = [
-                set(ag) for ag in product(*self.divisions)
-            ]
+            self.atomic_groups = frozenset(
+                frozenset(ag) for ag in product(*self.divisions)
+            )
         else:
-            self.atomic_groups = []
+            self.atomic_groups = frozenset()
 
     def check_division(
         self,
@@ -201,11 +204,12 @@ class ClassGroups:
         }
         if self.subgroup_empties:
             # Remove the specified empty atomic groups
-            for sub in self.subgroup_empties:
-                fs = self.group2set(sub)
+            duds = set()
+            for fs, sub in self.subgroup_empties.items():
                 try:
                     self.filtered_atomic_groups.remove(fs)
                 except KeyError:
+                    duds.add(fs)
                     REPORT(
                         "ERROR",
                         T["FILTER_NOT_ATOM"].format(
@@ -213,6 +217,8 @@ class ClassGroups:
                             sub=sub
                         )
                     )
+            for fs in duds:
+                self.subgroup_empties.remove(fs)
         # Get the (filtered) atomic groups for the primary groups
         gdict = {}
         for bg in self.primary_groups:

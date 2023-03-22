@@ -216,7 +216,7 @@ class ClassGroupsDialog(QDialog):
         self.pb_accept.setEnabled(False)
         
         self.set_atomic_groups()
-
+        self.fill_group_table()
 #?
         self.disable_triggers = False
 
@@ -258,6 +258,50 @@ class ClassGroupsDialog(QDialog):
         self.independent_divisions.clear()
         self.atomic_groups.clear()
         self.group_table.clearContents()
+
+    def fill_group_table(self):
+        cg = self.class_groups
+        aglist = [
+            (
+                len(g),
+                cg.set2group(g), 
+                "; ".join(cg.set2group(a) for a in alist)
+            )
+            for g, alist in cg.group2atoms.items()
+        ]
+        aglist.sort()
+        for agx in aglist:
+            print("§", agx)
+        self.group_table.setRowCount(len(aglist))
+        i = 0
+        for l, g, agl in aglist:
+            item = self.group_table.item(i, 0)
+            if not item:
+                item = QTableWidgetItem()
+                self.group_table.setItem(i, 0, item)
+            item.setText(g)
+            item = self.group_table.item(i, 1)
+            if not item:
+                item = QTableWidgetItem()
+                self.group_table.setItem(i, 1, item)
+            item.setText(agl)
+            i += 1
+
+    def on_atomic_groups_itemChanged(self, item):
+        # print("§§§§0:", self.class_groups.subgroup_empties.values())
+        row = self.atomic_groups.row(item)
+        agstr, ag = self.atomic_groups_list[row]
+        if item.checkState() == Qt.CheckState.Unchecked:
+            self.class_groups.subgroup_empties[ag] = agstr
+#            self.class_groups.filtered_atomic_groups.remove(ag)
+        else:
+            del(self.class_groups.subgroup_empties[ag])
+#            self.class_groups.filtered_atomic_groups.add(ag)
+        # Update group table
+        # print("§§§§1:", self.class_groups.subgroup_empties.values())
+        self.class_groups.filter_atomic_groups()
+        self.fill_group_table()
+
 
     def analyse(self):
         self.clear_results()

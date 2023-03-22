@@ -1,7 +1,7 @@
 """
 ui/dialogs/dialog_class_groups.py
 
-Last updated:  2023-03-21
+Last updated:  2023-03-22
 
 Supporting "dialog" for the class-data editor – specify the ways a class
 can be divided into groups.
@@ -39,13 +39,13 @@ T = TRANSLATIONS("ui.dialogs.dialog_class_groups")
 
 ### +++++
 
-import itertools
 from typing import Optional
 from ui.ui_base import (
     ### QtWidgets:
     QDialog,
     QDialogButtonBox,
     QTableWidgetItem,
+    QListWidgetItem,
     ### QtGui:
     QRegularExpressionValidator,
     ### QtCore:
@@ -55,129 +55,19 @@ from ui.ui_base import (
     ### other
     uic,
 )
-from core.classes import (
-    build_group_data,
-    atomic_maps,
-    atoms2groups,
-    class_divisions,
-)
+from core.classes import ClassGroups
 
 NO_ITEM = "–––"
 
 ### -----
 
-class ClassGroups:
-    def __init__(self, source:str):
-        # Validator for class divisions
-        g = "[A-Za-z0-9]+"
-        self.regex = QRegularExpression(f"^{g}(?:[+]{g})+$")
-        divs = source.replace(' ', '')
-        print("$$$", divs)
-        # Split off empty subgroups
-        try:
-            divs, self.subgroup_equalities = divs.split('/', 1)
-        except ValueError:
-            self.subgroup_equalities = ""
-        self.basic_groups = set()
-        self.divisions = []
-        if divs:
-            for div in divs.split(';'):
-                gset, e = self.check_division(div, self.basic_groups)
-                if e:
-                    REPORT(
-                        "ERROR",
-                        T["CLASS_GROUPS_ERROR"].format(text=source, e=e)
-                    )
-                else:
-                    self.divisions.append(gset)
-        self.atomic_groups = [
-            set(ag) for ag in itertools.product(*self.divisions)
-        ]
-
-    def check_division(
-        self,
-        div:str,
-        all_groups:set[str]
-    ) -> tuple[set[str],str]:
-        if self.regex.match(div).hasMatch():
-            gset = set(div.split('+'))
-            clashes = gset & all_groups
-            if clashes:
-                return (
-                    set(),
-                    T["REPEATED_GROUPS"].format(
-                        div=div,
-                        g=", ".join(sorted(clashes))
-                    )
-                )
-            all_groups.update(gset)
-            return (gset, "")
-        # Invalid division text
-        return (set(), T["DIVISION_SYNTAX_ERROR"].format(div=div))
-                
-    def filter_atomic_groups(self):
-        self.filtered_atomic_groups = [
-            set(ag) for ag in self.atomic_groups
-        ]
-        geqlist = []
-        for geq in self.subgroup_equalities.split('/'):
-            try:
-                l, r = geq.split('=', 1)
-            except ValueError:
-                print("???", self.subgroup_equalities, ":", geq)
-                REPORT(
-                    "ERROR",
-#TODO
-                    T["BAD_GROUP_EQUALITY"].format(text=geq)
-                )
-                continue
-            lset, e = self.read_dot_group(l)
-            if e:
-                REPORT(
-                    "ERROR",
-#TODO
-                    T["BAD_GROUP_EQUALITY_PART"].format(text=geq, e=e)
-                )
-                continue
-            rset, e = self.read_dot_group(r)
-            if e:
-                REPORT(
-                    "ERROR",
-#TODO
-                    T["BAD_GROUP_EQUALITY_PART"].format(text=geq, e=e)
-                )
-                continue
-            if not rset < lset:
-                REPORT(
-                    "ERROR",
-#TODO
-                    T["NOT_SUBSET"].format(text=geq)
-                )
-                continue
-            # Perform the substitutions
-            for ag in self.filtered_atomic_groups:
-                if lset <= ag:
-                    ag -= lset
-                    ag |= rset
 
 
-#        aset = {".".join(sorted(g)) for g in atomic_groups}
-#        print("\n§-->" + " | ".join(sorted(aset)))
 
-#TODO: Dynamic editing could be very tricky!
 
-#TODO: I am not catching the empty groups (e.g. A.R) here. Can I
-# work this out? Or would it indeed be easier to specify empty
-# groups and from these work out the equalities? Or would
-# specifying both explicitly be the best approach?
 
-    def read_dot_group(self, text:str) -> tuple[set, str]:
-        s = set(text.split('.'))
-        for ag in self.atomic_groups:
-            if s <= ag:
-                return (s, "")
-#TODO
-        return (set(), T["BAD_DOT_GROUP"].format(text=text))
+
+
 
 
 
@@ -214,6 +104,9 @@ class ClassGroupsDialog(QDialog):
     @Slot(str)
     def on_edit_division_textChanged(self, text):
         print("§LINE:", text)
+        return
+#TODO: rather react to textEdited?
+
         current_line = self.divisions.currentItem().text()
         if self.regex.match(text).hasMatch():
             glist = text.split('+')
@@ -305,16 +198,14 @@ class ClassGroupsDialog(QDialog):
         self.disable_triggers = True
 
         self.divisions.clear()
-        text = start_value.replace(' ', '')
-        if text:
-            line_list = text.split(';')
-            for l in line_list:
-                div, e = self.check_division(l)
-                if e:
-                    REPORT("ERROR", e.format(div=div, groups=text))
-                else:
-                    self.divisions.addItem(div)
+        self.class_groups = ClassGroups(start_value)
+        if self.class_groups.divisions:
+            for d in self.class_groups.divisions:
+                self.divisions.addItem("+".join(sorted(d)))
+            self.divisions.setEnabled(True)
+            self.new_division.setEnabled(True)
         else:
+#?
             self.AWAITING_ITEM = True
             self.divisions.setEnabled(False)
             self.divisions.addItem(NO_ITEM)
@@ -323,28 +214,37 @@ class ClassGroupsDialog(QDialog):
 
 #?
         self.pb_accept.setEnabled(False)
-
+        
+        self.set_atomic_groups()
 
 #?
         self.disable_triggers = False
 
 #TODO--
-        self.analyse()
+#        self.analyse()
 
         self.exec()
         return self.result
 
 
+    def set_atomic_groups(self):
+        self.atomic_groups.clear()
+        self.class_groups.filter_atomic_groups()
+        self.atomic_groups_list = [
+            (self.class_groups.set2group(ag), ag)
+            for ag in self.class_groups.atomic_groups
+        ]
+        self.atomic_groups_list.sort()
+        for agstr, ag in self.atomic_groups_list:
+            item = QListWidgetItem(agstr)
+            active = ag in self.class_groups.filtered_atomic_groups
+            item.setCheckState(
+                Qt.CheckState.Checked if active
+                else Qt.CheckState.Unchecked
+            )
+            self.atomic_groups.addItem(item)
 
-    def check_division(self, div):
-        if self.regex.match(div).hasMatch():
-            norm = '+'.join(sorted(div.split('+')))
-            if self.divisions.findItems(
-                norm, Qt.MatchFlag.MatchExactly
-            ):
-                return (norm, T["REPEATED_DIVISION"])
-            return (norm, None)
-        return (div, T["INVALID_DIVISION"])
+
 
     def reset(self):
         self.result = ""
@@ -491,67 +391,10 @@ def test_division(self, groups:str):
 if __name__ == "__main__":
 #    from core.db_access import open_database
 #    open_database()
-    cg = ClassGroups(t:="")
-    print(f"{t} ->", cg.atomic_groups)
-    cg = ClassGroups(t:="A+B;G+R;B+A")
-    print(f"{t} ->", cg.atomic_groups)
-    cg = ClassGroups(t:="A+B;G+r:I+II+III")
-    print(f"{t} ->", cg.atomic_groups)
-    cg = ClassGroups(t:="G+R;A+B;I+II+III/A.G=A/B.R=R")
-    cg.filter_atomic_groups()
-    print(f"{t} ->", cg.filtered_atomic_groups)
-
-    quit(0)
+    print(
+        "----->",
+        ClassGroupsDialog.popup("G+R;A+B;I+II+III-A.R.I-A.R.II-A.R.III")
+    )
     print("----->", ClassGroupsDialog.popup("A+B;G+R;B+A"))
     print("----->", ClassGroupsDialog.popup("A+B;G+r:I+II+III"))
-    print("----->", ClassGroupsDialog.popup("G+R;A+B;I+II+III/A.G=A/B.R=R"))
     print("----->", ClassGroupsDialog.popup(""))
-
-
-    _divs = [("G", "R"), ("A", "B.G", "B.R"), ("A", "B"), ("I", "II", "III")]
-
-    print("\nGROUP DIVISIONS:", _divs, "->")
-    res = build_group_data(_divs)
-    print("\n ... Independent divisions:")
-    divisions = res["INDEPENDENT_DIVISIONS"]
-    for d in divisions:
-        print("  ", d)
-    print("\n ... Group-map:")
-    group_map = res["GROUP_MAP"]
-    for g, l in group_map.items():
-        print(f"  {str(g):20}: {l}")
-#    print("\n ... Groups:", res["GROUPS"])
-    print("\n ... Basic:", res["BASIC"])
-    atoms = res["MINIMAL_SUBGROUPS"]
-    print("\n ... Atoms:", atoms)
-
-    group2atoms = atomic_maps(atoms, list(group_map))
-    print("\n ... group -> atoms:")
-    for g, a in group2atoms.items():
-        print("       ::", g, "->", a)
-    a2glist = atoms2groups(divisions, group2atoms)
-    print("\n ... atoms -> groups:")
-    for a, g in a2glist.items():
-        print("       ::", a, "->", g)
-
-    print("\n ... basics -> groups:")
-    a2g = atoms2groups(divisions, group_map, with_divisions=True)
-    for a, g in a2g.items():
-        print("       ::", a, "->", g)
-
-
-    all_groups = list(group_map)
-    import random
-    ng = random.randint(1, len(all_groups))
-    groups = random.sample(all_groups, ng)
-    print("\n$$$ IN:", groups)
-
-    chipdata = class_divisions(
-        groups,
-        group_map,
-        divisions
-    )
-    print("    GROUPS:", chipdata.groups)
-    print("    SET:", chipdata.basic_groups)
-    print(f"    {chipdata.num}/{chipdata.den} @ {chipdata.offset}")
-    print("    REST:", chipdata.rest_groups)

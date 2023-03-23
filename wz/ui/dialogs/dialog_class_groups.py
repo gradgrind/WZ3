@@ -110,7 +110,10 @@ class ClassGroupsDialog(QDialog):
         self.set_line_error(False)
         ## Update division list
         row = self.divisions.currentRow()
-        divlist = cg.division_lines()
+        divlist = [
+            self.divisions.item(r).text()
+            for r in range(self.divisions.count())
+        ]
         divlist[row] = text
         e = cg.init_divisions(divlist, report_errors=False)
         if e:
@@ -118,19 +121,6 @@ class ClassGroupsDialog(QDialog):
             self.set_analysis_report(e)
             return
         self.init_division_list(row)
-
-#????
-        current_item = self.divisions.currentItem()
-        current_item.setText(text)
-        divlist = cg.division_lines()
-        e = cg.init_divisions(divlist, report_errors=False)
-        if e:
-            self.clear_results()
-            self.set_analysis_report(e)
-            return
-        ## Redisplay atoms and results
-        self.set_atomic_groups()
-        self.fill_group_table()
         
     def set_line_error(self, e:bool):
         if self.line_error:

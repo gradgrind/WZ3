@@ -70,6 +70,7 @@ from ui.ui_base import (
 )
 from ui.dialogs.dialog_text_line import TextLineDialog
 from ui.dialogs.dialog_number_constraint import NumberConstraintDialog
+from ui.dialogs.dialog_class_groups import ClassGroupsDialog
 from ui.week_table import WeekTable
 
 CLASS_FIELDS = (
@@ -252,6 +253,11 @@ class ClassEditorPage(Page):
 #TODO
             if object_name == "SORTNAME":
                 pass
+            elif object_name == "DIVISIONS":
+                result = ClassGroupsDialog.popup(
+                    self.class_dict[object_name],
+                    parent=self
+                )
             else:
                 result = TextLineDialog.popup(
                     self.class_dict[object_name],

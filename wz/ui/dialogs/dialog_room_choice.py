@@ -156,7 +156,7 @@ class RoomDialog(QDialog):
             )
         if errors:
             elist = "\n".join(errors)
-            REPORT("ERROR", f"{T['INVALID_ROOM_IDS']}:\n{elist}")
+            REPORT("ERROR", f'{T["INVALID_ROOM_IDS"]}:\n{elist}')
         self.write_choices()
 
     def add_valid_room_choice(self, rid):
@@ -202,10 +202,10 @@ class RoomDialog(QDialog):
             if is_classroom:
                 return T["CLASSROOM_ALREADY_CHOSEN"]
             else:
-                return f"{T['ROOM_ALREADY_CHOSEN']}: '{rid}'"
+                return f'{T["ROOM_ALREADY_CHOSEN"]}: "{rid}"'
         if rid in self.room2line:
             return None
-        return f"{T['UNKNOWN_ROOM_ID']}: '{rid}'"
+        return f'{T["UNKNOWN_ROOM_ID"]}: "{rid}"'
 
     @Slot()
     def on_tb_add_clicked(self):

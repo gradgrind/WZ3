@@ -469,6 +469,7 @@ def db_unique_fields(table):
 """
 
 #TODO: Increase flexibility by using (e.g.) JSON?
+# Where am I still using this?
 def read_pairs(data:str) -> list[tuple[str,str]]:
     """Read a list of (key, value) pairs from the given string.
 
@@ -486,7 +487,6 @@ def read_pairs(data:str) -> list[tuple[str,str]]:
             k, v = line.split(":", 1)
             pairs.append((k.strip(), v.strip().replace("\\n", "\n")))
         except ValueError:
-            raise
             REPORT("ERROR", T["BAD_KEY_VALUE_LIST"].format(text=data))
     return pairs
 

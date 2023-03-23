@@ -352,6 +352,14 @@ ui.modules.course_editor: {
     REALLY_DELETE:  "Soll dieser „Kurs“ wirklich gelöscht werden?"
 }
 
+ui.dialogs.dialog_block_name: {
+    NEW_ITEM:       "Unterricht, Block oder Deputat"
+}
+
+ui.dialogs.dialog_class_groups: {
+    EMPTY_GROUPS_ERROR: "Bei Verarbeitung der Untergruppen:\n\n - {e}"
+}
+
 ui.dialogs.dialog_course_fields: {
     EDIT_COURSE_FIELDS: "Kursfelder bearbeiten"
     NEW_COURSE:     "Neuer Kurs"
@@ -365,6 +373,12 @@ ui.dialogs.dialog_course_fields: {
 #ui.dialogs.dialog_day_period: {
 #}
 
+#ui.dialogs.dialog_number_constraint: {
+#}
+
+#ui.dialogs.dialog_parallel_lessons: {
+#}
+
 ui.dialogs.dialog_room_choice: {
     INVALID_ROOM_IDS: "Ungültige Raumkürzel"
     NO_CLASSROOM_DEFINED: "Kein Klassenraum definiert"
@@ -373,27 +387,11 @@ ui.dialogs.dialog_room_choice: {
     UNKNOWN_ROOM_ID: "Unbekanntes Raumkürzel"
 }
 
+#ui.dialogs.dialog_text_line: {
+#}
+
 #ui.dialogs.dialog_workload: {
 #}
-
-ui.dialogs.dialog_block_name: {
-    NEW_ITEM:       "Unterricht, Block oder Deputat"
-}
-
-#ui.dialogs.dialog_number_constraint: {
-#}
-
-ui.dialogs.dialog_class_groups: {
-    EMPTY_GROUPS_ERROR: "Bei Verarbeitung der Untergruppen:\n\n - {e}"
-#?
-
-
-    INVALID_GROUP:  "Ungültige Schülergruppenbezeichnung: {g}"
-    REPEATED_GROUP: "Wiederholte Schülergruppenbezeichnung: {g}"
-    TOO_MANY_DOTS:  "Schülergruppenbezeichnung {g}: zu viele Teile"
-    SUBSET:         "Von Schülergruppe {g} ist auch die Untergruppe {sub} angegeben"
-    SINGLE_SUBGROUP: "Von Schülergruppe {g} ist nur Untergruppe {sub} angegeben"
-}
 
 ui.modules.grades_manager: {
     # Labels

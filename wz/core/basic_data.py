@@ -148,7 +148,7 @@ def get_rooms() -> KeyValueList:
         return SHARED_DATA["ROOMS"]
     except KeyError:
         pass
-    rooms = db_key_value_list("TT_ROOMS", "RID", "NAME", sort_field="RID")
+    rooms = db_key_value_list("ROOMS", "RID", "NAME", sort_field="RID")
     SHARED_DATA["ROOMS"] = rooms
     return rooms
 

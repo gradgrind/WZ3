@@ -1,7 +1,7 @@
 """
 ui/dialogs/dialog_workload.py
 
-Last updated:  2023-03-17
+Last updated:  2023-03-23
 
 Supporting "dialog" for the course editor – set workload/pay.
 
@@ -47,10 +47,8 @@ from core.basic_data import (
     get_payment_weights,
     Workload,
 )
-from core.db_access import db_update_fields
 from ui.ui_base import (
     ### QtWidgets:
-    APP,
     QDialog,
     QDialogButtonBox,
     ### QtGui:
@@ -170,7 +168,7 @@ class WorkloadDialog(QDialog):
         if wl.PAY_FACTOR != '!':
             self.result = wl
             super().accept()
-        
+
 
 # --#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#
 

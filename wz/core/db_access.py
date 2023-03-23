@@ -1,7 +1,7 @@
 """
 core/db_access.py
 
-Last updated:  2023-03-20
+Last updated:  2023-03-23
 
 Helper functions for accessing the database.
 
@@ -39,9 +39,7 @@ if __name__ == "__main__":
     basedir = os.path.dirname(appdir)
     from core.base import start
 
-    #    start.setup(os.path.join(basedir, 'TESTDATA'))
-    #    start.setup(os.path.join(basedir, 'DATA'))
-    start.setup(os.path.join(basedir, "DATA-2023"))
+    start.setup(os.path.join(basedir, 'TESTDATA'))
 
 T = TRANSLATIONS("core.db_access")
 
@@ -488,6 +486,7 @@ def read_pairs(data:str) -> list[tuple[str,str]]:
             k, v = line.split(":", 1)
             pairs.append((k.strip(), v.strip().replace("\\n", "\n")))
         except ValueError:
+            raise
             REPORT("ERROR", T["BAD_KEY_VALUE_LIST"].format(text=data))
     return pairs
 
@@ -654,5 +653,4 @@ if __name__ == "__main__":
 
 # It seems that null entries are read as empty strings ...
 
-    from core.base import Dates
     migrate_db(start.year_data_path(Dates.next_year()), [])

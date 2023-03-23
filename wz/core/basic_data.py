@@ -1,5 +1,5 @@
 """
-core/basic_data.py - last updated 2023-03-12
+core/basic_data.py - last updated 2023-03-23
 
 Handle caching of the basic data sources
 
@@ -23,7 +23,7 @@ T = TRANSLATIONS("core.basic_data")
 
 ### +++++
 
-from typing import Optional, NamedTuple
+from typing import NamedTuple
 
 from core.db_access import (
     db_read_fields,
@@ -198,7 +198,7 @@ def sublessons(tag:str, reset:bool=False) -> list[Sublesson]:
     sublessons. These are added to the mapping as empty lists.
     """
     if tag.replace(" ", "") != tag:
-        SHOW_ERROR(f"Bug: Spaces in partner tag: '{tag}'")
+        REPORT("ERROR", f"Bug: Spaces in partner tag: '{tag}'")
         return []
     if not tag:
         return []
@@ -224,7 +224,7 @@ class ParallelTag(NamedTuple):
                 weighting = 0
             elif weighting < 0 or weighting > 10:
                 REPORT(
-                    "ERROR", 
+                    "ERROR",
                     T["WEIGHT_OUT_OF_RANGE"].format(weight=weighting)
                 )
                 weighting = 0
@@ -345,7 +345,7 @@ def get_payment_weights() -> KeyValueList:
             return i2
         else:
             # TODO: rather raise ValueError?
-            SHOW_ERROR(T["BAD_WEIGHT"].format(key=item[0], val=i2))
+            REPORT("ERROR", T["BAD_WEIGHT"].format(key=item[0], val=i2))
             return None
 
     try:
@@ -386,24 +386,27 @@ class Workload:
                     get_payment_weights().map(PAY_FACTOR).replace(",", ".")
                 )
             except KeyError:
-                    REPORT("ERROR", T["UNKNOWN_PAYMENT_WEIGHT"].format(key=f))
+                    REPORT(
+                        "ERROR",
+                        T["UNKNOWN_PAYMENT_WEIGHT"].format(key=PAY_FACTOR)
+                    )
                     ok = False
             except ValueError:
                 REPORT(
-                    "ERROR", 
+                    "ERROR",
                     f"BUG: Invalid db entry in PAY_FACTORS: key {PAY_FACTOR}"
                 )
                 ok = False
             if WORK_GROUP:
                 if not WORKLOAD:
                     REPORT(
-                        "ERROR", 
+                        "ERROR",
                         T["PAYMENT_TAG_WITHOUT_NUMBER"].format(tag=WORK_GROUP)
                     )
                     ok = False
                 elif not PAYMENT_TAG_FORMAT.match(WORK_GROUP).hasMatch():
                     REPORT(
-                        "ERROR", 
+                        "ERROR",
                         T["INVALID_PAYMENT_TAG"].format(tag=WORK_GROUP)
                     )
                     ok = False
@@ -416,12 +419,12 @@ class Workload:
                 return
         elif WORKLOAD:
             REPORT(
-                "ERROR", 
+                "ERROR",
                 T["PAYMENT_NUMBER_WITHOUT_WEIGHT"]
             )
         elif WORK_GROUP:
             REPORT(
-                "ERROR", 
+                "ERROR",
                 T["PAYMENT_TAG_WITHOUT_NUMBER"].format(tag=WORK_GROUP)
             )
         else:

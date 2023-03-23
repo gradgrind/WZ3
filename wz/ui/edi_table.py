@@ -1,7 +1,7 @@
 """
 ui/edi_table.py
 
-Last updated:  2023-03-20
+Last updated:  2023-03-23
 
 An editable table widget using QTableWidget as base class. Only text
 cells are handled.
@@ -9,7 +9,7 @@ Originally inspired by "TableWidget.py" from the "silx" project
 (www.silx.org), thanks to P. Knobel, but it is now very different.
 Little attention has been paid to efficiency, and especially the
 undo-redo mechanism could consume a lot of space – it stacks
-complete snapshots of the table (as lists of lists). 
+complete snapshots of the table (as lists of lists).
 
 =+LICENCE=================================
 Copyright 2023 Michael Towers
@@ -361,7 +361,7 @@ class EdiTableWidget(QTableWidget):
         row_add_del=False,      # enable adding/deleting a table row
         column_add_del=False,   # enable adding/deleting a table column
         on_change=None,         # callback function: table changed
-        # <on_change> takes no arguments.        
+        # <on_change> takes no arguments.
     ):
         """Inizialize the table.
         Only the copy action is enabled by default.
@@ -543,7 +543,7 @@ class EdiTableWidget(QTableWidget):
             h = selected[4]
             r = selected[1] + h
         else:
-            QMessageBox.warning(self, _WARNING, _ROWOPFAIL)
+            QMessageBox.warning(self, T["WARNING"], T["ROWOPFAIL"])
             return
         while h > 0:
             self.insertRow(r)
@@ -584,7 +584,7 @@ class EdiTableWidget(QTableWidget):
             r -= 1
             self.removeRow(r)
         self.data_modified()
-        
+
     def delete_columns(self):
         """Delete the selected columns."""
         selected = self.get_selection()

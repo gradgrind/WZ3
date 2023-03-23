@@ -1,5 +1,5 @@
 """
-core/teachers.py - last updated 2023-03-18
+core/teachers.py - last updated 2023-03-23
 
 Manage teacher data.
 
@@ -20,8 +20,6 @@ Copyright 2023 Michael Towers
 =-LICENCE=================================
 """
 
-###############################################################
-
 import sys, os
 
 if __name__ == "__main__":
@@ -39,7 +37,7 @@ if __name__ == "__main__":
 
 from typing import NamedTuple
 
-from core.db_access import open_database, db_read_fields, read_pairs
+from core.db_access import open_database, db_read_fields
 
 ### -----
 
@@ -50,7 +48,6 @@ class TeacherData(NamedTuple):
     lastname: str
     signed: str
     sortname: str
-    tt_data: str
 
 
 class Teachers(dict):
@@ -67,10 +64,9 @@ class Teachers(dict):
             lastname,
             signed,
             sortname,
-            tt_data,
         ) in db_read_fields(
             "TEACHERS",
-            ("TID", "FIRSTNAMES", "LASTNAMES", "SIGNED", "SORTNAME", "TT_DATA"),
+            ("TID", "FIRSTNAMES", "LASTNAME", "SIGNED", "SORTNAME"),
             sort_field="SORTNAME",
         ):
             self[tid] = TeacherData(
@@ -79,7 +75,6 @@ class Teachers(dict):
                 lastname=lastname,
                 signed=signed,
                 sortname=sortname,
-                tt_data=dict(read_pairs(tt_data)),
             )
 
     def name(self, tid):

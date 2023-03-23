@@ -1,7 +1,7 @@
 """
 ui/modules/course_editor.py
 
-Last updated:  2023-03-18
+Last updated:  2023-03-23
 
 Edit course and blocks+lessons data.
 
@@ -64,7 +64,6 @@ from core.basic_data import (
     Workload,
     clear_cache,
     get_subjects,
-    get_simultaneous_weighting,
     BlockTag,
     ParallelTag,
 )

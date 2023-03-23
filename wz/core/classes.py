@@ -32,15 +32,15 @@ if __name__ == "__main__":
     from core.base import start
 
     start.setup(os.path.join(basedir, 'TESTDATA'))
-    
+
 T = TRANSLATIONS("core.classes")
 
 ### +++++
 
-from typing import NamedTuple, Optional
+from typing import NamedTuple
 from itertools import combinations, product
 
-from core.db_access import open_database, db_read_fields, read_pairs
+from core.db_access import open_database, db_read_fields
 
 ### -----
 
@@ -273,7 +273,6 @@ class ClassGroups:
             for fag in self.filtered_atomic_groups:
                 for c in combinations(fag, l):
                     c_set.add(frozenset(c))
-            xrsg = {}
             for c in c_set:
                 cs = frozenset(c)
                 faglist = []
@@ -313,7 +312,6 @@ def build_group_data(divisions):
     def groups2stringlist(groups):
         return tuple(sorted([group2string(g) for g in groups]))
 
-    results = {}
     groups = set()
     impossible_partners = {}  # {group -> {incompatible groups}}
     # Collect groups and build map (<impossible_partners>) giving all
@@ -423,7 +421,7 @@ def build_group_data(divisions):
         # print(" +++", __independent_divs)
     gmapl = []
     for g, mgroups in gmap.items():
-        g_str = group2string(g)
+        # g_str = group2string(g)
         for g_ in mgroups:
             if g_ not in groups:
                 raise ValueError(

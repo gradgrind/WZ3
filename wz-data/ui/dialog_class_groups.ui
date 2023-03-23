@@ -58,7 +58,11 @@
         </widget>
        </item>
        <item>
-        <widget class="QLineEdit" name="edit_division"/>
+        <widget class="QLineEdit" name="edit_division">
+         <property name="styleSheet">
+          <string notr="true"/>
+         </property>
+        </widget>
        </item>
        <item>
         <layout class="QHBoxLayout" name="horizontalLayout_2">
@@ -241,6 +245,10 @@
      </item>
      <item>
       <widget class="QLineEdit" name="analysis">
+       <property name="styleSheet">
+        <string notr="true">color: rgb(217, 0, 0);
+background-color: rgb(249, 255, 199);</string>
+       </property>
        <property name="readOnly">
         <bool>true</bool>
        </property>
@@ -291,22 +299,6 @@
     <hint type="destinationlabel">
      <x>286</x>
      <y>270</y>
-    </hint>
-   </hints>
-  </connection>
-  <connection>
-   <sender>divisions</sender>
-   <signal>currentTextChanged(QString)</signal>
-   <receiver>edit_division</receiver>
-   <slot>setText(QString)</slot>
-   <hints>
-    <hint type="sourcelabel">
-     <x>70</x>
-     <y>112</y>
-    </hint>
-    <hint type="destinationlabel">
-     <x>62</x>
-     <y>180</y>
     </hint>
    </hints>
   </connection>

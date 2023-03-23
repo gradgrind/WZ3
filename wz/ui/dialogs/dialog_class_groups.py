@@ -47,30 +47,15 @@ from ui.ui_base import (
     QTableWidgetItem,
     QListWidgetItem,
     ### QtGui:
-    QRegularExpressionValidator,
     ### QtCore:
     Qt,
-    QRegularExpression,
     Slot,
     ### other
     uic,
 )
 from core.classes import ClassGroups
 
-NO_ITEM = "–––"
-
 ### -----
-
-
-
-
-
-
-
-
-
-
-
 
 class ClassGroupsDialog(QDialog):
     @classmethod
@@ -89,13 +74,14 @@ class ClassGroupsDialog(QDialog):
             QDialogButtonBox.StandardButton.Ok
         )
 
-#TODO ...?
-# I should be able to assume that (apart from the dummy "new" entry) all
-# lines in the list are somehow "valid". That doesn't mean that the
-# collection is valid as a whole (according to the <analyse> function).
-# A function <check_division> should check form and meaning – the
-# present version is rather inadequate as it accepts, for instance
-# "A+A+A". 
+    @Slot(str)
+    def on_divisions_currentTextChanged(self, text):
+        if self.line_error:
+            self.set_line_error(False)
+            # Handle jumping away from a bad edit
+            self.init_division_list(self.divisions.currentRow())
+        else:
+            self.edit_division.setText(text)
 
     @Slot(str)
     def on_edit_division_textEdited(self, text):
@@ -131,32 +117,27 @@ class ClassGroupsDialog(QDialog):
         self.line_error = e
 
     def set_analysis_report(self, text):
-        if text:
-            self.analysis.setText(text)
-            self.analysis.setStyleSheet("color: rgb(255, 0, 0);")
-        else:
-            self.analysis.setText(NO_ITEM)
-            self.analysis.setStyleSheet("")
+        self.analysis.setText(text)
 
     @Slot()
     def on_new_division_clicked(self):
-        print("NEW")
-        self.AWAITING_ITEM = True
         self.divisions.setEnabled(False)
-        self.divisions.addItem(NO_ITEM)
+        self.divisions.addItem("")
         self.new_division.setEnabled(False)
         self.divisions.setCurrentRow(self.divisions.count() - 1)
-#        newline = self.edit_division.text()
-#        if newline:
-#            d = self.division_lines + [newline]
-#            if self.analyse(d):
-#                self.division_lines = d
-#                self.edit_division.clear()
-#                self.divisions.addItem(newline)
 
     @Slot()
     def on_remove_division_clicked(self):
-        print("REMOVE")
+        row = self.divisions.currentRow()
+        divlist = [
+            self.divisions.item(r).text()
+            for r in range(self.divisions.count())
+        ]
+        assert(len(divlist) > 1)
+        del(divlist[row])
+        self.class_groups.init_divisions(divlist, report_errors=True)
+        n = len(self.class_groups.divisions)
+        self.init_division_list(row if row < n else n-1)
 
     def activate(self, start_value:str) -> Optional[str]:
         """Open the dialog.
@@ -166,8 +147,6 @@ class ClassGroupsDialog(QDialog):
         self.pb_reset.setVisible(bool(start_value))
         self.edit_division.setStyleSheet("")
         self.line_error = False
-#?
-        self.AWAITING_ITEM = False
         self.class_groups = ClassGroups(start_value)
         self.init_division_list(0)
         self.exec()
@@ -184,14 +163,11 @@ class ClassGroupsDialog(QDialog):
             self.divisions.setEnabled(True)
             self.new_division.setEnabled(True)
         else:
-#?
-            self.AWAITING_ITEM = True
             self.divisions.setEnabled(False)
-            self.divisions.addItem(NO_ITEM)
+            self.divisions.addItem("")
             self.new_division.setEnabled(False)
-# disable results?
-
         self.divisions.setCurrentRow(row)
+        self.remove_division.setEnabled(len(divlist) > 1)
         ## Set up the atomic groups display and the general groups display
         self.set_atomic_groups()
         self.fill_group_table()
@@ -261,8 +237,7 @@ class ClassGroupsDialog(QDialog):
         self.set_analysis_report("")
         ## Regenerate the current text value
         self.value = cg.text_value()
-        if self.value != self.value0:
-            self.pb_accept.setEnabled(True)
+        self.pb_accept.setEnabled(self.value != self.value0)
 
     def on_atomic_groups_itemChanged(self, item):
         # print("§§§§0:", self.class_groups.subgroup_empties.values())
@@ -279,135 +254,6 @@ class ClassGroupsDialog(QDialog):
             REPORT("WARNING", "\n".join(elist))
         self.fill_group_table()
 
-
-##################################################################
-
-    def analyse(self):
-        self.clear_results()
-        divs = []
-        lines = []
-        for i in range(self.divisions.count()):
-            line = self.divisions.item(i).text()
-            divs.append(line.split('+'))
-            lines.append(line)
-        try:
-            group_data = build_group_data(divs)
-        except ValueError as e:
-            self.set_analysis_report(str(e))
-            self.pb_accept.setEnabled(False)
-            return
-        self.set_analysis_report("–––")
-        self.value = ';'.join(lines)
-        print(f"§VALUE: {self.value} [{self.value0}]")
-        self.pb_accept.setEnabled(self.value != self.value0)
-
-        divisions = group_data["INDEPENDENT_DIVISIONS"]
-        for d in divisions:
-            self.independent_divisions.addItem('+'.join(d))
-        group_map = group_data["GROUP_MAP"]
-        atoms = group_data["MINIMAL_SUBGROUPS"]
-        self.atomic_groups.addItems(atoms)
-        self.group_table.setRowCount(len(group_map))
-        i = 0
-        for g, l in group_map.items():
-            item = self.group_table.item(i, 0)
-            if not item:
-                item = QTableWidgetItem()
-                self.group_table.setItem(i, 0, item)
-            item.setText(g)
-            item = self.group_table.item(i, 1)
-            if not item:
-                item = QTableWidgetItem()
-                self.group_table.setItem(i, 1, item)
-            item.setText("; ".join(l))
-            i += 1
-
-def test_division(self, groups:str):
-    print("§Test division:", groups)
-    if self.regex.match(groups).hasMatch():
-        glist = groups.split('+')
-
-    else:
-        # bad pattern
-        return (None, )
-
-    gsets = set()
-# There shouldn't be a superset of any member here
-# It might also be possible to check for incomplete divisions, e.g.
-# "A.G+B.R". Can I assume that single elements are mutually exclusive?
-# If so I might expect "A.G+X" or "A.G+B.R+X". Whether these are really
-# valid can only be determined in combination with the other divisions.
-# I could ban more than one dot (for being too complicated!).
-
-    g0map = {}
-    doubles = []
-    for g in glist:
-        gn = g.split(".")
-        gnf = frozenset(gn)
-        gsets.add(gnf)
-        if len(gnf) != len(gn):
-            return (None, T["INVALID_GROUP"].format(g=g))
-        if len(gn) == 1:
-            if g in g0map:
-                return (None, T["REPEATED_GROUP"].format(g=g))
-            g0map[g] = []                
-
-        elif len(gn) == 2:
-            if gnf in doubles:
-                return (None, T["REPEATED_GROUP"].format(g=g))
-            doubles.append(gnf)
-
-        else:
-            return (None, T["TOO_MANY_DOTS"].format(g=g))
-
-    subs = {}
-    for g2f in doubles:
-        for g in g2f:
-            if g in g0map:
-                return (
-                    None,
-                    T["SUBSET"].format(g=g, sub='.'.join(sorted(g2f)))
-                )
-            try:
-                subs[g].append(g2f)
-            except KeyError:
-                subs[g] = [g2f]
-    if not g0map:
-        for g, gfl in subs.items():
-            if len(gfl) < 2:
-                return (
-                    None,
-                    T["SINGLE_SUBGROUP"].format(
-                        g=g,
-                        sub='.'.join(sorted(gfl[0]))
-                    )
-                )
-    return (gsets, None)
-
-    groups = set()
-    impossible_partners = {}  # {group -> {incompatible groups}}
-    # Collect groups and build map (<impossible_partners>) giving all
-    # other groups which are incompatible with each group in a "dot-join"
-    # (an intersection).
-
-    # Build "frozensets" of the member groups, splitting dotted items.
-    divsets = []
-    for div in divisions:
-        gsets = set()
-        for g in div:
-            gset = frozenset(g.split("."))
-            gsets.add(gset)
-            # Add to list of "acceptable" groups
-            groups.add(gset)
-        divsets.append(gsets)
-        # Extend the sets of mutually incompatible groups
-        for gset in gsets:
-            snew = gsets.copy()
-            snew.remove(gset)
-            try:
-                impossible_partners[gset] |= snew
-            except KeyError:
-                impossible_partners[gset] = snew
 
 # --#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#
 

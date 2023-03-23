@@ -1,7 +1,7 @@
 """
 ui/modules/teacher_editor.py
 
-Last updated:  2023-03-20
+Last updated:  2023-03-23
 
 Edit teacher data.
 
@@ -50,14 +50,10 @@ from core.db_access import (
     db_read_unique,
     db_read_full_table,
     db_update_field,
-    db_update_fields,
     db_new_row,
     db_delete_rows,
-    db_values,
-    db_read_unique_entry,
     NoRecord,
 )
-from core.teachers import Teachers
 from ui.ui_base import (
     ### QtWidgets:
     QLineEdit,
@@ -65,7 +61,6 @@ from ui.ui_base import (
     QWidget,
     QHeaderView,
     ### QtGui:
-    QIcon,
     ### QtCore:
     Qt,
     QEvent,
@@ -75,6 +70,7 @@ from ui.ui_base import (
 )
 from ui.dialogs.dialog_text_line import TextLineDialog
 from ui.dialogs.dialog_text_line_offer import TextLineOfferDialog
+from ui.dialogs.dialog_number_constraint import NumberConstraintDialog
 from ui.week_table import WeekTable
 from local.name_support import asciify, tvSplit
 
@@ -260,14 +256,14 @@ class TeacherEditorPage(Page):
         ):
             if object_name == "SORTNAME":
                 f, t, l = tvSplit(
-                    self.teacher_dict["FIRSTNAMES"], 
+                    self.teacher_dict["FIRSTNAMES"],
                     self.teacher_dict["LASTNAME"]
                 )
                 result = TextLineOfferDialog.popup(
                     self.teacher_dict["SORTNAME"],
                     asciify(f"{l}_{t}_{f}" if t else f"{l}_{f}"),
                     parent=self
-                )  
+                )
             else:
                 result = TextLineDialog.popup(
                     self.teacher_dict[object_name],

@@ -1,7 +1,7 @@
 """
 ui/modules/class_editor.py
 
-Last updated:  2023-03-20
+Last updated:  2023-03-23
 
 Edit class data.
 
@@ -50,14 +50,10 @@ from core.db_access import (
     db_read_unique,
     db_read_full_table,
     db_update_field,
-    db_update_fields,
     db_new_row,
     db_delete_rows,
-    db_values,
-    db_read_unique_entry,
     NoRecord,
 )
-from core.classes import Classes
 from ui.ui_base import (
     ### QtWidgets:
     QLineEdit,
@@ -73,7 +69,7 @@ from ui.ui_base import (
     uic,
 )
 from ui.dialogs.dialog_text_line import TextLineDialog
-from ui.dialogs.dialog_text_line_offer import TextLineOfferDialog
+from ui.dialogs.dialog_number_constraint import NumberConstraintDialog
 from ui.week_table import WeekTable
 
 CLASS_FIELDS = (

@@ -1,7 +1,7 @@
 """
 ui/dialogs/dialog_room_choice.py
 
-Last updated:  2023-03-16
+Last updated:  2023-03-23
 
 Supporting "dialog" for the course editor – select room(s).
 
@@ -41,10 +41,8 @@ T = TRANSLATIONS("ui.dialogs.dialog_room_choice")
 from core.basic_data import (
     get_rooms,
 )
-from core.db_access import db_update_field
 from ui.ui_base import (
     ### QtWidgets:
-    APP,
     QDialog,
     QDialogButtonBox,
     QTableWidgetItem,

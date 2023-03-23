@@ -1,7 +1,7 @@
 """
 ui/dialogs/dialog_class_groups.py
 
-Last updated:  2023-03-22
+Last updated:  2023-03-23
 
 Supporting "dialog" for the class-data editor – specify the ways a class
 can be divided into groups.
@@ -97,65 +97,41 @@ class ClassGroupsDialog(QDialog):
 # present version is rather inadequate as it accepts, for instance
 # "A+A+A". 
 
-
-
     @Slot(str)
-    def on_edit_division_textChanged(self, text):
-        print("§LINE:", text)
-        return
-#TODO: rather react to textEdited?
-
-        current_line = self.divisions.currentItem().text()
-
-# Get all primary groups, excluding the current line.
-
-#        self.class_groups.check_division(text,  all_groups:set[str]
-#        ) -> tuple[set[str],str]
-
-
-        if self.regex.match(text).hasMatch():
-            glist = text.split('+')
-            norm = '+'.join(sorted(glist))
-            if norm == current_line:
-                self.set_line_error(False)
-                if not self.AWAITING_ITEM:
-                    self.analyse()
-                return
-            
-            if self.divisions.findItems(
-                norm, Qt.MatchFlag.MatchExactly
-            ):
-#?
-                self.analysis.setText("REPEATED_DIVISION")
-                self.set_line_error(True)
-                return
-            if current_line == NO_ITEM:
-                self.divisions.setEnabled(True)
-                self.AWAITING_ITEM = False
-                self.new_division.setEnabled(True)
-
-            dset, e = test_division(glist)
-            if e:
-                self.analysis.setText(e)
-                self.set_line_error(True)
-                return
-#???
-
-#TODO: This shouldn't be necessary, if setting the current item caused
-# a callback to this slot ...
-# ... of course it won't, because this a a text-changed handler!
-            self.set_line_error(False)
-            self.divisions.currentItem().setText(norm)
-            self.analyse()
-            return
-        else:
+    def on_edit_division_textEdited(self, text):
+        cg = self.class_groups
+        ## Check just structure of division text
+        div, e = cg.check_division(text, set())
+        if e:
             self.set_line_error(True)
-            self.pb_accept.setEnabled(False)
             self.clear_results()
-#?
-            self.analysis.setText("INVALID_DIVISION")
+            self.set_analysis_report(e)
             return
+        self.set_line_error(False)
+        ## Update division list
+        row = self.divisions.currentRow()
+        divlist = cg.division_lines()
+        divlist[row] = text
+        e = cg.init_divisions(divlist, report_errors=False)
+        if e:
+            self.clear_results()
+            self.set_analysis_report(e)
+            return
+        self.init_division_list(row)
 
+#????
+        current_item = self.divisions.currentItem()
+        current_item.setText(text)
+        divlist = cg.division_lines()
+        e = cg.init_divisions(divlist, report_errors=False)
+        if e:
+            self.clear_results()
+            self.set_analysis_report(e)
+            return
+        ## Redisplay atoms and results
+        self.set_atomic_groups()
+        self.fill_group_table()
+        
     def set_line_error(self, e:bool):
         if self.line_error:
             if not e:
@@ -164,11 +140,13 @@ class ClassGroupsDialog(QDialog):
             self.edit_division.setStyleSheet("color: rgb(255, 0, 0);")
         self.line_error = e
 
-#    @Slot(str)
-#    def on_divisions_currentTextChanged(self, text):
-#        if self.disable_triggers:
-#            return
-#        print("CURRENT:", text)
+    def set_analysis_report(self, text):
+        if text:
+            self.analysis.setText(text)
+            self.analysis.setStyleSheet("color: rgb(255, 0, 0);")
+        else:
+            self.analysis.setText(NO_ITEM)
+            self.analysis.setStyleSheet("")
 
     @Slot()
     def on_new_division_clicked(self):
@@ -198,15 +176,21 @@ class ClassGroupsDialog(QDialog):
         self.pb_reset.setVisible(bool(start_value))
         self.edit_division.setStyleSheet("")
         self.line_error = False
-        self.AWAITING_ITEM = False
 #?
-        self.disable_triggers = True
-
-        self.divisions.clear()
+        self.AWAITING_ITEM = False
         self.class_groups = ClassGroups(start_value)
-        if self.class_groups.divisions:
-            for d in self.class_groups.divisions:
-                self.divisions.addItem("+".join(sorted(d)))
+        self.init_division_list(0)
+        self.exec()
+        return self.result
+
+    def init_division_list(self, row):
+        """Fill the divisions list widget.
+        Subsequently the other display widgets are set up.
+        """
+        self.divisions.clear()
+        divlist = self.class_groups.division_lines()
+        if divlist:
+            self.divisions.addItems(divlist)
             self.divisions.setEnabled(True)
             self.new_division.setEnabled(True)
         else:
@@ -215,26 +199,21 @@ class ClassGroupsDialog(QDialog):
             self.divisions.setEnabled(False)
             self.divisions.addItem(NO_ITEM)
             self.new_division.setEnabled(False)
-        self.divisions.setCurrentRow(0)
+# disable results?
 
-#?
-        self.pb_accept.setEnabled(False)
-        
+        self.divisions.setCurrentRow(row)
+        ## Set up the atomic groups display and the general groups display
         self.set_atomic_groups()
         self.fill_group_table()
-#?
-        self.disable_triggers = False
-
-#TODO--
-#        self.analyse()
-
-        self.exec()
-        return self.result
-
 
     def set_atomic_groups(self):
         self.atomic_groups.clear()
-        self.class_groups.filter_atomic_groups()
+        elist = self.class_groups.filter_atomic_groups()
+        if elist:
+            REPORT(
+                "WARNING",
+                T["EMPTY_GROUPS_ERROR"].format(e="\n - ".join(elist))
+            )
         self.atomic_groups_list = [
             (self.class_groups.set2group(ag), ag)
             for ag in self.class_groups.atomic_groups
@@ -249,8 +228,6 @@ class ClassGroupsDialog(QDialog):
             )
             self.atomic_groups.addItem(item)
 
-
-
     def reset(self):
         self.result = ""
         super().accept()
@@ -259,11 +236,12 @@ class ClassGroupsDialog(QDialog):
         self.result = self.value
         super().accept()
 
-#?
     def clear_results(self):
-        self.independent_divisions.clear()
+        """Clear result tables and disable "accept" button.
+        """
         self.atomic_groups.clear()
         self.group_table.clearContents()
+        self.pb_accept.setEnabled(False)
 
     def fill_group_table(self):
         cg = self.class_groups
@@ -276,8 +254,6 @@ class ClassGroupsDialog(QDialog):
             for g, alist in cg.group2atoms.items()
         ]
         aglist.sort()
-        for agx in aglist:
-            print("§", agx)
         self.group_table.setRowCount(len(aglist))
         i = 0
         for l, g, agl in aglist:
@@ -292,6 +268,11 @@ class ClassGroupsDialog(QDialog):
                 self.group_table.setItem(i, 1, item)
             item.setText(agl)
             i += 1
+        self.set_analysis_report("")
+        ## Regenerate the current text value
+        self.value = cg.text_value()
+        if self.value != self.value0:
+            self.pb_accept.setEnabled(True)
 
     def on_atomic_groups_itemChanged(self, item):
         # print("§§§§0:", self.class_groups.subgroup_empties.values())
@@ -303,11 +284,13 @@ class ClassGroupsDialog(QDialog):
             del(self.class_groups.subgroup_empties[ag])
         ## Update group table
         # print("§§§§1:", self.class_groups.subgroup_empties.values())
-        self.class_groups.filter_atomic_groups()
+        elist = self.class_groups.filter_atomic_groups()
+        if elist:
+            REPORT("WARNING", "\n".join(elist))
         self.fill_group_table()
 
 
-
+##################################################################
 
     def analyse(self):
         self.clear_results()
@@ -320,10 +303,10 @@ class ClassGroupsDialog(QDialog):
         try:
             group_data = build_group_data(divs)
         except ValueError as e:
-            self.analysis.setText(str(e))
+            self.set_analysis_report(str(e))
             self.pb_accept.setEnabled(False)
             return
-        self.analysis.setText("–––")
+        self.set_analysis_report("–––")
         self.value = ';'.join(lines)
         print(f"§VALUE: {self.value} [{self.value0}]")
         self.pb_accept.setEnabled(self.value != self.value0)

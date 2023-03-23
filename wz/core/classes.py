@@ -1,5 +1,5 @@
 """
-core/classes.py - last updated 2023-03-22
+core/classes.py - last updated 2023-03-23
 
 Manage class data.
 
@@ -196,7 +196,32 @@ class ClassGroups:
                 )
             divset.add(g)
             all_groups.add(g)
-        return (divset, "")
+        if len(divset) > 1:
+            return (divset, "")
+        return (divset, T["TOO_FEW_GROUPS"].format(div=div))
+
+    def division_lines(self) -> list[str]:
+        """Return a list of the divisions as text lines.
+        """
+        return [
+            "+".join(sorted(d))
+            for d in self.divisions
+        ]
+
+    def text_value(self) -> str:
+        """Return a text representation of the data:
+            - divisions as '+'-separated primary groups
+            - divisions seprated by ';'
+            - after the divisions a '-'-separated empty subgroup list
+              (there is a '-' before the first such subgroup, too)
+            - the empty subgroups must be valid "atomic" groups
+        """
+        divs = ';'.join(self.division_lines())
+        if self.subgroup_empties:
+            empties = [self.set2group(fs) for fs in self.subgroup_empties]
+            empties.sort()
+            return f"{divs}-{'-'.join(empties)}"
+        return divs
 
     def group2set(self, g:str) -> frozenset[str]:
         return frozenset(g.split('.'))
@@ -214,10 +239,11 @@ class ClassGroups:
             raise Bug(f"Invalid class-group: '{s}'")
         return ".".join(glist)
 
-    def filter_atomic_groups(self):
+    def filter_atomic_groups(self) -> list[str]:
         self.filtered_atomic_groups = {
             frozenset(ag) for ag in self.atomic_groups
         }
+        elist = []
         if self.subgroup_empties:
             # Remove the specified empty atomic groups
             duds = set()
@@ -226,15 +252,9 @@ class ClassGroups:
                     self.filtered_atomic_groups.remove(fs)
                 except KeyError:
                     duds.add(fs)
-                    REPORT(
-                        "ERROR",
-                        T["FILTER_NOT_ATOM"].format(
-                            text=self.source,
-                            sub=sub
-                        )
-                    )
+                    elist.append(T["FILTER_NOT_ATOM"].format(sub=sub))
             for fs in duds:
-                self.subgroup_empties.remove(fs)
+                del(self.subgroup_empties[fs])
         # Get the (filtered) atomic groups for the primary groups
         gdict = {}
         for bg in self.primary_groups:
@@ -245,13 +265,7 @@ class ClassGroups:
             if faglist:
                 gdict[frozenset(faglist)] = frozenset([bg])
             else:
-                REPORT(
-                    "ERROR",
-                    T["EMPTY_GROUP"].format(
-                        text=self.source,
-                        g=bg
-                    )
-                )
+                elist.append(T["EMPTY_GROUP"].format(g=bg))
         # Add the atomic groups for all possible subgroups, starting
         # with the shortest
         for l in range(2, len(self.divisions)):
@@ -278,6 +292,7 @@ class ClassGroups:
                 gdict[fs] = fag
         # Reverse the mapping to get the group -> atoms mapping
         self.group2atoms = {v: k for k, v in gdict.items()}
+        return elist
 
 
 #*************************************************************************
@@ -578,7 +593,13 @@ if __name__ == "__main__":
         "A+B;G+r:I+II+III",
     ):
         cg = ClassGroups(cglist)
-        cg.filter_atomic_groups()
+        elist = cg.filter_atomic_groups()
+        if elist:
+            estr = '\n - '.join(elist)
+            REPORT(
+                "ERROR",
+                f"Handling empty subgroups:\n\n - {estr}"
+            )
         print(f"\n{cglist} ->", cg.filtered_atomic_groups)
         print("divisions:", cg.divisions)
         for g, alist in cg.group2atoms.items():
@@ -587,7 +608,7 @@ if __name__ == "__main__":
                 "::",
                 [cg.set2group(a) for a in alist]
             )
-
+        print("%TEXT%", cg.text_value())
     quit(0)
 
 # old stuff ...

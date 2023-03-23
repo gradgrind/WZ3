@@ -50,9 +50,10 @@ core.classes: {
     INDEPENDENT_GROUPS_MISMATCH: "Untergruppe {group} fehlt"
     INVALID_GROUP_TAG:  "Klassenteilung „{div}“: ungültige Gruppenbezeichnung: „{g}“"
     REPEATED_GROUP:     "Klassenteilung „{div}“: wiederholte Gruppenbezeichnung: „{g}“"
+    TOO_FEW_GROUPS:     "Klassenteilung „{div}“: mindestens zwei Gruppen erforderlich"
     CLASS_GROUPS_ERROR: "Fehler in Klassengruppen: {text}\n\n{e}"
-    FILTER_NOT_ATOM:    "Fehler in Klassengruppen: {text}\n\n„{sub}“ ist keine Elementargruppe"
-    EMPTY_GROUP:        "Fehler in Klassengruppen: {text}\n\nSchülergruppe „{g}“ ist als leer konfiguriert"
+    FILTER_NOT_ATOM:    "„{sub}“ ist keine Elementargruppe"
+    EMPTY_GROUP:        "Schülergruppe „{g}“ ist als leer konfiguriert"
 }
 
 core.pupils: {
@@ -383,6 +384,7 @@ ui.dialogs.dialog_block_name: {
 #}
 
 ui.dialogs.dialog_class_groups: {
+    EMPTY_GROUPS_ERROR: "Bei Verarbeitung der Untergruppen:\n\n - {e}"
 #?
 
 

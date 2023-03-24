@@ -1,7 +1,7 @@
 """
 ui/wz_main.py
 
-Last updated:  2023-03-17
+Last updated:  2023-03-24
 
 The main window of the WZ GUI.
 
@@ -47,7 +47,9 @@ from ui.ui_base import (
     Slot,
 )
 
+from ui.modules.class_editor import ClassEditorPage
 from ui.modules.course_editor import CourseEditorPage
+from ui.modules.teacher_editor import TeacherEditorPage
 
 ### -----
 
@@ -64,6 +66,8 @@ class MainWidget(QWidget):
         super().__init__()
         uic.loadUi(APPDATAPATH("ui/wz_main.ui"), self)
         pages = (
+            ("ui_class_editor", ClassEditorPage()),
+            ("ui_teacher_editor", TeacherEditorPage()),
             ("ui_course_editor", CourseEditorPage()),
         )
         self.pages = {}
@@ -88,4 +92,5 @@ if __name__ == "__main__":
     MAIN_WIDGET = MainWidget()
 #    builtins.MAIN_WIDGET = MAIN_WIDGET
 #    MAIN_WIDGET.setWindowState(Qt.WindowMaximized)
+    MAIN_WIDGET.resize(1000, 550)
     run(MAIN_WIDGET)

@@ -103,7 +103,7 @@ class ClassEditorPage(Page):
             self.CLASS, self.NAME, self.CLASSROOM,
             self.DIVISIONS,
             self.MIN_LESSONS_PER_DAY, self.MAX_GAPS_PER_WEEK,
-            self.constraints,
+#            self.constraints,
         ):
             w.installEventFilter(self)
 

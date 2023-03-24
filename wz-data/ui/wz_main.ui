@@ -41,9 +41,31 @@
          <number>3</number>
         </property>
         <item>
-         <widget class="QPushButton" name="module_0">
+         <widget class="QComboBox" name="comboBox">
+          <item>
+           <property name="text">
+            <string>2023 – 2024</string>
+           </property>
+          </item>
+         </widget>
+        </item>
+        <item>
+         <widget class="Line" name="line_2">
+          <property name="frameShadow">
+           <enum>QFrame::Plain</enum>
+          </property>
+          <property name="lineWidth">
+           <number>2</number>
+          </property>
+          <property name="orientation">
+           <enum>Qt::Horizontal</enum>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QPushButton" name="ui_class_editor">
           <property name="text">
-           <string>PushButton</string>
+           <string>Klassen</string>
           </property>
           <property name="checkable">
            <bool>true</bool>
@@ -60,28 +82,9 @@
          </widget>
         </item>
         <item>
-         <widget class="QPushButton" name="module_1">
+         <widget class="QPushButton" name="ui_teacher_editor">
           <property name="text">
-           <string>PushButton</string>
-          </property>
-          <property name="checkable">
-           <bool>true</bool>
-          </property>
-          <property name="checked">
-           <bool>false</bool>
-          </property>
-          <property name="autoExclusive">
-           <bool>false</bool>
-          </property>
-          <attribute name="buttonGroup">
-           <string notr="true">buttonGroup</string>
-          </attribute>
-         </widget>
-        </item>
-        <item>
-         <widget class="QPushButton" name="module_2">
-          <property name="text">
-           <string>PushButton</string>
+           <string>Lehrpersonen</string>
           </property>
           <property name="checkable">
            <bool>true</bool>
@@ -125,15 +128,6 @@
         </size>
        </property>
       </spacer>
-     </item>
-     <item>
-      <widget class="QComboBox" name="comboBox">
-       <item>
-        <property name="text">
-         <string>2023 – 2024</string>
-        </property>
-       </item>
-      </widget>
      </item>
     </layout>
    </item>

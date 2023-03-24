@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>818</width>
-    <height>646</height>
+    <height>754</height>
    </rect>
   </property>
   <property name="sizePolicy">
@@ -318,7 +318,7 @@
        <item>
         <widget class="EdiTableWidget" name="AVAILABLE">
          <property name="toolTip">
-          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Die „Verfügbarkeit“ der Person kann für jede Stunde angegeben werden. Mögliche Werte sind „-“ (steht definitiv nicht zur Verfügung) über 1, 2, 3, ... 9 bis „+“ (steht unbegrenzt zur Verfügung).&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Die „Verfügbarkeit“ der Klasse kann für jede Stunde angegeben werden. Mögliche Werte sind „-“ (steht definitiv nicht zur Verfügung) über 1, 2, 3, ... 9 bis „+“ (steht ohne Einschränkung zur Verfügung).&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
          </property>
         </widget>
        </item>
@@ -360,6 +360,9 @@
          </item>
          <item row="2" column="1">
           <widget class="QComboBox" name="LUNCHBREAK">
+           <property name="toolTip">
+            <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Wichtigkeit einer Freistunde in der Mittagszeit. Mögliche Werte sind „-“ (kein Bedarf oder nicht relevant) über 1, 2, 3, ... 9 bis „+“ (muss unbedingt vorhanden sein).&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+           </property>
            <item>
             <property name="text">
              <string>-</string>

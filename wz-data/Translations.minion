@@ -10,16 +10,6 @@ core.base: {
 
 }
 
-core.db_access: {
-    # Messages
-    BACKUP_TO:          "Sicherungskopie der Daten: {f}\n"
-    REMOVE_OLD_BACKUP:  "Alte Sicherungskopie entfernt: {f}"
-    BAD_KEY_VALUE_LIST: "Ungültige Schlüssel-Wert-Liste,\nein Paar pro Zeile, Trennung durch ':':\n{text}"
-    BAD_KEY_IN_KV_LIST: "Ungültiger Schlüssel in Schlüssel-Wert-Liste: {key}"
-    NEWLINE_TAG_IN_KV_LIST: "Zeilenumbruch-Zeichen (\/n) in Schlüssel-Wert-Liste: {val}"
-    MONTHLY_DB_BACKUP:  "Die monatliche Sicherungskopie der Datenbank wurde angelegt:\n  {path}"
-}
-
 core.basic_data: {
     ## Messages
     BAD_WEIGHT:     "Ungültiger Gewichtungsfaktor für Deputatsstunden: {key} -> '{val}'"
@@ -56,6 +46,16 @@ core.classes: {
     EMPTY_GROUP:        "Schülergruppe „{g}“ ist als leer konfiguriert"
 }
 
+core.db_access: {
+    # Messages
+    BACKUP_TO:          "Sicherungskopie der Daten: {f}\n"
+    REMOVE_OLD_BACKUP:  "Alte Sicherungskopie entfernt: {f}"
+    BAD_KEY_VALUE_LIST: "Ungültige Schlüssel-Wert-Liste,\nein Paar pro Zeile, Trennung durch ':':\n{text}"
+    BAD_KEY_IN_KV_LIST: "Ungültiger Schlüssel in Schlüssel-Wert-Liste: {key}"
+    NEWLINE_TAG_IN_KV_LIST: "Zeilenumbruch-Zeichen (\/n) in Schlüssel-Wert-Liste: {val}"
+    MONTHLY_DB_BACKUP:  "Die monatliche Sicherungskopie der Datenbank wurde angelegt:\n  {path}"
+}
+
 core.pupils: {
     # Labels
     OPEN_TABLETYPE: "Tabellendatei"
@@ -72,13 +72,6 @@ core.report_courses: {
     UNKNOWN_GROUP: "In Klasse {klass}: unbekannte Gruppe ({group}) für Fach {sid} bei Lehrer {tid}"
     PUPIL_HAS_MULTIPLE_SID: "In Klasse {klass}, {pupil} hat mehrere Zeugniseinträge im Fach {subject}"
     MULTIPLE_REPORT_SETTINGS: "Gruppe {group}: Zeugnis-Info in Fach {subject} widersprüchlich"
-}
-
-template_engine.template_sub: {
-    # Messages
-    MISSING_PDFS: "pdf-Erstellung schlug fehl:\n  von {spath}\n  nach {dpath}"
-    MISSING_PDF: "pdf-Erstellung schlug fehl: {fpath}"
-    BAD_FIELD_INFO: "Ungültige Feld-Info ({error}) in:\n  {path}"
 }
 
 grades.grades_base: {
@@ -178,182 +171,19 @@ local.abitur: {
     EMPTY_SLOTS:    "Keine Daten für {n} Felder"
 }
 
-ui.ui_base: {
+template_engine.template_sub: {
     # Messages
-    UNKNOWN_KEY:    "Ungültige Selektion: '{key}'"
-    
-    # Labels
-    MODULE_NAME:    StackPage
-    MODULE_TITLE:   "Page Title"
-
-    # Dialog buttons, etc.
-    CANCEL:         Abbrechen
-    OK:             OK
-
-    INPUT_TITLE:    Eingabe
-    YESORNO_TITLE:  "Ja oder Nein?"
-    TEXTAREA_TITLE: "Text eingeben"
-    LOSE_CHANGES_TITLE: "Ungespeicherte Änderungen"
-    LOSE_CHANGES:   "Die Änderungen werden verworfen. Weitermachen?"
-
-    Reporter:       "Rückmeldungen"
-    INFO:           Mitteilung
-    WARNING:        Warnung
-    ERROR:          Fehler
-    PROCESSING:     "Daten werden verarbeitet"
-    DONE:           "fertig!"
-    ERRORS:         "Es gab allerdings {n} Fehler ..."
-    WARNINGS:       "Warnungen: {n}"
-
-    FILEOPEN:       "Datei öffnen"
-    DIROPEN:        "Ordner öffnen"
-    FILESAVE:       "Datei speichern"
-
-    CONFIRMATION:   Bestätigen
-}
-
-ui.grid_base: {
-    # Labels
-    Copy:           Kopieren
-    Paste:          Einfügen
-    
-    # Messages
-    BAD_ROW_LINE: "Ungültige Zeile für Linie: {row}"
-    BAD_COL_LINE: "Ungültige Spalte für Linie: {col}"
-    TILE_OUT_OF_BOUNDS: "Ungültige Platzierung für Raster-Kachel: Zeile={row}, Spalte={col}, Breite={cspan}, Höhe={rspan}"
-    GRID_CELL_RANGE: "Raster-Kachel in Zeile {row}, Spalte {col} darf nicht andere Kacheln überdecken"
-    NOT_STRING: "Kachelwert muss eine Zeichenkette sein, nicht: {val}"
-    PASTE_NOT_RECTANGULAR: "Die einzufügenden Daten sind nicht „rechteckig“, sie werden an {n} Stellen mit leeren Elementen ergänzt"
-    BAD_PASTE_RANGE: "Die Dimensionen der einzufügenden Daten sind nicht kompatibel mit dem ausgewählten Bereich: {h0}x{w0} -> {h1}x{w1}"
-    COPY_NO_SELECTION: "Keine Zellen ausgewählt zum Kopieren"
-    PASTE_NO_SELECTION: "Einfügen: Kein Zielbereich (Auswahl)"
-}
-
-ui.simple_table: {
-    # Labels
-    COPY_SELECTION:       "Auswahl kopieren"
-    PASTE_SELECTION:      "in Auswahl einfügen"
-    
-    # Messages
-    NO_SELECTION: "Keine Zellen ausgewählt"
-    PASTE_NOT_RECTANGULAR: "Die einzufügenden Daten sind nicht „rechteckig“, sie werden an {n} Stellen mit leeren Elementen ergänzt"
-    CLIPBOARD_EMPTY: "Die Zwischenablage ist leer"
-    BAD_PASTE_RANGE: "Die Dimensionen der einzufügenden Daten sind nicht kompatibel mit dem ausgewählten Bereich: {h0}x{w0} -> {h1}x{w1}"
-}
-
-ui.week_table: {
-    INVALID_AVAILABILITY:   "Ungültig: '{val}'\n  Gültig sind: +, - und 1..9"
-    INVALID_PERIOD_VALUES:  "Die Verfügbarkeitsdaten mussten {n}-mal angepasst werden.\n  Ursprünglich: {val}"
-    none:           "(keine)"
-}
-
-ui.modules.year_manager: {
-    # Labels
-    MODULE_NAME:    Jahre
-    MODULE_TITLE:   "Jahresdaten verwalten"
-    MIGRATE_DATA:   "Daten für das nächste Schuljahr vorbereiten"
-    SELECT_REPEATERS: "Falls es Schüler gibt, die das letzte Jahr wiederholen, sollten sie hier markiert werden."
-    CLASS_K:    "Klasse {klass}"
-    PROCESS_MIGRATE: "Datenbank für {year} vorbereiten"
-    
-    # Tooltips
-    MIGRATE_TO_NEXT_YEAR: "Eine neue Datenbank wird angelegt, alle Schüler in die nächste Klasse versetzt."
-}
-
-ui.modules.pupils_manager: {
-    # Labels
-    MODULE_NAME:    Schüler
-    MODULE_TITLE:   "Schülerdaten verwalten"
-    CLASS:          Klasse
-    CLASS_K:        "Klasse {klass}"
-    NEW_PUPIL:      "Neuer Schüler"
-    NEW_PUPIL_N:    "Neu: {name}"
-    CHANGE_PUPIL_FIELD: "{name}, Feld ändern: {field}"
-    CHANGE_PUPIL_FIELDS: "{name}, mehrere Felder ändern ..."
-    CHANGE_CLASS:   "Klasse wechseln"
-    REMOVE_PUPIL:   "Schüler entfernen"
-    REMOVE_PUPIL_N: "Entfernen: {name}"
-    CHANGED_PUPIL_DATA: "Geänderte Schülerdaten:\n  Welche sollten übernommen werden?"
-    UPDATE_PUPILS:  "Schülerdaten aktualisieren"
-    DB_UPDATE_PUPILS: "Update pupils in DB"
-
-    # Messages
-    PID_WARNING:    "WARNUNG: Außer bei neuen Schülern sollte das Kennzeichen normalerweise nicht geändert werden!"
-    CLASS_WARNING:  "WARNUNG: Wenn die Klasse geändert wird, werden die selektierten Schüler aus der Liste für die aktuelle Klasse verschwinden!"
-    PID_EXISTS:     "Schüler-Kennzeichen existiert schon: '{pid}'"
-    NULL_PID:       "Leeres Schüler-Kennzeichen"
-    SORT_NAME_EXISTS: "Der Sortiername existiert schon"
-    CONFIRM_DELETE_PUPILS: "Sollen folgende Schüler(-Kennzeichen) wirklich aus der Datenbank entfernt werden?\n{pnames}"
-    NO_CHANGES:     "Keine Änderungen!"
-}
-
-ui.modules.teacher_editor: {
-    REALLY_DELETE:  "Soll {FIRSTNAMES} {LASTNAME} wirklich aus der Datenbank entfernt werden?"
-#?
-    # Messages
-    UNIQUE_FIELDS:  "Die Hauptfelder müssen einmalig sein."
-    
-    # Teacher field editor buttons
-    DELETE:         Löschen
-    UPDATE:         Übernehmen
-    NEW:            Hinzufügen
-
-    # Teacher table fields
-    TID:            Kürzel
-    FIRSTNAMES:     Vornamen
-    LASTNAME:       Nachname
-    SIGNED:         gezeichnet
-    SORTNAME:       Sortiername
-    TT_DATA:        Stundenplandaten
-
-    # Constraints
-    AVAILABILITY:   Verfügbarkeit
-    MINPERDAY:      "Stunden pro Tag – mind."
-    MAXGAPSPERDAY:  "Lücken pro Tag – max."
-    MAXGAPSPERWEEK: "Lücken pro Woche – max."
-    MAXBLOCK:       "aufeinanderfolgende Stunden – max."
-    AVAILABLE:      "Verfügbarkeit"
-}
-
-ui.modules.class_editor: {
-    # Messages
-    INVALID_PERIOD_VALUES:  "Die Verfügbarkeitsdaten mussten {n}-mal angepasst werden.\n  Ursprünglich:\n{val}"
-    UNIQUE_FIELDS:  "Die Hauptfelder müssen einmalig sein."
-    INVALID_AVAILABILITY:   "Gültig sind '+', '-' und '*', nicht '{val}'"
-
-    # Labels
-    MODULE_NAME:    Klassen
-    MODULE_TITLE:   "Klassendaten verwalten"
-
-    # Class field editor buttons
-    DELETE:         Löschen
-    UPDATE:         Übernehmen
-    NEW:            Hinzufügen
-
-    # Class table fields
-    CLASS:          Klasse
-    NAME:           Name
-    DIVISIONS:      Teilungen
-    CLASSROOM:      Klassenraum
-    TT_DATA:        Stundenplandaten
-
-    # Constraints
-    AVAILABILITY:   Verfügbarkeit
-    MINDAILY:       "Stunden pro Tag – mind."
-    MAXGAPSWEEKLY:  "Lücken pro Woche – max."
-    NOTAFTER:       "Fach B nicht nach Fach A"
-    PAIRGAP:        "Lücke zwischen Fach A und Fach B"
-    AVAILABLE:      "Verfügbarkeit"
-    
-}
-
-ui.modules.course_editor: {
-    UNKNOWN_VALUE_IN_FIELD: "{cid}': '{cell_value}"
-    REALLY_DELETE:  "Soll dieser „Kurs“ wirklich gelöscht werden?"
+    MISSING_PDFS: "pdf-Erstellung schlug fehl:\n  von {spath}\n  nach {dpath}"
+    MISSING_PDF: "pdf-Erstellung schlug fehl: {fpath}"
+    BAD_FIELD_INFO: "Ungültige Feld-Info ({error}) in:\n  {path}"
 }
 
 ui.dialogs.dialog_block_name: {
     NEW_ITEM:       "Unterricht, Block oder Deputat"
+}
+
+ui.dialogs.dialog_choose_one_room: {
+    UNKNOWN_ROOM_ID: "Unbekanntes Raumkürzel: „{rid}“"
 }
 
 ui.dialogs.dialog_class_groups: {
@@ -393,37 +223,21 @@ ui.dialogs.dialog_room_choice: {
 #ui.dialogs.dialog_workload: {
 #}
 
-ui.modules.grades_manager: {
+ui.grid_base: {
     # Labels
-    MODULE_NAME:    "Noten"
-    MODULE_TITLE:   "Noten verwalten"
-
-    Export_PDF:     "als PDF exportieren"
-    GRADES:         "NOTEN"
-    MAKE_INPUT_TABLE: "Eingabetabelle erstellen"
-    READ_INPUT_TABLE: "Eingabetabelle einlesen"
-    MAKE_REPORTS:   "Zeugnisse erstellen"
-    DO_MAKE_REPORTS: "erstellen"
-    SHOW_DATA:      "zusätzliche Infos anzeigen"
-#    Pupils:         "Schülerinnen und Schüler"
-
+    Copy:           Kopieren
+    Paste:          Einfügen
+    
     # Messages
-    BAD_GROUP_IN_CONFIG: "Konfiguration GRADE_ENTRY_TABLES: Ungültige Klasse/Gruppe ({group}) für Anlass „{occasion}“"
-    BAD_CUSTOM_WIDTH: "In Konfigurationsdatei {path}:\n Wert for EXTRA_FIELD_WIDTHS, Fachkürzel {sid} ist keine gültige Spaltenbreite."
-    UNKNOWN_INPUT_METHOD: "In Konfigurationsdatei {path}:\n  GROUP_DATA für {group}, Anlass {occasion}, EXTRA_FIELDS, SID={sid}:\n METHOD „{method}“ ist ungültig"
-    UNKNOWN_COLUMN_TYPE: "In Konfigurationsdatei {path}:\n  GROUP_DATA für {group}, Anlass {occasion}, EXTRA_FIELDS, SID={sid}:\n TYPE „{ctype}“ ist ungültig"
-    ROW_NOT_EDITABLE: "Diese Zeile kann nicht geändert werden"
-    INVALID_VALUE:  "Dieser Wert ({val}) ist ungültig für Feld „{field}“"
-    CELL_NOT_EDITABLE: "Feld „{field}“ darf nicht geändert werden"
-}
-
-ui.modules.timetable_editor: {
-    # Labels
-    MODULE_NAME:    "Stundenplan"
-    MODULE_TITLE:   "Stundenplan bearbeiten"
-
-    # Messages
-    BLOCK_ROOM_CONFLICT: "Räume nicht unabhängig für Kurs(e) mit Kennzeichen {tag}, Klasse {klass}, Fach {sid}: {rooms}"
+    BAD_ROW_LINE: "Ungültige Zeile für Linie: {row}"
+    BAD_COL_LINE: "Ungültige Spalte für Linie: {col}"
+    TILE_OUT_OF_BOUNDS: "Ungültige Platzierung für Raster-Kachel: Zeile={row}, Spalte={col}, Breite={cspan}, Höhe={rspan}"
+    GRID_CELL_RANGE: "Raster-Kachel in Zeile {row}, Spalte {col} darf nicht andere Kacheln überdecken"
+    NOT_STRING: "Kachelwert muss eine Zeichenkette sein, nicht: {val}"
+    PASTE_NOT_RECTANGULAR: "Die einzufügenden Daten sind nicht „rechteckig“, sie werden an {n} Stellen mit leeren Elementen ergänzt"
+    BAD_PASTE_RANGE: "Die Dimensionen der einzufügenden Daten sind nicht kompatibel mit dem ausgewählten Bereich: {h0}x{w0} -> {h1}x{w1}"
+    COPY_NO_SELECTION: "Keine Zellen ausgewählt zum Kopieren"
+    PASTE_NO_SELECTION: "Einfügen: Kein Zielbereich (Auswahl)"
 }
 
 ui.modules.abi: {
@@ -450,6 +264,144 @@ ui.modules.abi: {
     INVALID_SID:    "Fachkennzeichen ({sid}) im Abitur: „Fachtyp“ ungültig"
     NO_SLOT:        "Kein Platz in Vorlage für Fach mit Kennzeichen {sid}"
     TOO_FEW_SUBJECTS: "Zu wenig Fächer von Typ „{tag}“"
+}
+
+ui.modules.class_editor: {
+    REALLY_DELETE:  "Soll Klasse {CLASS} ({NAME}) wirklich aus der Datenbank entfernt werden?"
+}
+
+ui.modules.course_editor: {
+    UNKNOWN_VALUE_IN_FIELD: "{cid}': '{cell_value}"
+    REALLY_DELETE:  "Soll dieser „Kurs“ wirklich gelöscht werden?"
+}
+
+ui.modules.grades_manager: {
+    # Labels
+    MODULE_NAME:    "Noten"
+    MODULE_TITLE:   "Noten verwalten"
+
+    Export_PDF:     "als PDF exportieren"
+    GRADES:         "NOTEN"
+    MAKE_INPUT_TABLE: "Eingabetabelle erstellen"
+    READ_INPUT_TABLE: "Eingabetabelle einlesen"
+    MAKE_REPORTS:   "Zeugnisse erstellen"
+    DO_MAKE_REPORTS: "erstellen"
+    SHOW_DATA:      "zusätzliche Infos anzeigen"
+#    Pupils:         "Schülerinnen und Schüler"
+
+    # Messages
+    BAD_GROUP_IN_CONFIG: "Konfiguration GRADE_ENTRY_TABLES: Ungültige Klasse/Gruppe ({group}) für Anlass „{occasion}“"
+    BAD_CUSTOM_WIDTH: "In Konfigurationsdatei {path}:\n Wert for EXTRA_FIELD_WIDTHS, Fachkürzel {sid} ist keine gültige Spaltenbreite."
+    UNKNOWN_INPUT_METHOD: "In Konfigurationsdatei {path}:\n  GROUP_DATA für {group}, Anlass {occasion}, EXTRA_FIELDS, SID={sid}:\n METHOD „{method}“ ist ungültig"
+    UNKNOWN_COLUMN_TYPE: "In Konfigurationsdatei {path}:\n  GROUP_DATA für {group}, Anlass {occasion}, EXTRA_FIELDS, SID={sid}:\n TYPE „{ctype}“ ist ungültig"
+    ROW_NOT_EDITABLE: "Diese Zeile kann nicht geändert werden"
+    INVALID_VALUE:  "Dieser Wert ({val}) ist ungültig für Feld „{field}“"
+    CELL_NOT_EDITABLE: "Feld „{field}“ darf nicht geändert werden"
+}
+
+ui.modules.pupils_manager: {
+    # Labels
+    MODULE_NAME:    Schüler
+    MODULE_TITLE:   "Schülerdaten verwalten"
+    CLASS:          Klasse
+    CLASS_K:        "Klasse {klass}"
+    NEW_PUPIL:      "Neuer Schüler"
+    NEW_PUPIL_N:    "Neu: {name}"
+    CHANGE_PUPIL_FIELD: "{name}, Feld ändern: {field}"
+    CHANGE_PUPIL_FIELDS: "{name}, mehrere Felder ändern ..."
+    CHANGE_CLASS:   "Klasse wechseln"
+    REMOVE_PUPIL:   "Schüler entfernen"
+    REMOVE_PUPIL_N: "Entfernen: {name}"
+    CHANGED_PUPIL_DATA: "Geänderte Schülerdaten:\n  Welche sollten übernommen werden?"
+    UPDATE_PUPILS:  "Schülerdaten aktualisieren"
+    DB_UPDATE_PUPILS: "Update pupils in DB"
+
+    # Messages
+    PID_WARNING:    "WARNUNG: Außer bei neuen Schülern sollte das Kennzeichen normalerweise nicht geändert werden!"
+    CLASS_WARNING:  "WARNUNG: Wenn die Klasse geändert wird, werden die selektierten Schüler aus der Liste für die aktuelle Klasse verschwinden!"
+    PID_EXISTS:     "Schüler-Kennzeichen existiert schon: '{pid}'"
+    NULL_PID:       "Leeres Schüler-Kennzeichen"
+    SORT_NAME_EXISTS: "Der Sortiername existiert schon"
+    CONFIRM_DELETE_PUPILS: "Sollen folgende Schüler(-Kennzeichen) wirklich aus der Datenbank entfernt werden?\n{pnames}"
+    NO_CHANGES:     "Keine Änderungen!"
+}
+
+ui.modules.teacher_editor: {
+    REALLY_DELETE:  "Soll {FIRSTNAMES} {LASTNAME} ({TID}) wirklich aus der Datenbank entfernt werden?"
+}
+
+ui.modules.timetable_editor: {
+    # Labels
+    MODULE_NAME:    "Stundenplan"
+    MODULE_TITLE:   "Stundenplan bearbeiten"
+
+    # Messages
+    BLOCK_ROOM_CONFLICT: "Räume nicht unabhängig für Kurs(e) mit Kennzeichen {tag}, Klasse {klass}, Fach {sid}: {rooms}"
+}
+
+ui.modules.year_manager: {
+    # Labels
+    MODULE_NAME:    Jahre
+    MODULE_TITLE:   "Jahresdaten verwalten"
+    MIGRATE_DATA:   "Daten für das nächste Schuljahr vorbereiten"
+    SELECT_REPEATERS: "Falls es Schüler gibt, die das letzte Jahr wiederholen, sollten sie hier markiert werden."
+    CLASS_K:    "Klasse {klass}"
+    PROCESS_MIGRATE: "Datenbank für {year} vorbereiten"
+    
+    # Tooltips
+    MIGRATE_TO_NEXT_YEAR: "Eine neue Datenbank wird angelegt, alle Schüler in die nächste Klasse versetzt."
+}
+
+ui.simple_table: {
+    # Labels
+    COPY_SELECTION:       "Auswahl kopieren"
+    PASTE_SELECTION:      "in Auswahl einfügen"
+    
+    # Messages
+    NO_SELECTION: "Keine Zellen ausgewählt"
+    PASTE_NOT_RECTANGULAR: "Die einzufügenden Daten sind nicht „rechteckig“, sie werden an {n} Stellen mit leeren Elementen ergänzt"
+    CLIPBOARD_EMPTY: "Die Zwischenablage ist leer"
+    BAD_PASTE_RANGE: "Die Dimensionen der einzufügenden Daten sind nicht kompatibel mit dem ausgewählten Bereich: {h0}x{w0} -> {h1}x{w1}"
+}
+
+ui.ui_base: {
+    # Messages
+    UNKNOWN_KEY:    "Ungültige Selektion: '{key}'"
+    
+    # Labels
+    MODULE_NAME:    StackPage
+    MODULE_TITLE:   "Page Title"
+
+    # Dialog buttons, etc.
+    CANCEL:         Abbrechen
+    OK:             OK
+
+    INPUT_TITLE:    Eingabe
+    YESORNO_TITLE:  "Ja oder Nein?"
+    TEXTAREA_TITLE: "Text eingeben"
+    LOSE_CHANGES_TITLE: "Ungespeicherte Änderungen"
+    LOSE_CHANGES:   "Die Änderungen werden verworfen. Weitermachen?"
+
+    Reporter:       "Rückmeldungen"
+    INFO:           Mitteilung
+    WARNING:        Warnung
+    ERROR:          Fehler
+    PROCESSING:     "Daten werden verarbeitet"
+    DONE:           "fertig!"
+    ERRORS:         "Es gab allerdings {n} Fehler ..."
+    WARNINGS:       "Warnungen: {n}"
+
+    FILEOPEN:       "Datei öffnen"
+    DIROPEN:        "Ordner öffnen"
+    FILESAVE:       "Datei speichern"
+
+    CONFIRMATION:   Bestätigen
+}
+
+ui.week_table: {
+    INVALID_AVAILABILITY:   "Ungültig: '{val}'\n  Gültig sind: +, - und 1..9"
+    INVALID_PERIOD_VALUES:  "Die Verfügbarkeitsdaten mussten {n}-mal angepasst werden.\n  Ursprünglich: {val}"
+    none:           "(keine)"
 }
 
 timetable.activities: {

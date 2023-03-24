@@ -1,7 +1,7 @@
 """
 ui/dialogs/dialog_choose_one_room.py
 
-Last updated:  2023-03-23
+Last updated:  2023-03-24
 
 Supporting "dialog" for the class-data editor – select a room as the
 classroom of the current class.
@@ -35,7 +35,7 @@ if __name__ == "__main__":
     from core.base import start
     start.setup(os.path.join(basedir, 'TESTDATA'))
 
-#T = TRANSLATIONS("ui.dialogs.dialog_choose_one_room")
+T = TRANSLATIONS("ui.dialogs.dialog_choose_one_room")
 
 ### +++++
 
@@ -108,16 +108,15 @@ class ChooseOneRoomDialog(QDialog):
         self.result = None
         self.room0 = start_value
         self.pb_reset.setVisible(bool(start_value))
+        self.room_table.setCurrentCell(-1, 0)
         try:
             row = self.rooms.index(start_value)
         except KeyError:
-#TODO
-            REPORT("ERROR", "Invalid room: '{room}'".format(room=start_value))
+            REPORT("ERROR", T["UNKNOWN_ROOM_ID"].format(rid=start_value))
             row = -1
-            self.room = ""
-#TODO row-changed signal not occurring!
+            self.room = "!!!"
+            self.pb_accept.setEnabled(False)
         self.room_table.setCurrentCell(row, 0)
-
         self.exec()
         return self.result
 

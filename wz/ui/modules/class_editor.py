@@ -1,7 +1,7 @@
 """
 ui/modules/class_editor.py
 
-Last updated:  2023-03-23
+Last updated:  2023-03-24
 
 Edit class data.
 
@@ -68,9 +68,10 @@ from ui.ui_base import (
     ### uic
     uic,
 )
-from ui.dialogs.dialog_text_line import TextLineDialog
-from ui.dialogs.dialog_number_constraint import NumberConstraintDialog
+from ui.dialogs.dialog_choose_one_room import ChooseOneRoomDialog
 from ui.dialogs.dialog_class_groups import ClassGroupsDialog
+from ui.dialogs.dialog_number_constraint import NumberConstraintDialog
+from ui.dialogs.dialog_text_line import TextLineDialog
 from ui.week_table import WeekTable
 
 CLASS_FIELDS = (
@@ -147,7 +148,6 @@ class ClassEditorPage(Page):
             rdict = {fields[i]: val for i, val in enumerate(rec)}
             self.class2row[rdict["CLASS"]] = r
             self.class_list.append(rdict)
-            # print("  --", rdict)
             c = 0
             for field in CLASS_FIELDS:
                 cell_value = rdict[field]
@@ -172,7 +172,6 @@ class ClassEditorPage(Page):
 
     def on_class_table_itemSelectionChanged(self):
         row = self.class_table.currentRow()
-        # print("§§§ on_course_table_itemSelectionChanged", row)
         if row >= 0:
             self.class_dict = self.class_list[row]
             self.set_class()
@@ -215,9 +214,10 @@ class ClassEditorPage(Page):
         """Add a new class.
         The fields will initially have dummy values.
         """
-        db_new_row(
+        e = db_new_row(
             "CLASSES",
-            **{f: "?" for f in CLASS_FIELDS}
+            CLASS = "?",
+            NAME="???",
         )
         self.load_class_table()
         self.set_class_id("?")
@@ -245,14 +245,15 @@ class ClassEditorPage(Page):
     def field_editor(self, obj: QLineEdit):
         row = self.class_table.currentRow()
         object_name = obj.objectName()
-        print("EDIT", object_name)
         ### CLASSES fields
         if object_name in (
             "CLASS", "NAME", "CLASSROOM", "DIVISIONS"
         ):
-#TODO
-            if object_name == "SORTNAME":
-                pass
+            if object_name == "CLASSROOM":
+                result = ChooseOneRoomDialog.popup(
+                    self.class_dict[object_name],
+                    parent=self
+                )
             elif object_name == "DIVISIONS":
                 result = ClassGroupsDialog.popup(
                     self.class_dict[object_name],
@@ -311,7 +312,6 @@ class ClassEditorPage(Page):
             self.LUNCHBREAK.setCurrentIndex(-1)
             return
         if self.current_lunchbreak != weight:
-            print("§UPDATE LUNCHBREAK:", weight)
             db_update_field(
                 "TT_CLASSES",
                 "LUNCHBREAK",

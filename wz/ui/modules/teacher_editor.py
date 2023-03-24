@@ -151,7 +151,6 @@ class TeacherEditorPage(Page):
             rdict = {fields[i]: val for i, val in enumerate(rec)}
             self.tid2row[rdict["TID"]] = r
             self.teacher_list.append(rdict)
-            # print("  --", rdict)
             c = 0
             for field in TEACHER_FIELDS:
                 cell_value = rdict[field]
@@ -176,7 +175,6 @@ class TeacherEditorPage(Page):
 
     def on_teacher_table_itemSelectionChanged(self):
         row = self.teacher_table.currentRow()
-        # print("§§§ on_course_table_itemSelectionChanged", row)
         if row >= 0:
             self.teacher_dict = self.teacher_list[row]
             self.set_teacher()
@@ -249,7 +247,6 @@ class TeacherEditorPage(Page):
     def field_editor(self, obj: QLineEdit):
         row = self.teacher_table.currentRow()
         object_name = obj.objectName()
-        print("EDIT", object_name)
         ### TEACHER fields
         if object_name in (
             "TID", "FIRSTNAMES", "LASTNAME", "SIGNED", "SORTNAME"
@@ -319,7 +316,6 @@ class TeacherEditorPage(Page):
             self.LUNCHBREAK.setCurrentIndex(-1)
             return
         if self.current_lunchbreak != weight:
-            print("§UPDATE LUNCHBREAK:", weight)
             db_update_field(
                 "TT_TEACHERS",
                 "LUNCHBREAK",

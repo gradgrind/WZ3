@@ -97,6 +97,8 @@ class ClassEditorPage(Page):
         self.class_table.horizontalHeader().setSectionResizeMode(
             QHeaderView.ResizeMode.ResizeToContents
         )
+        print("??? sizeHint:", self.constraints.sizeHint())
+        print("??? minimumSizeHint:", self.constraints.minimumSizeHint())
         # Set up activation for the editors for the read-only lesson/block
         # fields:
         for w in (

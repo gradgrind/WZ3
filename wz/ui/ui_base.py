@@ -180,6 +180,15 @@ class StandalonePage(StackPage):
             event.ignore()
 
 
+class SmallList(QListWidget):
+    """Something of a bodge to avoid too large default list sizes.
+    Seems to help a little  in certain case where the Qt layout
+    system  is a bit stubborn ...
+    """
+    def sizeHint(self):
+        return QSize(70, 70)
+
+
 class KeySelector(QComboBox):
     """A modified QComboBox:
     A selection widget for key-description pairs. The key is the

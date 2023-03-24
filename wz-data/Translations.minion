@@ -1,6 +1,7 @@
 ### Translations
 
 core.base: {
+#TODO: not yet fully adapted for WZ3?
     # Messages
     MISSING_LAST_DAY: "Feld „LAST_DAY“ fehlt im Kalender"
     BAD_DATE:       "Ungültiges Datum: {date}"
@@ -11,6 +12,7 @@ core.base: {
 }
 
 core.basic_data: {
+#TODO: not yet fully adapted for WZ3?
     ## Messages
     BAD_WEIGHT:     "Ungültiger Gewichtungsfaktor für Deputatsstunden: {key} -> '{val}'"
     INVALID_PAYMENT_TAG: "Ungültiges Gruppen-Kennzeichen: „{tag}“"
@@ -35,6 +37,7 @@ core.basic_data: {
 }
 
 core.classes: {
+#TODO: not yet fully adapted for WZ3?
     INVALID_GROUP_FIELD: "Die Gruppenangabe (Feld DIVISIONS) für Klasse {klass} ist fehlerhaft"
     GROUP_INFO_ERROR:  "Klasse {klass}, Gruppenangabe (Feld DIVISIONS): {e}"
     INDEPENDENT_GROUPS_MISMATCH: "Untergruppe {group} fehlt"
@@ -47,7 +50,6 @@ core.classes: {
 }
 
 core.db_access: {
-    # Messages
     BACKUP_TO:          "Sicherungskopie der Daten: {f}\n"
     REMOVE_OLD_BACKUP:  "Alte Sicherungskopie entfernt: {f}"
     BAD_KEY_VALUE_LIST: "Ungültige Schlüssel-Wert-Liste,\nein Paar pro Zeile, Trennung durch ':':\n{text}"
@@ -57,6 +59,7 @@ core.db_access: {
 }
 
 core.pupils: {
+#TODO ... not yet implemented/adapted
     # Labels
     OPEN_TABLETYPE: "Tabellendatei"
 
@@ -69,12 +72,14 @@ core.pupils: {
 }
 
 core.report_courses: {
+#TODO ... not yet implemented/adapted
     UNKNOWN_GROUP: "In Klasse {klass}: unbekannte Gruppe ({group}) für Fach {sid} bei Lehrer {tid}"
     PUPIL_HAS_MULTIPLE_SID: "In Klasse {klass}, {pupil} hat mehrere Zeugniseinträge im Fach {subject}"
     MULTIPLE_REPORT_SETTINGS: "Gruppe {group}: Zeugnis-Info in Fach {subject} widersprüchlich"
 }
 
 grades.grades_base: {
+#TODO ... not yet implemented/adapted
     TITLE:          "Notentabelle, erstellt {time}"
 
     # Messages
@@ -99,6 +104,7 @@ grades.grades_base: {
 }
 
 grades.gradetable: {
+#TODO ... not yet implemented/adapted
 #TODO: to be replaced by grades_base?
     TITLE:          "Notentabelle, erstellt {time}"
     PID:            "ID"
@@ -132,6 +138,7 @@ grades.gradetable: {
 }
 
 grades.makereports: {
+#TODO ... not yet implemented/adapted
     # Messages
     INVALID_REPORT_TYPE: "Ungültige Zeugnis-Art ({rtype}) für Schüler:\n  {pids}"
     NO_REPORT_TYPE: "Keine Zeugnis-Art für Schüler:\n  {pids}"
@@ -156,15 +163,18 @@ grades.makereports: {
 }
 
 local.grade_functions: {
+#TODO ... not yet implemented/adapted
 #TODO: to be replaced by grade_processing?
     UNKNOWN_GRADE_FUNCTION: "In Konfigurationdatei GRADE_CONFIG: unbekannte Notenberechnungsfunktion – „{name}“"
 }
 
 local.grade_processing: {
+#TODO ... not yet implemented/adapted
     UNKNOWN_GRADE_FUNCTION: "In Konfigurationdatei GRADE_CONFIG: unbekannte Notenberechnungsfunktion – „{name}“"
 }
 
 local.abitur: {
+#TODO ... not yet implemented/adapted
     INVALID_SID:    "Fachkennzeichen ({sid}) im Abitur: „Fachtyp“ ungültig"
     NO_SLOT:        "Fach mit Kennzeichen {sid}: zu viele Fächer dieses „Fachtyps“, kein Platz"
     TOO_FEW_SUBJECTS: "Zu wenig Fächer von Typ „{tag}“"
@@ -172,6 +182,7 @@ local.abitur: {
 }
 
 template_engine.template_sub: {
+#TODO ... not yet implemented/adapted
     # Messages
     MISSING_PDFS: "pdf-Erstellung schlug fehl:\n  von {spath}\n  nach {dpath}"
     MISSING_PDF: "pdf-Erstellung schlug fehl: {fpath}"
@@ -224,6 +235,7 @@ ui.dialogs.dialog_room_choice: {
 #}
 
 ui.grid_base: {
+#TODO ... not yet implemented/adapted
     # Labels
     Copy:           Kopieren
     Paste:          Einfügen
@@ -241,6 +253,7 @@ ui.grid_base: {
 }
 
 ui.modules.abi: {
+#TODO ... not yet implemented/adapted
     # Labels
     MODULE_NAME:    "Abiturnoten"
     MODULE_TITLE:   "Ergebnisse der Abiturprüfungen"
@@ -276,6 +289,7 @@ ui.modules.course_editor: {
 }
 
 ui.modules.grades_manager: {
+#TODO ... not yet implemented/adapted
     # Labels
     MODULE_NAME:    "Noten"
     MODULE_TITLE:   "Noten verwalten"
@@ -300,6 +314,7 @@ ui.modules.grades_manager: {
 }
 
 ui.modules.pupils_manager: {
+#TODO ... not yet implemented/adapted
     # Labels
     MODULE_NAME:    Schüler
     MODULE_TITLE:   "Schülerdaten verwalten"
@@ -331,6 +346,7 @@ ui.modules.teacher_editor: {
 }
 
 ui.modules.timetable_editor: {
+#TODO ... not yet implemented/adapted
     # Labels
     MODULE_NAME:    "Stundenplan"
     MODULE_TITLE:   "Stundenplan bearbeiten"
@@ -340,6 +356,7 @@ ui.modules.timetable_editor: {
 }
 
 ui.modules.year_manager: {
+#TODO ... not yet implemented/adapted
     # Labels
     MODULE_NAME:    Jahre
     MODULE_TITLE:   "Jahresdaten verwalten"
@@ -353,6 +370,7 @@ ui.modules.year_manager: {
 }
 
 ui.simple_table: {
+#TODO ... not yet implemented/adapted
     # Labels
     COPY_SELECTION:       "Auswahl kopieren"
     PASTE_SELECTION:      "in Auswahl einfügen"
@@ -365,37 +383,28 @@ ui.simple_table: {
 }
 
 ui.ui_base: {
-    # Messages
-    UNKNOWN_KEY:    "Ungültige Selektion: '{key}'"
-    
-    # Labels
-    MODULE_NAME:    StackPage
-    MODULE_TITLE:   "Page Title"
+#TODO: module may need cleaning up for WZ3 (use uic?)
 
-    # Dialog buttons, etc.
+    UNKNOWN_KEY:    "Ungültige Selektion: '{key}'"
+    YESORNO_TITLE:  "Ja oder Nein?"
     CANCEL:         Abbrechen
     OK:             OK
-
-    INPUT_TITLE:    Eingabe
-    YESORNO_TITLE:  "Ja oder Nein?"
-    TEXTAREA_TITLE: "Text eingeben"
-    LOSE_CHANGES_TITLE: "Ungespeicherte Änderungen"
     LOSE_CHANGES:   "Die Änderungen werden verworfen. Weitermachen?"
-
-    Reporter:       "Rückmeldungen"
+    LOSE_CHANGES_TITLE: "Ungespeicherte Änderungen"
+    INPUT_TITLE:    Eingabe
+    TEXTAREA_TITLE: "Text eingeben"
     INFO:           Mitteilung
     WARNING:        Warnung
     ERROR:          Fehler
+    CONFIRMATION:   Bestätigen
+    FILEOPEN:       "Datei öffnen"
+    DIROPEN:        "Ordner öffnen"
+    FILESAVE:       "Datei speichern"
+    Reporter:       "Rückmeldungen"
     PROCESSING:     "Daten werden verarbeitet"
     DONE:           "fertig!"
     ERRORS:         "Es gab allerdings {n} Fehler ..."
     WARNINGS:       "Warnungen: {n}"
-
-    FILEOPEN:       "Datei öffnen"
-    DIROPEN:        "Ordner öffnen"
-    FILESAVE:       "Datei speichern"
-
-    CONFIRMATION:   Bestätigen
 }
 
 ui.week_table: {
@@ -405,6 +414,7 @@ ui.week_table: {
 }
 
 timetable.activities: {
+#TODO ... not yet implemented/adapted
     CourseData:     "<Kurs: Klasse={klass}, Gruppe={group}, Fach={sid}, Lehrer={tid}>"
     NO_CLASSROOM:   "LESSONS-Tabelle, id={id}, {course}:\n  Klasse hat keinen Klassenraum, wird aber angegeben ($) im Raum-Feld"
     UNKNOWN_ROOM:   "LESSONS-Tabelle, id={id}, {course}:\n  unbekannter Raum ({rid})"
@@ -418,6 +428,7 @@ timetable.activities: {
 }
 
 timetable.list_activities: {
+#TODO ... not yet implemented/adapted
     TEACHER_SUPPRESSED: "Lehrkraft ausgeschlossen: {tname}"
     TEACHER_NO_ACTIVITIES: "Lehrkraft ohne „Aktivitäten“: {tname}"
     CONTINUOUS_BLOCK_TAG: "Durchgehende Kurse dürfen keine Deputatskennung haben: {course} mit Kennzeichen {tag}"
@@ -448,6 +459,7 @@ timetable.list_activities: {
 }
 
 timetable.asc_data: {
+#TODO ... not yet implemented/adapted
     # Entries probably valid not just for "aSc"
     WHOLE_CLASS:    alle  # name for a "group" comprising the whole class
     BAD_PLAIN_BLOCK: "{course}: für Kennzeichen {tag} muss es genau einen Kurs geben"
@@ -459,6 +471,7 @@ timetable.asc_data: {
 }
 
 timetable.fet_data: {
+#TODO ... not yet implemented/adapted
     # Entries probably valid not just for "aSc" or "fet"
     WHOLE_CLASS:    alle  # name for a "group" comprising the whole class
     BAD_PLAIN_BLOCK: "{course}: für Kennzeichen {tag} muss es genau einen Kurs geben"

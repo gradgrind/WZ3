@@ -1,7 +1,7 @@
 """
 ui/ui_base.py
 
-Last updated:  2023-01-25
+Last updated:  2023-03-24
 
 Support stuff for the GUI: application initialization, dialogs, etc.
 
@@ -23,8 +23,6 @@ Copyright 2023 Michael Towers
 
 =-LICENCE========================================
 """
-
-#####################################################
 
 import sys, os, locale, builtins, traceback, glob, time
 
@@ -145,10 +143,6 @@ class StackPage(QWidget):
     Subclass this to add the required functionality.
     The actual visible widget is referenced by its name.
     """
-
-    name = T["MODULE_NAME"]
-    title = T["MODULE_TITLE"]
-
     def enter(self):
         """Called when a tab page is activated (selected) and when there
         is a change of year (which is treated as a reentry).
@@ -279,7 +273,7 @@ def LoseChangesDialog():
 
 def LineDialog(message, text=None, title=None):
     td = QDialog()
-    td.setWindowTitle(title or _INPUT_TITLE)
+    td.setWindowTitle(title or T["INPUT_TITLE"])
     vbox = QVBoxLayout(td)
     vbox.addWidget(QLabel(message))
     lineedit = QLineEdit(text or "")

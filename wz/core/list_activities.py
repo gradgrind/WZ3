@@ -60,8 +60,9 @@ from core.basic_data import (
     get_teachers,
     get_subjects,
     sublessons,
+    Workload,
     BlockTag,
-    PaymentData,
+#    PaymentData,
 )
 from core.course_data import filtered_courses, course_activities
 
@@ -72,14 +73,14 @@ DECIMAL_SEP = CONFIG["DECIMAL_SEP"]
 #TODO ...
 
 class ClassBlockInfo(NamedTuple):
-    course: CourseData
+#    course: CourseData
     block: BlockTag
     lessons: list[int]
     periods: float  # (per week, averaged over the year)
     notes: str
 
 
-class TeacherClassCourses(Courses):
+class TeacherClassCourses:#(Courses):
     def teacher_class_subjects(self):
         """Organize the data according to teachers and classes, keeping
         data for real lessons and payment-only entries separate.
@@ -921,50 +922,85 @@ class PdfCreator:
 
 
 class TPrTuple(NamedTuple):
-    CLASS: str      # short name
-    xtype: int      # item type (0: pay-only, 1: block, 2: simple)
+    CLASS: str          # short name
+    BLOCKTAG: BlockTag  # invalid for "pay-only" ("#$") and "simple" ("~#")
     SUBJECT: str    # full name
     GROUP: str      # '*' for whole class, empty for "none"
-    RID: str        # room-id
+    RIDS: str       # room-ids
     LENGTHS: tuple  # integer values, or empty
     WORKLOAD: Workload
 
+#?
+    def pay(self, nlessons:int):
+        w = self.WORKLOAD
+        if w.WORKLOAD:
+            n = w.nd
+        else:
+            assert (nlessons >= 0)
+            n = nlessons
+        return (n, w.fd, n*w.fd)
+
+    def __str__(self):
+        if self.BLOCKTAG.sid and self.BLOCKTAG.tag:
+            # valid block-tag
+            prefix = f"[{str(self.BLOCKTAG)}] "
+        else:
+            prefix = ""
+        g = f".{self.GROUP}" if self.GROUP else ""
+        ll = ",".join(str(l) for l in self.LENGTHS)
+        if self.WORKLOAD.WORKLOAD:
+            nw = self.WORKLOAD.nd
+#TODO: This is declared as a <float> ... but shouldn't it be an <int>?
+# Also look at the setting-dialog ...
+        else:
+            nw = sum(self.LENGTHS)
+        f = self.WORKLOAD.fd
+        pay = f"{nw}x{self.WORKLOAD.PAY_FACTOR} = {nw*f}"
+        return f"{self.CLASS}{g}|{prefix}{self.SUBJECT}|{self.RIDS}|{ll}|{pay}"
 
 def list_one_teacher(tid):
     tname = get_teachers().name(tid)
     subjects = get_subjects()
+    classes = get_classes()
+    collect = []
     for course in filtered_courses("TEACHER", tid):
-        #CLASS = course["CLASS"]
-        #GRP = course["GRP"]
-        #SUBJECT = course["SUBJECT"]
         w, l, b = course_activities(course["course"])
+        cl = course["CLASS"]
+        cr = classes.get_classroom(cl)
         if w:
             prtuple = TPrTuple(
-                course["CLASS"],    # CLASS (short name)
-                0,                  # xtype
+                cl,                 # CLASS (short name)
+                BlockTag("", "$", ""), # invalid block-type
                 subjects.map(course["SUBJECT"]), # SUBJECT (full name)
                 course["GRP"],      # GROUP
-                "",                 # RID: room-id
+                "",                 # RIDS: room-ids
                 (),                 # LENGTHS
                 w[0],               # WORKLOAD                 
             )
+            collect.append(prtuple)
         if l:
-            print("  ---", str(l[0]), l[1:])
-        for bi in b:
-#TODO: What about the block subject and tag?
-# Get the <BlockTag> from bi[4]
-# The lesson list is bi[3]
             prtuple = TPrTuple(
                 course["CLASS"],    # CLASS (short name)
-                1,                  # xtype
+                BlockTag("~", "", ""), # invalid blocktag
                 subjects.map(course["SUBJECT"]), # SUBJECT (full name)
                 course["GRP"],      # GROUP
-                bi[1]["ROOM"],      # RID: room-id
-                tuple(l["LENGTH"] for l in bi[3]), # LENGTHS
-                w[0],               # WORKLOAD                 
+                l[1]["ROOM"].replace('$', cr), # RIDS: room-ids
+                tuple(l["LENGTH"] for l in l[3]), # LENGTHS
+                l[0],               # WORKLOAD                 
             )
-        else:
-            print("  +++ []")
+            collect.append(prtuple)
+        for bi in b:
+            prtuple = TPrTuple(
+                course["CLASS"],    # CLASS (short name)
+                bi[4],              # blocktag
+                subjects.map(course["SUBJECT"]), # SUBJECT (full name)
+                course["GRP"],      # GROUP
+                bi[1]["ROOM"].replace('$', cr), # RIDS: room-ids
+                tuple(l["LENGTH"] for l in bi[3]), # LENGTHS
+                bi[0],               # WORKLOAD                 
+            )
+            print("  +++", prtuple)
+            collect.append(prtuple)
 
 
 # --#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#
@@ -974,6 +1010,9 @@ if __name__ == "__main__":
     from ui.ui_base import saveDialog
 
     open_database()
+    list_one_teacher("AE")
+    quit(0)
+
 
     def run_me():
         courses = TeacherClassCourses()

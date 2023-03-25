@@ -360,6 +360,8 @@ def get_payment_weights() -> KeyValueList:
 
 
 class Workload:
+#TODO: May <WORKLOAD> really be a float?
+# What is WORK_GROUP?!
     def __init__(self, WORKLOAD, PAY_FACTOR, WORK_GROUP, **xargs):
         """Check the validity of the arguments and save them as
         attributes. If any errors are reported, return a special

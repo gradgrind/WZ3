@@ -50,7 +50,7 @@ from core.basic_data import (
 
 ### -----
 
-def load_course_table(filter, value):
+def filtered_courses(filter, value):
     fields, records = db_read_full_table(
         "COURSES",
         sort_field="SUBJECT",
@@ -145,7 +145,7 @@ if __name__ == "__main__":
     from core.db_access import open_database
     open_database()
 
-    for course in load_course_table("TEACHER", "AE"):
+    for course in filtered_courses("TEACHER", "AE"):
         print("\n\n *** COURSE:", course["course"], course)
         w, l, b = course_activities(course["course"])
         if w:

@@ -1,7 +1,7 @@
 """
 ui/modules/course_editor.py
 
-Last updated:  2023-03-23
+Last updated:  2023-03-25
 
 Edit course and blocks+lessons data.
 
@@ -55,7 +55,6 @@ from core.db_access import (
     db_new_row,
     db_delete_rows,
     db_values,
-    db_read_unique_entry,
     NoRecord,
 )
 from core.teachers import Teachers
@@ -64,9 +63,9 @@ from core.basic_data import (
     Workload,
     clear_cache,
     get_subjects,
-    BlockTag,
     ParallelTag,
 )
+from core.course_data import filtered_courses, course_activities
 from ui.ui_base import (
     ### QtWidgets:
     QLineEdit,
@@ -121,6 +120,7 @@ class LessonRowData(NamedTuple):
          1 – block lesson group
     """
     ROW_TYPE: int
+    WORKLOAD_INFO: Workload
     COURSE_LESSON_INFO: dict
     LESSON_GROUP_INFO: dict
     LESSON_INFO: dict
@@ -148,6 +148,9 @@ class CourseEditorPage(Page):
             self.wish_time, self.parallel,
         ):
             w.installEventFilter(self)
+        self.last_combo_filter_index = 0
+        self.filter_value = ""
+        self.select2index = {}
 
     def eventFilter(self, obj: QWidget, event: QEvent) -> bool:
         """Event filter for the "lesson" fields.
@@ -171,8 +174,13 @@ class CourseEditorPage(Page):
         open_database()
         clear_cache()
         self.init_data()
+        # Restore previous view (filter/value), if any
+        fv = self.filter_value
         self.combo_filter.setCurrentIndex(-1)
-        self.combo_filter.setCurrentIndex(0)
+        self.combo_filter.setCurrentIndex(self.last_combo_filter_index)
+        self.combo_class.setCurrentIndex(
+            self.select2index.get(fv, 0)
+        )
 
 # ++++++++++++++ The widget implementation fine details ++++++++++++++
 
@@ -193,12 +201,15 @@ class CourseEditorPage(Page):
         """Handle a change of filter field for the course table."""
         if i < 0:
             return
+        self.last_combo_filter_index = i
         # class, subject, teacher
         self.filter_field = FOREIGN_FIELDS[i]
         # print("§§§ on_combo_filter_currentIndexChanged", i, self.filter_field)
         self.select_list = self.filter_list[self.filter_field]
         self.combo_class.clear()
-        for kv in self.select_list:
+        self.select2index.clear()
+        for n, kv in enumerate(self.select_list):
+            self.select2index[kv[0]] = n
             self.combo_class.addItem(kv[1])
 
     @Slot(int)
@@ -213,21 +224,13 @@ class CourseEditorPage(Page):
     def load_course_table(self, select_index, table_row):
         self.filter_value = self.select_list[select_index][0]
         self.suppress_handlers = True
-        fields, records = db_read_full_table(
-            "COURSES",
-            sort_field="SUBJECT",
-            **{self.filter_field: self.filter_value}
-        )
-        # Populate the course table
-        self.course_table.setRowCount(len(records))
-        self.courses = []
-        for r, rec in enumerate(records):
-            rdict = {fields[i]: val for i, val in enumerate(rec)}
-            self.courses.append(rdict)
-            # print("  --", rdict)
+        self.courses = filtered_courses(self.filter_field, self.filter_value)
+        ## Populate the course table
+        self.course_table.setRowCount(len(self.courses))
+        for r, _course in enumerate(self.courses):
             c = 0
             for cid, ctype, align in COURSE_TABLE_FIELDS:
-                cell_value = rdict[cid]
+                cell_value = _course[cid]
                 item = self.course_table.item(r, c)
                 if not item:
                     item = QTableWidgetItem()
@@ -240,7 +243,6 @@ class CourseEditorPage(Page):
                     item.setTextAlignment(a | Qt.AlignmentFlag.AlignVCenter)
                     self.course_table.setItem(r, c, item)
                 if ctype == 1:
-#TODO: rather use a map?
                     for k, v in self.filter_list[cid]:
                         if k == cell_value:
                             item.setText(v)
@@ -261,9 +263,9 @@ class CourseEditorPage(Page):
         self.pb_delete_course.setEnabled(False)
         self.pb_edit_course.setEnabled(False)
         self.frame_r.setEnabled(False)
-        if len(records) > 0:
-            if table_row >= len(records):
-                table_row = len(records) - 1
+        if len(self.courses) > 0:
+            if table_row >= len(self.courses):
+                table_row = len(self.courses) - 1
             self.course_table.setCurrentCell(table_row, 0)
 
     def on_course_table_itemSelectionChanged(self):
@@ -276,9 +278,10 @@ class CourseEditorPage(Page):
             self.set_course(self.course_dict["course"])
             self.frame_r.setEnabled(True)
         else:
-            pass
             # e.g. when entering an empty table
-            # print("EMPTY TABLE")
+            self.lesson_table.setRowCount(0)
+            self.course_dict = None
+            self.course_id = None
 
     def set_course(self, course: int):
         # print("SET COURSE:", repr(course))
@@ -291,121 +294,69 @@ class CourseEditorPage(Page):
         If <lesson_select_id> is above 0, select the lesson with the given id.
         Otherwise select no element.
         """
-        fields, records = db_read_full_table(
-            "COURSE_LESSONS", course=self.course_id
-        )
-        ### Build a list of entries
-        ## First loop through entries in COURSE_LESSONS
         self.lesson_table_suppress_update = True
         self.lesson_table.setRowCount(0)
         self.course_lessons = []
+        ### Build a list of entries
+        pay_only, simple_lessons, block_lessons = course_activities(
+            self.course_id
+        )
         row = 0
-
-#NOTE: There should be only one COURSE_LESSONS entry for "simple lesson"
-# types and "workload/payment" types. For "block lesson" types there can
-# be more than one entry, but they should be connected with LESSON_GROUP
-# entries with distinct (non-empty) BLOCK_x values.
-# If violations are discovered, there should be an error report. It
-# might be helpful to delete the offending entries, but as they are
-# really not expected – and should not be possible – it is perhaps
-# better to report the offending entries and not to delete them, so
-# that they are available for debugging purposes – the report could
-# be via a bug exception?
-
-# Also note how the parameters are set in various tables. The room
-# wish and pay details apply to all lesson components as they are set in
-# COURSE_LESSONS. Only the time wish is set in the lesson component.
-# This may be a bit restrictive, but is perhaps reasonable for most
-# cases. If it is really essential to have a particular room for a
-# particular lesson (and another one, or a choice, for another lesson),
-# perhaps some additional constraint could be added ...
-
-        workload_element = False
-        simple_element = False
         row_to_select = -1
-        for rec in records:
-            cldict = {fields[i]: val for i, val in enumerate(rec)}
-            # <cldict> contains workload/payment and room-wish fields
-            lg = cldict["lesson_group"]
-            if lg:
-                lgfields, lgrecord = db_read_unique_entry(
-                    "LESSON_GROUP", lesson_group=lg
-                )
-                lgdata = {
-                    lgfields[i]: val for i, val in enumerate(lgrecord)
-                }
-                # This contains the block-name, if any
-                block_sid = lgdata["BLOCK_SID"]
-                block_tag = lgdata["BLOCK_TAG"]
-                # The uniqueness of a block name should be enforced by
-                # the UNIQUE constraint on the LESSON_GROUP table
-                # ("BLOCK_SID" + "BLOCK_TAG" fields).
-                # The uniqueness of a course/lesson_group connection
-                # should be enforced by the UNIQUE constraint on the
-                # COURSE_LESSONS table ("course" + "lesson_group" fields).
-                if block_sid:
-                    etype = 1
-                    icon = self.icons["BLOCK"]
-                    bt = BlockTag.build(block_sid, block_tag)
-                    lgdata["BlockTag"] = bt
-                else:
-                    if simple_element:
-                        raise Bug(
-                            "Multiple entries in COURSE_LESSONS"
-                            f"for simple lesson item, course {self.course_id}"
-                        )
-                    simple_element = True
-                    etype = 0
-                    icon = self.icons["LESSON"]
-                lfields, lrecords = db_read_full_table(
-                    "LESSONS", lesson_group=lg
-                )
-                lgdata["nLessons"] = len(lrecords)
-                for lrec in lrecords:
-                    self.lesson_table.insertRow(row)
-                    ldata = {lfields[i]: val for i, val in enumerate(lrec)}
-                    w = QTableWidgetItem(icon, "")
-                    self.lesson_table.setItem(row, 0, w)
-                    ln = ldata["LENGTH"]
-                    w = QTableWidgetItem(str(ln))
-                    self.lesson_table.setItem(row, 1, w)
-                    if etype == 1:
-                        w = QTableWidgetItem(bt.subject)
-                        self.lesson_table.setItem(row, 2, w)
-                    self.course_lessons.append(
-                        LessonRowData(etype, cldict, lgdata, ldata)
-                    )
-                    if ldata["id"] == lesson_select_id:
-                        row_to_select = row
-                    row += 1
-            else:
-                # payment/workload item
-                if workload_element:
-                    raise Bug("Multiple entries in COURSE_LESSONS"
-                        f"for workload item, course {self.course_id}"
-                    )
-                workload_element = True
-                if lesson_select_id == 0:
-                    row_to_select = row
+        if pay_only:
+            # payment/workload item
+            if lesson_select_id == 0:
+                row_to_select = row
+            self.lesson_table.insertRow(row)
+            w = QTableWidgetItem(self.icons["PAY"], "")
+            self.lesson_table.setItem(row, 0, w)
+            w = QTableWidgetItem("–")
+            self.lesson_table.setItem(row, 1, w)
+            self.course_lessons.append(
+                LessonRowData(-1, *pay_only, None, None)
+            )
+            row += 1
+        if simple_lessons:
+            workload_data, cldict, lgdata, lessons = simple_lessons
+            lgdata["nLessons"] = len(lessons)
+            # Add a line for each lesson
+            for ldata in lessons:
                 self.lesson_table.insertRow(row)
-                w = QTableWidgetItem(self.icons["PAY"], "")
+                w = QTableWidgetItem(self.icons["LESSON"], "")
                 self.lesson_table.setItem(row, 0, w)
-                w = QTableWidgetItem("–")
+                ln = ldata["LENGTH"]
+                w = QTableWidgetItem(str(ln))
                 self.lesson_table.setItem(row, 1, w)
                 self.course_lessons.append(
-                    LessonRowData(-1, cldict, None, None)
+                    LessonRowData(0, workload_data, cldict, lgdata, ldata)
                 )
+                if ldata["id"] == lesson_select_id:
+                    row_to_select = row
+                row += 1
+        for bl in block_lessons:
+            workload_data, cldict, lgdata, lessons, btag = bl
+            # Additional info used by the course editor
+            lgdata["nLessons"] = len(lessons)
+            lgdata["BlockTag"] = btag
+            # Add a line for each lesson
+            for ldata in lessons:
+                self.lesson_table.insertRow(row)
+                w = QTableWidgetItem(self.icons["BLOCK"], "")
+                self.lesson_table.setItem(row, 0, w)
+                ln = ldata["LENGTH"]
+                w = QTableWidgetItem(str(ln))
+                self.lesson_table.setItem(row, 1, w)
+                w = QTableWidgetItem(btag.subject)
+                self.lesson_table.setItem(row, 2, w)
+                self.course_lessons.append(
+                    LessonRowData(1, workload_data, cldict, lgdata, ldata)
+                )
+                if ldata["id"] == lesson_select_id:
+                    row_to_select = row
                 row += 1
         self.lesson_table.setCurrentCell(row_to_select, 0)
         self.lesson_table_suppress_update = False
         self.on_lesson_table_itemSelectionChanged()
-
-#TODO: Is something like this needed?
-# Toggle the stretch on the last section because of a possible bug in
-# Qt, where the stretch can be lost when repopulating.
-#        hh = table.horizontalHeader()
-#        hh.setStretchLastSection(False)
-#        hh.setStretchLastSection(True)
 
     @Slot()
     def on_pb_delete_course_clicked(self):
@@ -490,7 +441,7 @@ class CourseEditorPage(Page):
         # Populate the form fields
         self.lesson_sub.setEnabled(False)
         if row < 0:
-            self.current_lesson = LessonRowData(-2, None, None, None)
+            self.current_lesson = LessonRowData(-2, None, None, None, None)
             self.lesson_add.setEnabled(False)
             self.remove_element.setEnabled(False)
             self.payment.setEnabled(False)
@@ -601,9 +552,11 @@ class CourseEditorPage(Page):
                 parent=self
             )
             if result is not None:
+                btag, lgnew = result
+                assert(lgnew < 0)
                 db_update_fields(
                     "LESSON_GROUP",
-                    [("BLOCK_SID", result.sid), ("BLOCK_TAG", result.tag)],
+                    [("BLOCK_SID", btag.sid), ("BLOCK_TAG", btag.tag)],
                     lesson_group=lg["lesson_group"]
                 )
                 # Redisplay lessons
@@ -696,8 +649,8 @@ class CourseEditorPage(Page):
         """Add an item type: block, simple lesson or workload/payment.
         The item can only be added when its type is not already present
         for the course. A block may already exist (just add a reference
-        to this course) or may be completely new. If a simple lesson or
-        a new completely new course is added, a single lesson is also
+        to this course) or it may be completely new. If a simple lesson
+        or a new completely new course is added, a single lesson is also
         added, together with the other necessary db table entries.
         """
         workload = True
@@ -710,40 +663,44 @@ class CourseEditorPage(Page):
                 simple = False
             elif cl.ROW_TYPE > 0:
                 blockset.add(cl.LESSON_GROUP_INFO["BlockTag"])
-        btag = BlockNameDialog.popup(
+        bn = BlockNameDialog.popup(
             workload=workload,
             simple=simple,
             blocks=blockset,
             parent=self,
         )
-        if btag:
-            if btag.sid:
-                lg = db_new_row(
-                    "LESSON_GROUP",
-                    BLOCK_SID=btag.sid,
-                    BLOCK_TAG=btag.tag,
-                    NOTES="",
+        if bn:
+            btag, lg = bn
+            if lg < 0:
+                if btag.sid:
+                    lg = db_new_row(
+                        "LESSON_GROUP",
+                        BLOCK_SID=btag.sid,
+                        BLOCK_TAG=btag.tag,
+                        NOTES="",
+                    )
+                elif btag.tag == "$":
+                    # Workload/payment, no lesson_group
+                    cl = db_new_row(
+                        "COURSE_LESSONS",
+                        course=self.course_id,
+                    )
+                    # Redisplay lessons
+                    self.display_lessons(0)
+                    return
+                else:
+                    # "Simple" lesson_group
+                    lg = db_new_row(
+                        "LESSON_GROUP",
+                        NOTES="",
+                    )
+                l = db_new_row(
+                    "LESSONS",
+                    lesson_group=lg,
+                    LENGTH=1,
                 )
-            elif btag.tag == "$":
-                # Workload/payment, no lesson_group
-                cl = db_new_row(
-                    "COURSE_LESSONS",
-                    course=self.course_id,
-                )
-                # Redisplay lessons
-                self.display_lessons(0)
-                return
             else:
-                # "Simple" lesson_group
-                lg = db_new_row(
-                    "LESSON_GROUP",
-                    NOTES="",
-                )
-            l = db_new_row(
-                "LESSONS",
-                lesson_group=lg,
-                LENGTH=1,
-            )
+                l = -1
             cl = db_new_row(
                 "COURSE_LESSONS",
                 course=self.course_id,

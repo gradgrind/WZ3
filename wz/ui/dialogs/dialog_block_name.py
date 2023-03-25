@@ -88,6 +88,22 @@ class BlockNameDialog(QDialog):
        all courses connected to the lesson_group. The selected block-name
        mustn't already be in use. The current block-name is passed in as
        parameter <blocktag>.
+    
+    This dialog itself causes no database changes, that must be done by
+    the calling code on the basis of the returned value.
+    If the dialog is cancelled, <None> is returned and there should be
+    no changes to the database.
+    Otherwise a tuple is returned:
+        (<BlockTag> item, lesson_group key or -1)
+    The block tag can be empty, indicating that a simple-lesson group
+    is to be added. The second tuple element is -1.
+    Alternatively, the block tag can be invalid (sid="", tag="$"), in
+    which case a workload/payment-only entry is to be added. The
+    second tuple element is -1.
+    Otherwise a valid, non-empty block tag is returned.
+    If the second tuple element is -1, the block tag is new.
+    If the second tuple element > 0, this is the lesson_group key of
+    the existing LESSON_GROUP entry for the block tag.
     """
     @classmethod
     def popup(cls, parent=None, **kargs):
@@ -146,16 +162,20 @@ class BlockNameDialog(QDialog):
 
     @Slot()
     def on_only_pay_clicked(self):
-        self.result = BlockTag("", "$", "") # an illegal value
+        self.result = (
+            BlockTag("", "$", ""), # an illegal value
+            -1
+        )
         super().accept()
 
     def init_courses(self, btag):
         self.course_map = {}
         self.course_ids = []
         try:
-            lesson_group=self.sid_block_map[btag]
+            self.existing_lesson_group=self.sid_block_map[btag]
         except KeyError:
             # No courses, a new block-name (always acceptable)
+            self.existing_lesson_group = -1
             self.table_courses.setRowCount(0)
             self.list_lessons.clear()
             self.pb_accept.setEnabled(True)
@@ -163,7 +183,7 @@ class BlockNameDialog(QDialog):
         course_refs = db_read_fields(
             "COURSE_LESSONS",
             ["id", "course", "ROOM"],
-            lesson_group=lesson_group
+            lesson_group=self.existing_lesson_group
         )
         # A block-name change to an existing value is not permitted,
         # otherwise an existing lesson_group is acceptable as long as
@@ -217,7 +237,7 @@ class BlockNameDialog(QDialog):
         for l, t in db_read_fields(
             "LESSONS",
             ["LENGTH", "TIME"],
-            lesson_group=lesson_group
+            lesson_group=self.existing_lesson_group
         ):
             text = str(l)
             if t:
@@ -234,6 +254,7 @@ class BlockNameDialog(QDialog):
         """Open the dialog.
         """
         self.result = None
+        self.existing_lesson_group = -1
         self.disable_triggers = True
         self.blocktag = blocktag
         if blocktag:
@@ -283,12 +304,12 @@ class BlockNameDialog(QDialog):
         if i < 0:
             # The "accept" button should only be enabled when this is
             # an acceptable result ...
-            self.result = BlockTag("", "", "")
+            self.result = (BlockTag("", "", ""), -1)
         else:
             s = self.sid_list[i]
             t = self.block_tag.currentText()
             # Invalid values should not be possible here ...
-            self.result = BlockTag.build(s, t)
+            self.result = (BlockTag.build(s, t), self.existing_lesson_group)
         super().accept()
 
 
@@ -310,5 +331,5 @@ if __name__ == "__main__":
     print("----->", BlockNameDialog.popup(
         blocktag=BlockTag.build("ZwE", "09G10G")
     ))
-    print("----->", BlockNameDialog.popup(BlockTag.build("Hu", "")))
-    print("----->", BlockNameDialog.popup(BlockTag.build("XXX", "")))
+    print("----->", BlockNameDialog.popup(blocktag=BlockTag.build("Hu", "")))
+    print("----->", BlockNameDialog.popup(blocktag=BlockTag.build("XXX", "")))

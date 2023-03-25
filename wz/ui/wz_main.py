@@ -1,7 +1,7 @@
 """
 ui/wz_main.py
 
-Last updated:  2023-03-24
+Last updated:  2023-03-25
 
 The main window of the WZ GUI.
 
@@ -81,6 +81,9 @@ class MainWidget(QWidget):
         try:
             page = self.pages[oname]
         except KeyError:
+            if oname == "ui_info":
+                self.stackedWidget.setCurrentIndex(0)
+                return
             raise Bug(f"No page for button {oname}")
         self.stackedWidget.setCurrentWidget(page)
         page.enter()

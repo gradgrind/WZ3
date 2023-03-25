@@ -50,7 +50,11 @@ from core.basic_data import (
 
 ### -----
 
-def filtered_courses(filter, value):
+def filtered_courses(filter:str, value:str) -> list[dict]:
+    """Return a list of COURSES (as <dict>s) where the value of
+    field <filter> is equal to <value>.
+    Filter can be "CLASS", "TEACHER" or "SUBJECT".
+    """
     fields, records = db_read_full_table(
         "COURSES",
         sort_field="SUBJECT",

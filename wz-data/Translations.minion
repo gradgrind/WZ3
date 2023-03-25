@@ -49,6 +49,37 @@ core.classes: {
     EMPTY_GROUP:        "Schülergruppe „{g}“ ist als leer konfiguriert"
 }
 
+core.list_activities: {
+#TODO ... not yet implemented/adapted
+    TEACHER_SUPPRESSED: "Lehrkraft ausgeschlossen: {tname}"
+    TEACHER_NO_ACTIVITIES: "Lehrkraft ohne „Aktivitäten“: {tname}"
+    CONTINUOUS_BLOCK_TAG: "Durchgehende Kurse dürfen keine Deputatskennung haben: {course} mit Kennzeichen {tag}"
+    PARTNER_PAY_MISMATCH: "„Partner-Kurse“ müssen die gleichen Deputatsangaben haben:\n  {course1}\n  {course2}\n  Kennzeichen {tag}"
+    PARTNER_SID_MISMATCH: "„Partner-Kurse“ müssen das gleiche Fach haben:\n  {course1}\n  {course2}\n  Kennzeichen {tag}"
+    PARTNER_ROOM_MISMATCH: "„Partner-Kurse“ müssen den gleichen Raum haben:\n  {course1}\n  {course2}\n  Kennzeichen {tag}"
+    BAD_PLAIN_BLOCK:    "{course}: für Kennzeichen {tag} muss es genau einen Kurs geben"
+    CONTINUOUS_PLUS_OTHERS: "{course}: eine durchgehende Aktivität (Kennzeichen {tag}) kann nicht parallel zu anderen Aktivitäten stattfinden"
+    BLOCK_TOO_FULL: "{teacher}: Block (Kennzeichen {tag}) hat zu viele Unterrichtseinheiten"
+    BLOCK_NO_LESSONS: "Block (Kennzeichen {tag}) hat keine Unterrichtseinheiten"
+    CLASS_NO_ACTIVITIES: "Klasse ohne „Aktivitäten“: {klass}"
+    TAG_NO_ACTIVITIES: "Klasse {klass}: Kennzeichen ({tag}) hat keine Aktivitäten"
+    Repeated_page_title: "Seitentitel wurde doppelt verwendet: {ref}"
+    TAG_NO_LESSONS: "{course}, Kennzeichen {tag}: Keine Aktivitäten"
+    
+    # output
+    continuous: durchgehend
+    H_group:    Gruppe
+    H_subject:  Fach
+    H_room:     Raum
+    H_lessons_blocks: "St./[Epochen]"
+    H_workload: Deputat
+    H_teacher:  Lehrer
+    H_lessons:  Stunden
+    H_total:    insgesamt
+    classes-subjects: "Klassen-Fächer"
+    teachers-subjects: "Lehrer-Fächer"
+}
+
 core.db_access: {
     BACKUP_TO:          "Sicherungskopie der Daten: {f}\n"
     REMOVE_OLD_BACKUP:  "Alte Sicherungskopie entfernt: {f}"
@@ -425,37 +456,6 @@ timetable.activities: {
     NON_LESSON_NO_TEACHER: "BLOCKS-Tabelle, id={id}, {course}:\n  Deputatseintrag ohne Lehrer"
     PAYMENT_NO_NUMBER:  "BLOCKS-Tabelle, id={id}, {course}:\n  Bei der Deputatsangabe ({payment}) fehlt die Anzahl der Einheiten"
     COURSE_MULTIPLE_PAY: "{course}: Normalerweise sollte ein Kurs maximal eine „Aktivität“ haben, die nur deputatsrelevant ist"
-}
-
-timetable.list_activities: {
-#TODO ... not yet implemented/adapted
-    TEACHER_SUPPRESSED: "Lehrkraft ausgeschlossen: {tname}"
-    TEACHER_NO_ACTIVITIES: "Lehrkraft ohne „Aktivitäten“: {tname}"
-    CONTINUOUS_BLOCK_TAG: "Durchgehende Kurse dürfen keine Deputatskennung haben: {course} mit Kennzeichen {tag}"
-    PARTNER_PAY_MISMATCH: "„Partner-Kurse“ müssen die gleichen Deputatsangaben haben:\n  {course1}\n  {course2}\n  Kennzeichen {tag}"
-    PARTNER_SID_MISMATCH: "„Partner-Kurse“ müssen das gleiche Fach haben:\n  {course1}\n  {course2}\n  Kennzeichen {tag}"
-    PARTNER_ROOM_MISMATCH: "„Partner-Kurse“ müssen den gleichen Raum haben:\n  {course1}\n  {course2}\n  Kennzeichen {tag}"
-    BAD_PLAIN_BLOCK:    "{course}: für Kennzeichen {tag} muss es genau einen Kurs geben"
-    CONTINUOUS_PLUS_OTHERS: "{course}: eine durchgehende Aktivität (Kennzeichen {tag}) kann nicht parallel zu anderen Aktivitäten stattfinden"
-    BLOCK_TOO_FULL: "{teacher}: Block (Kennzeichen {tag}) hat zu viele Unterrichtseinheiten"
-    BLOCK_NO_LESSONS: "Block (Kennzeichen {tag}) hat keine Unterrichtseinheiten"
-    CLASS_NO_ACTIVITIES: "Klasse ohne „Aktivitäten“: {klass}"
-    TAG_NO_ACTIVITIES: "Klasse {klass}: Kennzeichen ({tag}) hat keine Aktivitäten"
-    Repeated_page_title: "Seitentitel wurde doppelt verwendet: {ref}"
-    TAG_NO_LESSONS: "{course}, Kennzeichen {tag}: Keine Aktivitäten"
-    
-    # output
-    continuous: durchgehend
-    H_group:    Gruppe
-    H_subject:  Fach
-    H_room:     Raum
-    H_lessons_blocks: "St./[Epochen]"
-    H_workload: Deputat
-    H_teacher:  Lehrer
-    H_lessons:  Stunden
-    H_total:    insgesamt
-    classes-subjects: "Klassen-Fächer"
-    teachers-subjects: "Lehrer-Fächer"
 }
 
 timetable.asc_data: {

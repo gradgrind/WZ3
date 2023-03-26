@@ -360,67 +360,108 @@ def get_payment_weights() -> KeyValueList:
 
 
 class Workload:
-    def __init__(self, PAY_TAG:str):
-        """Check the validity of the argument and extract the component
-        parts. The results are saved as attributes.
-        If any errors are detected, return a special "error" result:
-            attribute PAY_TAG is then "!".
+#TODO: May <WORKLOAD> really be a float?
+# What is WORK_GROUP?!
+    def __init__(self, WORKLOAD, PAY_FACTOR, WORK_GROUP, **xargs):
+        """Check the validity of the arguments and save them as
+        attributes. If any errors are reported, return a special
+        "error" result.
         """
-        self.PAY_TAG = PAY_TAG
-        self.NLESSONS = 0
-        self.PAYMENT = 0.0
-        self.PAY_FACTOR_TAG = ""
-        self.PAY_FACTOR = 0.0
-        if PAY_TAG:
-            try:
-                n, f = PAY_TAG.split("*", 1)
-            except ValueError:
+        ok = True
+        if PAY_FACTOR:
+            if WORKLOAD:
                 try:
-                    d = float(PAY_TAG.replace(",", "."))
-                    if d < 0.1 or d > 50.0:
-                        raise ValueError
-                except ValueError:
-                    self.PAY_TAG = "!"
-                    T["INVALID_PAY_TAG"].format(tag=PAY_TAG)
-                    return
-                self.PAYMENT = d
-                return
-            else:
-                if n == ".":
-                    # use actual number of lessons
-                    self.NLESSONS = -1
-                else:
-                    try:
-                        self.NLESSONS = int(n)
-                        if self.NLESSONS < 1:
+                    if PAYMENT_FORMAT.match(WORKLOAD).hasMatch():
+                        nd = float(WORKLOAD.replace(",", "."))
+                        if nd < 0.0 or nd > PAYMENT_MAX:
                             raise ValueError
-                    except ValueError:
-                        self.PAY_TAG = "!"
-                        T["INVALID_PAY_TAG"].format(tag=PAY_TAG)
-                        return
-                try:
-                    v = get_payment_weights().map(f)
-                    fd = float(v.replace(",", "."))
-                    if fd < 0.1 or fd > 50.0:
+                    else:
                         raise ValueError
-                except KeyError:
-                    REPORT(
-                        "ERROR",
-                        T["UNKNOWN_PAYMENT_WEIGHT"].format(key=f)
-                    )
-                    self.PAY_TAG = "!"
-                    return
                 except ValueError:
+                    REPORT("ERROR", T["BAD_NUMBER"].format(val=WORKLOAD))
+                    ok = False
+            else:
+                # Use the number & length of the actual lessons
+                nd = -1.0
+            try:
+                fd = float(
+                    get_payment_weights().map(PAY_FACTOR).replace(",", ".")
+                )
+            except KeyError:
                     REPORT(
                         "ERROR",
-                        T["INVALID_PAYMENT_WEIGHT"].format(key=f, val=v)
+                        T["UNKNOWN_PAYMENT_WEIGHT"].format(key=PAY_FACTOR)
                     )
-                    self.PAY_TAG = "!"
-                    return
-                self.PAY_FACTOR_TAG = f
-                self.PAY_FACTOR = fd
-                if self.NLESSONS > 0:
-                    self.PAYMENT = fd * n
+                    ok = False
+            except ValueError:
+                REPORT(
+                    "ERROR",
+                    f"BUG: Invalid db entry in PAY_FACTORS: key {PAY_FACTOR}"
+                )
+                ok = False
+            if WORK_GROUP:
+                if not WORKLOAD:
+                    REPORT(
+                        "ERROR",
+                        T["PAYMENT_TAG_WITHOUT_NUMBER"].format(tag=WORK_GROUP)
+                    )
+                    ok = False
+                elif not PAYMENT_TAG_FORMAT.match(WORK_GROUP).hasMatch():
+                    REPORT(
+                        "ERROR",
+                        T["INVALID_PAYMENT_TAG"].format(tag=WORK_GROUP)
+                    )
+                    ok = False
+            if ok:
+                self.WORKLOAD = WORKLOAD
+                self.PAY_FACTOR = PAY_FACTOR
+                self.WORK_GROUP = WORK_GROUP
+                self.nd = nd
+                self.fd = fd
+                return
+        elif WORKLOAD:
+            REPORT(
+                "ERROR",
+                T["PAYMENT_NUMBER_WITHOUT_WEIGHT"]
+            )
+        elif WORK_GROUP:
+            REPORT(
+                "ERROR",
+                T["PAYMENT_TAG_WITHOUT_NUMBER"].format(tag=WORK_GROUP)
+            )
+        else:
+            # "Empty" result
+            self.WORKLOAD = ""
+            self.PAY_FACTOR = ""
+            self.WORK_GROUP = ""
+            self.nd = 0.0
+            self.fd = 0.0
+            return
+        # Error result
+        self.WORKLOAD = ""
+        self.PAY_FACTOR = "!"
+        self.WORK_GROUP = ""
+        self.nd = 0.0
+        self.fd = 0.0
+
+    def isNone(self):
+        return not self.PAY_FACTOR
+
+    def isValid(self):
+        return self.PAY_FACTOR != "!"
+
+    def __eq__(self, other):
+        return (
+            self.WORKLOAD == other.WORKLOAD
+            and self.PAY_FACTOR == other.PAY_FACTOR
+            and self.WORK_GROUP == other.WORK_GROUP
+        )
+
+    def __str__(self):
+        if self.PAY_FACTOR:
+            t = f"/{self.WORK_GROUP}" if self.WORK_GROUP else ""
+            return f"{self.WORKLOAD}*{self.PAY_FACTOR}{t}"
+        return ""
 
 ### END: FUNCTIONS FOR WORKLOAD/PAYMENT DETAILS ###
 

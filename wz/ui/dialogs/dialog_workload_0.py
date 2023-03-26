@@ -1,7 +1,7 @@
 """
 ui/dialogs/dialog_workload.py
 
-Last updated:  2023-03-26
+Last updated:  2023-03-23
 
 Supporting "dialog" for the course editor – set workload/pay.
 
@@ -77,9 +77,6 @@ class WorkloadDialog(QDialog):
         self.pb_accept = self.buttonBox.button(
             QDialogButtonBox.StandardButton.Ok
         )
-        
-        return
-
         v = QRegularExpressionValidator(PAYMENT_FORMAT)
         self.workload.setValidator(v)
         self.factor_list = []
@@ -89,29 +86,16 @@ class WorkloadDialog(QDialog):
         v = QRegularExpressionValidator(PAYMENT_TAG_FORMAT)
         self.work_group.setValidator(v)
 
-    @Slot(bool)
-    def on_rb_explicit_toggled(self, on):
-        self.stackedWidget.setCurrentIndex(0 if on else 1)
-
     def activate(self, start_value:dict) -> Optional[Workload]:
         """Open the dialog. The initial values are taken from <start_value>,
         which must contain the keys WORKLOAD, PAY_FACTOR, WORK_GROUP.
         The values are checked before showing the dialog.
         Return a <Workload> instance if the data is changed.
         """
-        self.exec()
-
-#TODO
-        return self.result
-
         self.result = None
         self.suppress_events = True
         self.val0 = Workload(**start_value)
-        self.pb_reset.setVisible(not self.val0.PAY_TAG)
-
-#TODO
-
-
+        self.pb_reset.setVisible(not self.val0.isNone())
         self.field_w = self.val0.WORKLOAD
         self.workload.setText(self.field_w)
         self.nlessons.setChecked(bool(self.field_w))
@@ -176,7 +160,7 @@ class WorkloadDialog(QDialog):
 
     def reset(self):
         """Return an "empty" value."""
-        self.result = Workload("")
+        self.result = Workload("", "", "")
         super().accept()
 
     def accept(self):

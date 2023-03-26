@@ -6,90 +6,191 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>381</width>
-    <height>211</height>
+    <width>377</width>
+    <height>278</height>
    </rect>
   </property>
   <property name="windowTitle">
    <string>Dialog</string>
   </property>
-  <layout class="QVBoxLayout" name="verticalLayout">
+  <layout class="QVBoxLayout" name="verticalLayout_3">
    <item>
-    <widget class="QGroupBox" name="nlessons">
-     <property name="toolTip">
-      <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Bei normalen Unterrichtstunden ergibt sich das Deputat aus der Anzahl der Stunden – multipliziert mit dem Deputatsfaktor.&lt;/p&gt;&lt;p&gt;Alternativ kann eine konkrete „Stundenzahl“ hier angegeben werden.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+    <widget class="QToolBox" name="toolBox">
+     <property name="styleSheet">
+      <string notr="true">QToolBox::tab {
+	color: rgb(0, 170, 0);
+}
+</string>
      </property>
-     <property name="title">
-      <string>Stunden angeben (z.B. „Epochen“)</string>
+     <property name="frameShape">
+      <enum>QFrame::NoFrame</enum>
      </property>
-     <property name="checkable">
-      <bool>true</bool>
+     <property name="lineWidth">
+      <number>1</number>
      </property>
-     <layout class="QVBoxLayout" name="verticalLayout_2">
-      <item>
-       <layout class="QFormLayout" name="formLayout">
-        <item row="0" column="0">
-         <widget class="QLabel" name="label1">
-          <property name="text">
-           <string>Anzahl</string>
-          </property>
-          <property name="buddy">
-           <cstring>workload</cstring>
-          </property>
-         </widget>
-        </item>
-        <item row="0" column="1">
-         <widget class="QLineEdit" name="workload">
-          <property name="toolTip">
-           <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Die Anzahl der Blöcke/Epochen für diesen „Kurs“. Das Deputat ergibt sich aus dem Produkt dieser Zahl mit dem Deputatsfaktor.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-          </property>
-         </widget>
-        </item>
-        <item row="1" column="0">
-         <widget class="QLabel" name="label3">
-          <property name="toolTip">
-           <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;br/&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-          </property>
-          <property name="text">
-           <string>Gruppen-Kennzeichen</string>
-          </property>
-          <property name="buddy">
-           <cstring>work_group</cstring>
-          </property>
-         </widget>
-        </item>
-        <item row="1" column="1">
-         <widget class="QLineEdit" name="work_group">
-          <property name="toolTip">
-           <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Wenn in einem Block mehrere Gruppen („Kurse“) gemeinsam unterrichtet werden, sollten sie hier ein Kennzeichen haben, damit die Deputate nicht mehrfach gezählt werden.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-          </property>
-         </widget>
-        </item>
-       </layout>
-      </item>
-     </layout>
+     <property name="currentIndex">
+      <number>0</number>
+     </property>
+     <property name="tabSpacing">
+      <number>12</number>
+     </property>
+     <widget class="QWidget" name="page">
+      <property name="geometry">
+       <rect>
+        <x>0</x>
+        <y>0</y>
+        <width>373</width>
+        <height>181</height>
+       </rect>
+      </property>
+      <attribute name="label">
+       <string>Deputat mit Stunden und Faktor</string>
+      </attribute>
+      <layout class="QVBoxLayout" name="verticalLayout_5">
+       <item>
+        <layout class="QVBoxLayout" name="verticalLayout">
+         <item>
+          <widget class="QRadioButton" name="rb_implicit">
+           <property name="text">
+            <string>unterrichtete Stunden</string>
+           </property>
+           <property name="checked">
+            <bool>true</bool>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QRadioButton" name="rb_explicit">
+           <property name="text">
+            <string>Stunden explicit angeben (z.B. „Epochen“)</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QStackedWidget" name="stackedWidget">
+           <property name="currentIndex">
+            <number>1</number>
+           </property>
+           <widget class="QWidget" name="page_2">
+            <layout class="QHBoxLayout" name="horizontalLayout_2">
+             <item>
+              <widget class="QLabel" name="label1">
+               <property name="text">
+                <string>Anzahl</string>
+               </property>
+               <property name="buddy">
+                <cstring>workload</cstring>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QSpinBox" name="nlessons">
+               <property name="enabled">
+                <bool>true</bool>
+               </property>
+               <property name="minimum">
+                <number>1</number>
+               </property>
+               <property name="maximum">
+                <number>50</number>
+               </property>
+               <property name="value">
+                <number>1</number>
+               </property>
+              </widget>
+             </item>
+            </layout>
+           </widget>
+           <widget class="QWidget" name="page_4">
+            <layout class="QVBoxLayout" name="verticalLayout_4">
+             <property name="leftMargin">
+              <number>3</number>
+             </property>
+             <property name="topMargin">
+              <number>3</number>
+             </property>
+             <property name="rightMargin">
+              <number>3</number>
+             </property>
+             <property name="bottomMargin">
+              <number>3</number>
+             </property>
+             <item>
+              <widget class="QLabel" name="label_2">
+               <property name="text">
+                <string>Die Stundenzahl wird von der Gesamtzahl der Wochenstunden für den Kurs übernommen.</string>
+               </property>
+               <property name="wordWrap">
+                <bool>true</bool>
+               </property>
+              </widget>
+             </item>
+            </layout>
+           </widget>
+          </widget>
+         </item>
+         <item>
+          <layout class="QHBoxLayout" name="horizontalLayout_3">
+           <item>
+            <widget class="QLabel" name="label2">
+             <property name="text">
+              <string>Deputatsfaktor</string>
+             </property>
+             <property name="buddy">
+              <cstring>pay_factor</cstring>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QComboBox" name="pay_factor">
+             <property name="toolTip">
+              <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Um das Deputat für einen „Kurs“ zu errechnen, wird die Stundenzahl mit diesem Faktor multipliziert.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+             </property>
+            </widget>
+           </item>
+          </layout>
+         </item>
+        </layout>
+       </item>
+      </layout>
+     </widget>
+     <widget class="QWidget" name="page_3">
+      <property name="geometry">
+       <rect>
+        <x>0</x>
+        <y>0</y>
+        <width>355</width>
+        <height>136</height>
+       </rect>
+      </property>
+      <attribute name="label">
+       <string>Deputatsstunden direkt</string>
+      </attribute>
+      <layout class="QVBoxLayout" name="verticalLayout_2">
+       <item>
+        <layout class="QHBoxLayout" name="horizontalLayout">
+         <item>
+          <widget class="QLabel" name="label">
+           <property name="text">
+            <string>Deputatsstunden</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QDoubleSpinBox" name="payment">
+           <property name="decimals">
+            <number>3</number>
+           </property>
+           <property name="maximum">
+            <double>50.000000000000000</double>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </item>
+      </layout>
+     </widget>
     </widget>
-   </item>
-   <item>
-    <layout class="QHBoxLayout" name="horizontalLayout">
-     <item>
-      <widget class="QLabel" name="label2">
-       <property name="text">
-        <string>Deputatsfaktor</string>
-       </property>
-       <property name="buddy">
-        <cstring>pay_factor</cstring>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QComboBox" name="pay_factor">
-       <property name="toolTip">
-        <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Um das Deputat für einen „Kurs“ zu errechnen, wird die Stundenzahl mit diesem Faktor multipliziert.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-       </property>
-      </widget>
-     </item>
-    </layout>
    </item>
    <item>
     <widget class="Line" name="line">
@@ -119,8 +220,8 @@
    <slot>accept()</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>248</x>
-     <y>254</y>
+     <x>270</x>
+     <y>324</y>
     </hint>
     <hint type="destinationlabel">
      <x>157</x>
@@ -135,8 +236,8 @@
    <slot>reject()</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>316</x>
-     <y>260</y>
+     <x>338</x>
+     <y>324</y>
     </hint>
     <hint type="destinationlabel">
      <x>286</x>

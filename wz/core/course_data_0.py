@@ -81,42 +81,20 @@ def course_activities(course_id:int
 
     NOTE how the parameters are set in various tables. The room-wish
     and pay details apply to all lesson components as they are set in
-    WORKLOAD. Only the time-wish is set in the lesson component.
+    COURSE_LESSONS. Only the time-wish is set in the lesson component.
     This may be a bit restrictive, but is perhaps reasonable for most
     cases. If it is really essential to have a particular room for a
     particular lesson (and another one, or a choice, for another
     lesson), perhaps some additional constraint could be added ...
-    
-    There is also the possibility that multiple courses share a WORKLOAD
-    entry, which means that room and pay-data values are shared by all
-    the courses. The main idea behind this option is to facilitate
-    combining groups (especially from different classes – within one
-    class it is probably better to have a single group for this). It
-    could also be used for joint teaching as long as the room is shared
-    and the pay-data identical. Otherwise a block might be better. 
     """
     workload_element = None
     simple_element = None
     block_elements = []
     fields, records = db_read_full_table(
-        "COURSE_WORKLOAD", course=course_id
+        "COURSE_LESSONS", course=course_id
     )
     for rec in records:
-        cwdict = {fields[i]: val for i, val in enumerate(rec)}
-        fields_w, record_w = db_read_unique_entry(
-            "WORKLOAD", workload=cwdict["workload"]
-        )
-        #wdict = {fields_w[i]: val for i, val in enumerate(record_w)}
-        # Combined <dict>
-        for i, val in enumerate(record_w):
-            cwdict[fields_w[i]] = val
-
-        print("\n  ---", cwdict)
-    return
-
-    if True:
-
-        
+        cldict = {fields[i]: val for i, val in enumerate(rec)}
         workload_data = Workload(**cldict)
         # <cldict> contains workload/payment and room-wish fields
         lg = cldict["lesson_group"]
@@ -173,10 +151,6 @@ if __name__ == "__main__":
 
     for course in filtered_courses("TEACHER", "AE"):
         print("\n\n *** COURSE:", course["course"], course)
-
-        course_activities(course["course"])
-        continue
-
         w, l, b = course_activities(course["course"])
         if w:
             print("  ***", str(w[0]), w[1:])

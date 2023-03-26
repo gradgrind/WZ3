@@ -1,7 +1,7 @@
 """
 ui/dialogs/dialog_parallel_lessons.py
 
-Last updated:  2023-03-20
+Last updated:  2023-03-26
 
 Supporting "dialog" for the course editor – handle wishes for lessons
 starting at the same time.
@@ -107,7 +107,7 @@ class ParallelsDialog(QDialog):
                 id=lid,
             )
             bsid, btag = db_read_unique(
-                "LESSON_GROUP",
+                "LESSON_GROUPS",
                 ["BLOCK_SID", "BLOCK_TAG"],
                 lesson_group=lg_id,
             )

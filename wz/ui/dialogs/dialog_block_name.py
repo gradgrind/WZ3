@@ -1,7 +1,7 @@
 """
 ui/dialogs/dialog_block_name.py
 
-Last updated:  2023-03-12
+Last updated:  2023-03-26
 
 Supporting "dialog" for the course editor – handle blocks.
 
@@ -103,7 +103,7 @@ class BlockNameDialog(QDialog):
     Otherwise a valid, non-empty block tag is returned.
     If the second tuple element is -1, the block tag is new.
     If the second tuple element > 0, this is the lesson_group key of
-    the existing LESSON_GROUP entry for the block tag.
+    the existing LESSON_GROUPS entry for the block tag.
     """
     @classmethod
     def popup(cls, parent=None, **kargs):
@@ -143,7 +143,7 @@ class BlockNameDialog(QDialog):
         if sid:
             self.block_tag.setEnabled(True)
             tags = db_read_fields(
-                "LESSON_GROUP",
+                "LESSON_GROUPS",
                 ["lesson_group", "BLOCK_TAG"],
                 sort_field="BLOCK_TAG",
                 BLOCK_SID=sid,

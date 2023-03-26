@@ -1,7 +1,7 @@
 """
 ui/modules/course_editor.py
 
-Last updated:  2023-03-25
+Last updated:  2023-03-26
 
 Edit course and blocks+lessons data.
 
@@ -544,7 +544,7 @@ class CourseEditorPage(Page):
                 )
                 cl["ROOM"] = result
                 obj.setText(result)
-        ### BLOCK (LESSON_GROUP)
+        ### BLOCK (LESSON_GROUPS)
         elif object_name == "block_name":
             lg = self.current_lesson.LESSON_GROUP_INFO
             result = BlockNameDialog.popup(
@@ -555,20 +555,20 @@ class CourseEditorPage(Page):
                 btag, lgnew = result
                 assert(lgnew < 0)
                 db_update_fields(
-                    "LESSON_GROUP",
+                    "LESSON_GROUPS",
                     [("BLOCK_SID", btag.sid), ("BLOCK_TAG", btag.tag)],
                     lesson_group=lg["lesson_group"]
                 )
                 # Redisplay lessons
                 lesson_select_id = self.current_lesson.LESSON_INFO["id"]
                 self.display_lessons(lesson_select_id)
-        ### NOTES (LESSON_GROUP)
+        ### NOTES (LESSON_GROUPS)
         elif object_name == "notes":
             lg = self.current_lesson.LESSON_GROUP_INFO
             result = TextLineDialog.popup(lg["NOTES"], parent=self)
             if result is not None:
                 db_update_field(
-                    "LESSON_GROUP",
+                    "LESSON_GROUPS",
                     "NOTES",
                     result,
                     lesson_group=lg["lesson_group"]
@@ -674,7 +674,7 @@ class CourseEditorPage(Page):
             if lg < 0:
                 if btag.sid:
                     lg = db_new_row(
-                        "LESSON_GROUP",
+                        "LESSON_GROUPS",
                         BLOCK_SID=btag.sid,
                         BLOCK_TAG=btag.tag,
                         NOTES="",
@@ -691,7 +691,7 @@ class CourseEditorPage(Page):
                 else:
                     # "Simple" lesson_group
                     lg = db_new_row(
-                        "LESSON_GROUP",
+                        "LESSON_GROUPS",
                         NOTES="",
                     )
                 l = db_new_row(
@@ -751,14 +751,14 @@ class CourseEditorPage(Page):
         """Remove the current element from the current course.
         If no other courses reference the element (which is always
         the case for simple lessons and workload/payment elements),
-        the element (LESSON_GROUP entry) itself will be deleted.
+        the element (LESSON_GROUPS entry) itself will be deleted.
         """
         cl = self.current_lesson.COURSE_LESSON_INFO["id"]
         lg = self.current_lesson.COURSE_LESSON_INFO["lesson_group"]
         db_delete_rows("COURSE_LESSONS", id=cl)
         records = db_read_full_table("COURSE_LESSONS", lesson_group=lg)[1]
         if len(records) == 0:
-            db_delete_rows("LESSON_GROUP", lesson_group=lg)
+            db_delete_rows("LESSON_GROUPS", lesson_group=lg)
         self.display_lessons(-1)
 
 

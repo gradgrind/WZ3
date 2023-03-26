@@ -1,10 +1,10 @@
 """
 ui/dialogs/dialog_text_line.py
 
-Last updated:  2023-03-13
+Last updated:  2023-03-26
 
 Supporting "dialog" for the course editor – edit the NOTES field
-of a LESSON_GROUP record.
+of a LESSON_GROUPS record.
 
 
 =+LICENCE=============================

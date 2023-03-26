@@ -1,7 +1,7 @@
 """
 core/course_data.py
 
-Last updated:  2023-03-25
+Last updated:  2023-03-26
 
 Support functions dealing with courses, lessons, etc.
 
@@ -100,7 +100,7 @@ def course_activities(course_id:int
         lg = cldict["lesson_group"]
         if lg:
             lgfields, lgrecord = db_read_unique_entry(
-                "LESSON_GROUP", lesson_group=lg
+                "LESSON_GROUPS", lesson_group=lg
             )
             lgdata = {
                 lgfields[i]: val for i, val in enumerate(lgrecord)
@@ -109,7 +109,7 @@ def course_activities(course_id:int
             block_sid = lgdata["BLOCK_SID"]
             block_tag = lgdata["BLOCK_TAG"]
             # The uniqueness of a block name should be enforced by
-            # the UNIQUE constraint on the LESSON_GROUP table
+            # the UNIQUE constraint on the LESSON_GROUPS table
             # ("BLOCK_SID" + "BLOCK_TAG" fields).
             # The uniqueness of a course/lesson_group connection
             # should be enforced by the UNIQUE constraint on the

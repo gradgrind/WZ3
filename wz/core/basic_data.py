@@ -381,7 +381,10 @@ class Workload:
                         raise ValueError
                 except ValueError:
                     self.PAY_TAG = "!"
-                    T["INVALID_PAY_TAG"].format(tag=PAY_TAG)
+                    REPORT(
+                        "ERROR",
+                        T["INVALID_PAY_TAG"].format(tag=PAY_TAG)
+                    )
                     return
                 self.PAYMENT = d
                 return
@@ -396,7 +399,10 @@ class Workload:
                             raise ValueError
                     except ValueError:
                         self.PAY_TAG = "!"
-                        T["INVALID_PAY_TAG"].format(tag=PAY_TAG)
+                        REPORT(
+                            "ERROR",
+                            T["INVALID_PAY_TAG"].format(tag=PAY_TAG)
+                        )
                         return
                 try:
                     v = get_payment_weights().map(f)
@@ -421,6 +427,13 @@ class Workload:
                 self.PAY_FACTOR = fd
                 if self.NLESSONS > 0:
                     self.PAYMENT = fd * self.NLESSONS
+
+    def payment(self, nlessons:int=None):
+        if nlessons:
+            assert(self.NLESSONS == -1)
+            assert(self.PAY_FACTOR > 0.0)
+            return self.PAY_FACTOR * nlessons
+        return self.PAYMENT
 
 ### END: FUNCTIONS FOR WORKLOAD/PAYMENT DETAILS ###
 

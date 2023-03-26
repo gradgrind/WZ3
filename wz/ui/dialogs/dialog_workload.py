@@ -70,7 +70,7 @@ class WorkloadDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent=parent)
         self.val0 = None
-        self.suppress_events = True
+        self.suppress_callbacks = True
         uic.loadUi(APPDATAPATH("ui/dialog_workload.ui"), self)
         self.pb_reset = self.buttonBox.button(QDialogButtonBox.StandardButton.Reset)
         self.pb_reset.clicked.connect(self.reset)
@@ -82,68 +82,99 @@ class WorkloadDialog(QDialog):
             self.factor_list.append(k)
             self.pay_factor.addItem(f"{k} ({v})")
 
-    @Slot(bool)
-    def on_rb_explicit_toggled(self, on):
-        self.stackedWidget.setCurrentIndex(0 if on else 1)
-
-    def activate(self, start_value:str) -> Optional[Workload]:
-        """Open the dialog. The initial values are taken from <start_value>,
-        which must contain the keys WORKLOAD, PAY_FACTOR, WORK_GROUP.
-        The values are checked before showing the dialog.
-        Return a <Workload> instance if the data is changed.
+    def activate(self, start_value:str) -> Optional[str]:
+        """Open the dialog. The initial values are taken from <start_value>.
+        The value is checked before showing the dialog.
+        Return a workload-tag  if the data is changed.
         """
-        print("§§§§§ WITH", start_value)
         self.result = None
         self.suppress_events = True
-        self.val0 = Workload(start_value)
-        self.pb_reset.setVisible(bool(self.val0.PAY_TAG))
-        if self.val0.PAY_FACTOR_TAG:
+        self.val0 = start_value
+        self.pb_reset.setVisible(bool(self.val0))
+        # Check and decode initial value
+        w0 = Workload(start_value)
+        self.suppress_callbacks = True
+        if w0.PAY_FACTOR_TAG:
             self.pay_factor.setCurrentIndex(
-                get_payment_weights().index(self.val0.PAY_FACTOR_TAG)
+                get_payment_weights().index(w0.PAY_FACTOR_TAG)
             )
         else:
             self.pay_factor.setCurrentIndex(0)
-        if self.val0.NLESSONS != 0:
+        if w0.NLESSONS > 0:
+            self.nlessons.setValue(w0.NLESSONS)
+        else:
+            self.nlessons.setValue(1)
+        if w0.PAYMENT > 0.0:
+            self.payment.setValue(w0.PAYMENT)
+        else:
+            self.payment.setValue(1.0)
+        if w0.NLESSONS <= 0:
             self.rb_implicit.setChecked(True)
-            if self.val0.NLESSONS > 0:
-                self.nlessons.setValue(self.val0.NLESSONS)
-                self.rb_explicit.setChecked(True)
-            else:
-                self.rb_explicit.setChecked(False)
+            self.on_rb_explicit_toggled(False)
+        else:
+            self.rb_explicit.setChecked(True)
+            self.on_rb_explicit_toggled(True)
+        if w0.NLESSONS == 0 and w0.PAYMENT > 0.0:
+            # Plain number
+            self.toolBox.setCurrentIndex(1)
+        else:
+            # Also if no start value, begin with factor option
+            self.toolBox.setCurrentIndex(0)
+        self.suppress_callbacks = False
+        self.update_val()
         self.exec()
         return self.result
 
     @Slot(bool)
-    def on_nlessons_toggled(self, state):
-        if self.suppress_events:
-            return
-        self.set_nlessons(state)
+    def on_rb_explicit_toggled(self, on):
+        self.stackedWidget.setCurrentIndex(0 if on else 1)
+        self.update_val()
 
-    def set_nlessons(self, state):
-        if state:
-            self.field_w = "1"
-            self.field_wg = self.work_group.text()
-        else:
-            self.field_w = ""
-            self.field_wg = ""
-            self.work_group.setText(self.field_wg)
-        self.workload.setText(self.field_w)
-        self.acceptable()
+    @Slot(int)
+    def on_toolBox_currentChanged(self, i):
+        self.update_val()
+    
+    @Slot(int)
+    def on_nlessons_valueChanged(self, i):
+        self.update_val()
+
+    @Slot(float)
+    def on_payment_valueChanged(self, f):
+        self.update_val()
 
     @Slot(int)
     def on_pay_factor_currentIndexChanged(self, i):
-        print("PAY_FACTOR:", get_payment_weights()[i]) # (k, v)
+        self.update_val()
+
+    def update_val(self):
+        if self.suppress_callbacks:
+            return
+        i = self.toolBox.currentIndex()
+        assert(i >= 0)
+        if i == 0:
+            # with factor
+            pfi = self.pay_factor.currentIndex()
+            assert(pfi >= 0)
+            pf = self.factor_list[pfi]
+            if self.rb_implicit.isChecked():
+                self.val = f".*{pf}"
+            else:
+                self.val = f"{self.nlessons.cleanText()}*{pf}"
+        elif i == 1:
+            # simple number
+            self.val = self.payment.cleanText()
+        changed = self.val != self.val0
+        self.pb_accept.setEnabled(changed)
+        # print("NEW VAL:", changed, self.val)
 
     def reset(self):
         """Return an "empty" value."""
-        self.result = Workload("")
+        self.result = ""
         super().accept()
 
     def accept(self):
-        wl = Workload(self.field_w, self.field_pf, self.field_wg)
-        if wl.PAY_FACTOR != '!':
-            self.result = wl
-            super().accept()
+        self.result = self.val
+        super().accept()
 
 
 # --#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#
@@ -153,6 +184,6 @@ if __name__ == "__main__":
     open_database()
     print("----->", WorkloadDialog.popup(""))
     print("----->", WorkloadDialog.popup(".*HuKl"))
-    print("----->", WorkloadDialog.popup("2*DpSt"))
+    print("----->", WorkloadDialog.popup("1.23456"))
     print("----->", WorkloadDialog.popup("1*HuEp"))
     print("----->", WorkloadDialog.popup("Fred"))

@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>377</width>
-    <height>278</height>
+    <height>328</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -29,7 +29,7 @@
       <number>1</number>
      </property>
      <property name="currentIndex">
-      <number>0</number>
+      <number>1</number>
      </property>
      <property name="tabSpacing">
       <number>12</number>
@@ -40,7 +40,7 @@
         <x>0</x>
         <y>0</y>
         <width>373</width>
-        <height>181</height>
+        <height>169</height>
        </rect>
       </property>
       <attribute name="label">
@@ -69,7 +69,7 @@
          <item>
           <widget class="QStackedWidget" name="stackedWidget">
            <property name="currentIndex">
-            <number>1</number>
+            <number>0</number>
            </property>
            <widget class="QWidget" name="page_2">
             <layout class="QHBoxLayout" name="horizontalLayout_2">
@@ -160,11 +160,11 @@
         <x>0</x>
         <y>0</y>
         <width>355</width>
-        <height>136</height>
+        <height>176</height>
        </rect>
       </property>
       <attribute name="label">
-       <string>Deputatsstunden direkt</string>
+       <string>Deputatsstunden direkt angeben</string>
       </attribute>
       <layout class="QVBoxLayout" name="verticalLayout_2">
        <item>
@@ -181,8 +181,14 @@
            <property name="decimals">
             <number>3</number>
            </property>
+           <property name="minimum">
+            <double>0.100000000000000</double>
+           </property>
            <property name="maximum">
             <double>50.000000000000000</double>
+           </property>
+           <property name="value">
+            <double>1.000000000000000</double>
            </property>
           </widget>
          </item>
@@ -190,6 +196,13 @@
        </item>
       </layout>
      </widget>
+    </widget>
+   </item>
+   <item>
+    <widget class="Line" name="line_2">
+     <property name="orientation">
+      <enum>Qt::Horizontal</enum>
+     </property>
     </widget>
    </item>
    <item>

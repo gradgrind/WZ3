@@ -145,8 +145,8 @@ class CourseEditorPage(Page):
             self.wish_time, self.parallel,
         ):
             w.installEventFilter(self)
-        self.last_combo_filter_index = 0
-        self.filter_value = ""
+        self.filter_field = "CLASS"
+        self.last_course = None
         self.select2index = {}
 
     def eventFilter(self, obj: QWidget, event: QEvent) -> bool:
@@ -171,17 +171,13 @@ class CourseEditorPage(Page):
         open_database()
         clear_cache()
         self.init_data()
-        # Restore previous view (filter/value), if any
-        fv = self.filter_value
-#TODO
-        #self.pb_XXX.setChecked(True)
-        return
-
-        self.combo_filter.setCurrentIndex(-1)
-        self.combo_filter.setCurrentIndex(self.last_combo_filter_index)
-        self.combo_class.setCurrentIndex(
-            self.select2index.get(fv, 0)
-        )
+        if self.filter_field == "CLASS": pb = self.pb_CLASS
+        elif self.filter_field == "TEACHER": pb = self.pb_TEACHER
+        else: pb = self.pb_SUBJECT
+        self.disable_action = True
+        pb.setChecked(True)
+        self.disable_action = False
+        self.set_combo(self.filter_field)
 
 # ++++++++++++++ The widget implementation fine details ++++++++++++++
 
@@ -197,18 +193,23 @@ class CourseEditorPage(Page):
         }
         self.course_field_editor = None
 
-#TODO
     @Slot(QAbstractButton)
     def on_buttonGroup_buttonClicked(self, pb):
         # CLASS, SUBJECT or TEACHER
+        if self.disable_action: return
         oname = pb.objectName() 
         self.set_combo(oname.split("_", 1)[1])
 
     def set_combo(self, field):
-        """Handle a change of filter field for the course table."""
+        """Handle a change of filter field for the course table.
+        Choose the initial value selection on the basis of the last
+        selected course.
+        """
+        try:
+            fv = self.last_course.get(field)
+        except AttributeError:
+            fv = None
         self.filter_field = field
-        print("FILTER ->", field)
-#TODO?        self.last_combo_filter_index = i
         # class, subject, teacher
         self.select_list = self.filter_list[self.filter_field]
         self.combo_class.clear()
@@ -216,6 +217,9 @@ class CourseEditorPage(Page):
         for n, kv in enumerate(self.select_list):
             self.select2index[kv[0]] = n
             self.combo_class.addItem(kv[1])
+        self.combo_class.setCurrentIndex(
+            self.select2index.get(fv, 0)
+        )
 
     @Slot(int)
     def on_combo_class_currentIndexChanged(self, i):
@@ -280,6 +284,7 @@ class CourseEditorPage(Page):
             self.pb_delete_course.setEnabled(True)
             self.pb_edit_course.setEnabled(True)
             self.course_dict = self.courses[row]
+            self.last_course = self.course_dict     # for restoring views
             self.set_course(self.course_dict["course"])
             self.frame_r.setEnabled(True)
         else:

@@ -420,7 +420,7 @@ class Workload:
                 self.PAY_FACTOR_TAG = f
                 self.PAY_FACTOR = fd
                 if self.NLESSONS > 0:
-                    self.PAYMENT = fd * n
+                    self.PAYMENT = fd * self.NLESSONS
 
 ### END: FUNCTIONS FOR WORKLOAD/PAYMENT DETAILS ###
 

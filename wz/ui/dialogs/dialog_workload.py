@@ -77,57 +77,39 @@ class WorkloadDialog(QDialog):
         self.pb_accept = self.buttonBox.button(
             QDialogButtonBox.StandardButton.Ok
         )
-        
-        return
-
-        v = QRegularExpressionValidator(PAYMENT_FORMAT)
-        self.workload.setValidator(v)
         self.factor_list = []
         for k, v in get_payment_weights():
             self.factor_list.append(k)
             self.pay_factor.addItem(f"{k} ({v})")
-        v = QRegularExpressionValidator(PAYMENT_TAG_FORMAT)
-        self.work_group.setValidator(v)
 
     @Slot(bool)
     def on_rb_explicit_toggled(self, on):
         self.stackedWidget.setCurrentIndex(0 if on else 1)
 
-    def activate(self, start_value:dict) -> Optional[Workload]:
+    def activate(self, start_value:str) -> Optional[Workload]:
         """Open the dialog. The initial values are taken from <start_value>,
         which must contain the keys WORKLOAD, PAY_FACTOR, WORK_GROUP.
         The values are checked before showing the dialog.
         Return a <Workload> instance if the data is changed.
         """
-        self.exec()
-
-#TODO
-        return self.result
-
+        print("§§§§§ WITH", start_value)
         self.result = None
         self.suppress_events = True
-        self.val0 = Workload(**start_value)
-        self.pb_reset.setVisible(not self.val0.PAY_TAG)
-
-#TODO
-
-
-        self.field_w = self.val0.WORKLOAD
-        self.workload.setText(self.field_w)
-        self.nlessons.setChecked(bool(self.field_w))
-        if self.val0.isValid():
-            try:
-                i = self.factor_list.index(self.val0.PAY_FACTOR)
-            except ValueError:
-                raise Bug(f"Unknown PAY_FACTOR: {self.val0.PAY_FACTOR}")
+        self.val0 = Workload(start_value)
+        self.pb_reset.setVisible(bool(self.val0.PAY_TAG))
+        if self.val0.PAY_FACTOR_TAG:
+            self.pay_factor.setCurrentIndex(
+                get_payment_weights().index(self.val0.PAY_FACTOR_TAG)
+            )
         else:
-            i = 0
-        self.field_wg = self.val0.WORK_GROUP
-        self.work_group.setText(self.field_wg)
-        self.pay_factor.setCurrentIndex(i)
-        self.field_pf = self.factor_list[i]
-        self.suppress_events = False
-        self.set_nlessons(bool(self.field_w))
+            self.pay_factor.setCurrentIndex(0)
+        if self.val0.NLESSONS != 0:
+            self.rb_implicit.setChecked(True)
+            if self.val0.NLESSONS > 0:
+                self.nlessons.setValue(self.val0.NLESSONS)
+                self.rb_explicit.setChecked(True)
+            else:
+                self.rb_explicit.setChecked(False)
         self.exec()
         return self.result
 
@@ -150,29 +132,7 @@ class WorkloadDialog(QDialog):
 
     @Slot(int)
     def on_pay_factor_currentIndexChanged(self, i):
-        if self.suppress_events:
-            return
-        self.field_pf = self.factor_list[i]
-        self.acceptable()
-
-    @Slot(str)
-    def on_workload_textEdited(self, w):
-        self.field_w = w
-        self.acceptable()
-
-    @Slot(str)
-    def on_work_group_textEdited(self, wg):
-        self.field_wg = wg
-        self.acceptable()
-
-    def acceptable(self):
-        self.pb_accept.setEnabled(
-            self.field_pf != '!' and (
-                self.field_w != self.val0.WORKLOAD
-                or self.field_wg != self.val0.WORK_GROUP
-                or self.field_pf != self.val0.PAY_FACTOR
-            )
-        )
+        print("PAY_FACTOR:", get_payment_weights()[i]) # (k, v)
 
     def reset(self):
         """Return an "empty" value."""
@@ -191,18 +151,8 @@ class WorkloadDialog(QDialog):
 if __name__ == "__main__":
     from core.db_access import open_database
     open_database()
-    print("----->", WorkloadDialog.popup(
-        {"WORKLOAD": "", "PAY_FACTOR": "", "WORK_GROUP": ""}
-    ))
-    print("----->", WorkloadDialog.popup(
-        {"WORKLOAD": "", "PAY_FACTOR": "HuKl", "WORK_GROUP": ""}
-    ))
-    print("----->", WorkloadDialog.popup(
-        {"WORKLOAD": "2", "PAY_FACTOR": "DpSt", "WORK_GROUP": ""}
-    ))
-    print("----->", WorkloadDialog.popup(
-        {"WORKLOAD": "0,5", "PAY_FACTOR": "HuEp", "WORK_GROUP": "tag1"}
-    ))
-    print("----->", WorkloadDialog.popup(
-        {"WORKLOAD": "Fred", "PAY_FACTOR": "HuEp", "WORK_GROUP": ""}
-    ))
+    print("----->", WorkloadDialog.popup(""))
+    print("----->", WorkloadDialog.popup(".*HuKl"))
+    print("----->", WorkloadDialog.popup("2*DpSt"))
+    print("----->", WorkloadDialog.popup("1*HuEp"))
+    print("----->", WorkloadDialog.popup("Fred"))

@@ -127,7 +127,7 @@ class LessonRowData(NamedTuple):
 class CourseEditorPage(Page):
     def __init__(self):
         super().__init__()
-        uic.loadUi(APPDATAPATH("ui/course_editor_2.ui"), self)
+        uic.loadUi(APPDATAPATH("ui/course_editor.ui"), self)
         self.icons = {
             "LESSON": QIcon.fromTheme("lesson"),
             "BLOCK": QIcon.fromTheme("lesson_block"),

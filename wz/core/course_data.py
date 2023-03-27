@@ -66,7 +66,7 @@ def filtered_courses(filter:str, value:str) -> list[dict]:
 
 
 def course_activities(course_id:int
-) -> tuple[Optional[dict], Optional[dict], list[dict], dict]:
+) -> tuple[Optional[dict], Optional[dict], list[dict]]:
     """Seek lessons and workload/pament info for the given course
     (<course_id>).
     There can be a (single) workload/payment entry.
@@ -95,7 +95,6 @@ def course_activities(course_id:int
     workload_element = None
     simple_element = None
     block_elements = []
-    workload_map = {}   # record usage of WORKLOAD entries
     fields, records = db_read_full_table(
         "COURSE_WORKLOAD", course=course_id
     )
@@ -104,12 +103,11 @@ def course_activities(course_id:int
         # should be enforced by the UNIQUE constraint on the
         # COURSE_WORKLOAD table ("course" + "workload" fields).
         cwdict = {fields[i]: val for i, val in enumerate(rec)}
-        w = cwdict["workload"]
-        workload_map[w] = cwdict
         fields_w, record_w = db_read_unique_entry(
-            "WORKLOAD", workload=w
+            "WORKLOAD", workload=cwdict["workload"]
         )
-        ## Combined <dict> for the COURSE_WORKLOAD and WORKLOAD entries
+        ## Combined <dict> for the COURSE_WORKLOAD and WORKLOAD entries.
+        ## If there is a LESSON_GROUPS entry, its fields will also be added.
         for i, val in enumerate(record_w):
             cwdict[fields_w[i]] = val
         # <cwdict> contains workload/payment and room-wish fields
@@ -118,14 +116,11 @@ def course_activities(course_id:int
             lgfields, lgrecord = db_read_unique_entry(
                 "LESSON_GROUPS", lesson_group=lg
             )
-            lgdata = {
-                lgfields[i]: val for i, val in enumerate(lgrecord)
-            }
-            ## Add data from LESSON_GROUPS entry
-            cwdict["lesson_group_data"] = lgdata
+            for i, val in enumerate(lgrecord):
+                cwdict[lgfields[i]] = val
             # This contains the block-name, if any
-            block_sid = lgdata["BLOCK_SID"]
-            block_tag = lgdata["BLOCK_TAG"]
+            block_sid = cwdict["BLOCK_SID"]
+            block_tag = cwdict["BLOCK_TAG"]
             # The uniqueness of a block name should be enforced by
             # the UNIQUE constraint on the LESSON_GROUPS table
             # ("BLOCK_SID" + "BLOCK_TAG" fields).
@@ -155,7 +150,7 @@ def course_activities(course_id:int
                     f"for workload item, course {course_id}"
                 )
             workload_element = cwdict
-    return (workload_element, simple_element, block_elements, workload_map)
+    return (workload_element, simple_element, block_elements)
 
 
 # --#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#
@@ -166,7 +161,7 @@ if __name__ == "__main__":
 
     for course in filtered_courses("TEACHER", "AE"):
         print("\n\n *** COURSE:", course["course"], course)
-        w, l, b, wm = course_activities(course["course"])
+        w, l, b = course_activities(course["course"])
         if w:
             print("  ***", w)
         else:
@@ -180,4 +175,3 @@ if __name__ == "__main__":
                 print("  +++", bi)
         else:
             print("  +++ []")
-        print("  ###", list(wm))

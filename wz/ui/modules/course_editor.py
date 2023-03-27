@@ -109,6 +109,7 @@ COURSE_TABLE_FIELDS = ( # the fields shown in the course table
     ("INFO", 0, -1),
 )
 
+'''
 class LessonRowData(NamedTuple):
     """ROW_TYPE:
         -2 – no item (all other fields <None>)
@@ -121,6 +122,7 @@ class LessonRowData(NamedTuple):
     COURSE_LESSON_INFO: dict
     LESSON_GROUP_INFO: dict
     LESSON_INFO: dict
+'''
 
 ### -----
 
@@ -304,13 +306,20 @@ class CourseEditorPage(Page):
         If <lesson_select_id> is above 0, select the lesson with the given id.
         Otherwise select no element.
         """
+        def is_shared_workload(key:int) -> bool:
+            """Determine whether a WORKLOAD entry is used by multiple courses.
+            """
+            clist = db_values("COURSE_WORKLOAD", "course", workload=key)
+            return len(clist) > 1
+
         self.lesson_table_suppress_update = True
         self.lesson_table.setRowCount(0)
         self.course_lessons = []
         ### Build a list of entries
-        pay_only, simple_lessons, block_lessons = course_activities(
-            self.course_id
-        )
+        (   pay_only,
+            simple_lessons,
+            block_lessons
+        ) = course_activities(self.course_id)
         row = 0
         row_to_select = -1
         if pay_only:
@@ -322,44 +331,49 @@ class CourseEditorPage(Page):
             self.lesson_table.setItem(row, 0, w)
             w = QTableWidgetItem("–")
             self.lesson_table.setItem(row, 1, w)
-            self.course_lessons.append(
-                LessonRowData(-1, *pay_only, None, None)
-            )
+            if is_shared_workload(pay_only["workload"]):
+                w = QTableWidgetItem("!")
+                self.lesson_table.setItem(row, 2, w)
+            self.course_lessons.append((-1, pay_only, -1))
             row += 1
         if simple_lessons:
-            workload_data, cldict, lgdata, lessons = simple_lessons
-            lgdata["nLessons"] = len(lessons)
+            lessons = simple_lessons["lessons"]
+            simple_lessons["nLessons"] = len(lessons)
+            shared = is_shared_workload(simple_lessons["workload"])
             # Add a line for each lesson
-            for ldata in lessons:
+            for i, ldata in enumerate(lessons):
                 self.lesson_table.insertRow(row)
                 w = QTableWidgetItem(self.icons["LESSON"], "")
                 self.lesson_table.setItem(row, 0, w)
                 ln = ldata["LENGTH"]
                 w = QTableWidgetItem(str(ln))
                 self.lesson_table.setItem(row, 1, w)
-                self.course_lessons.append(
-                    LessonRowData(0, workload_data, cldict, lgdata, ldata)
-                )
+                if shared:
+                    w = QTableWidgetItem("!")
+                    self.lesson_table.setItem(row, 2, w)
+                self.course_lessons.append((0, simple_lessons, i))
                 if ldata["id"] == lesson_select_id:
                     row_to_select = row
                 row += 1
         for bl in block_lessons:
-            workload_data, cldict, lgdata, lessons, btag = bl
             # Additional info used by the course editor
-            lgdata["nLessons"] = len(lessons)
-            lgdata["BlockTag"] = btag
+            lessons = bl["lessons"]
+            bl["nLessons"] = len(lessons)
+            shared = is_shared_workload(bl["workload"])
             # Add a line for each lesson
-            for ldata in lessons:
+            for i, ldata in enumerate(lessons):
                 self.lesson_table.insertRow(row)
                 w = QTableWidgetItem(self.icons["BLOCK"], "")
                 self.lesson_table.setItem(row, 0, w)
                 ln = ldata["LENGTH"]
                 w = QTableWidgetItem(str(ln))
                 self.lesson_table.setItem(row, 1, w)
-                w = QTableWidgetItem(btag.subject)
+                w = QTableWidgetItem(
+                    f"! {bl['blocktag'].subject}" if shared
+                    else bl['blocktag'].subject
+                )
                 self.lesson_table.setItem(row, 2, w)
-                self.course_lessons.append(
-                    LessonRowData(1, workload_data, cldict, lgdata, ldata)
+                self.course_lessons.append((1, bl, i)
                 )
                 if ldata["id"] == lesson_select_id:
                     row_to_select = row
@@ -451,7 +465,7 @@ class CourseEditorPage(Page):
         # Populate the form fields
         self.lesson_sub.setEnabled(False)
         if row < 0:
-            self.current_lesson = LessonRowData(-2, None, None, None, None)
+            self.current_lesson = (-2, None, -1)
             self.lesson_add.setEnabled(False)
             self.remove_element.setEnabled(False)
             self.payment.setEnabled(False)
@@ -460,9 +474,8 @@ class CourseEditorPage(Page):
             self.remove_element.setEnabled(True)
             self.payment.setEnabled(True)
             self.current_lesson = self.course_lessons[row]
-            wd = Workload(**self.current_lesson.COURSE_LESSON_INFO)
-            self.payment.setText(str(wd))
-        if self.current_lesson.ROW_TYPE < 0:
+            self.payment.setText(self.current_lesson[1]["PAY_TAG"])
+        if self.current_lesson[0] < 0:
             # payment entry or nothing selected
             self.lesson_length.setCurrentIndex(-1)
             self.lesson_length.setEnabled(False)
@@ -477,32 +490,35 @@ class CourseEditorPage(Page):
             self.notes.clear()
             self.notes.setEnabled(False)
         else:
-            if self.current_lesson.ROW_TYPE > 0:
+            rtype, data, index = self.current_lesson
+            llist = data["lessons"]
+            lthis = llist[index]
+            if rtype > 0:
                 self.block_name.setText(
-                    str(self.current_lesson.LESSON_GROUP_INFO["BlockTag"])
+                    str(data["blocktag"])
                 )
                 self.block_name.setEnabled(True)
             else:
                 self.block_name.clear()
                 self.block_name.setEnabled(False)
             self.lesson_add.setEnabled(True)
-            if self.current_lesson.LESSON_GROUP_INFO["nLessons"] > 1:
+            if data["nLessons"] > 1:
                 self.lesson_sub.setEnabled(True)
             self.lesson_length.setCurrentText(
-                str(self.current_lesson.LESSON_INFO["LENGTH"])
+                str(lthis["LENGTH"])
             )
             self.lesson_length.setEnabled(True)
             self.wish_room.setText(
-                self.current_lesson.COURSE_LESSON_INFO["ROOM"]
+                data["ROOM"]
             )
             self.wish_room.setEnabled(True)
-            self.wish_time.setText(self.current_lesson.LESSON_INFO["TIME"])
+            self.wish_time.setText(lthis["TIME"])
             self.wish_time.setEnabled(True)
             try:
                 t, w = db_read_unique(
                     "PARALLEL_LESSONS",
                     ["TAG", "WEIGHTING"],
-                    lesson_id=self.current_lesson.LESSON_INFO["id"]
+                    lesson_id=lthis["id"]
                 )
             except NoRecord:
                 self.current_parallel_tag = ParallelTag.build("", 0)
@@ -511,7 +527,7 @@ class CourseEditorPage(Page):
                 self.current_parallel_tag = ParallelTag.build(t, w)
                 self.parallel.setText(str(self.current_parallel_tag))
             self.parallel.setEnabled(True)
-            self.notes.setText(self.current_lesson.LESSON_GROUP_INFO["NOTES"])
+            self.notes.setText(data["NOTES"])
             self.notes.setEnabled(True)
 
     def field_editor(self, obj: QLineEdit):
@@ -519,24 +535,23 @@ class CourseEditorPage(Page):
         # print("EDIT", object_name)
         ### PAYMENT (COURSE_LESSONS)
         if object_name == "payment":
-            cl = self.current_lesson.COURSE_LESSON_INFO
-            result = WorkloadDialog.popup(start_value=cl, parent=self)
+            cl = self.current_lesson[1]
+            result = WorkloadDialog.popup(
+                start_value=cl["PAY_TAG"], parent=self
+            )
             if result is not None:
                 # Update the db, no redisplay necessary
-                udmap = [
-                    (f, getattr(result, f))
-                    for f in ("WORKLOAD", "PAY_FACTOR", "WORK_GROUP")
-                ]
-                db_update_fields(
-                    "COURSE_LESSONS",
-                    udmap,
-                    id=cl["id"]
+                db_update_field(
+                    "WORKLOAD",
+                    "PAY_TAG",
+                    result,
+                    workload=cl["workload"]
                 )
                 cl.update(dict(udmap))
-                obj.setText(str(result))
+                obj.setText(result)
         ### ROOM (COURSE_LESSONS)
         elif object_name == "wish_room":
-            cl = self.current_lesson.COURSE_LESSON_INFO
+            cl = self.current_lesson[1]
             classroom = Classes().get_classroom(
                 self.course_dict["CLASS"], null_ok=True
             )
@@ -547,18 +562,18 @@ class CourseEditorPage(Page):
             )
             if result is not None:
                 db_update_field(
-                    "COURSE_LESSONS",
+                    "WORKLOAD",
                     "ROOM",
                     result,
-                    id=cl["id"]
+                    workload=cl["workload"]
                 )
                 cl["ROOM"] = result
                 obj.setText(result)
         ### BLOCK (LESSON_GROUPS)
         elif object_name == "block_name":
-            lg = self.current_lesson.LESSON_GROUP_INFO
+            lg = self.current_lesson[1]
             result = BlockNameDialog.popup(
-                blocktag=lg["BlockTag"],
+                blocktag=lg["blocktag"],
                 parent=self
             )
             if result is not None:
@@ -570,11 +585,13 @@ class CourseEditorPage(Page):
                     lesson_group=lg["lesson_group"]
                 )
                 # Redisplay lessons
-                lesson_select_id = self.current_lesson.LESSON_INFO["id"]
+                llist = lg["lessons"]
+                lthis = llist[self.current_lesson[2]]
+                lesson_select_id = lthis["id"]
                 self.display_lessons(lesson_select_id)
         ### NOTES (LESSON_GROUPS)
         elif object_name == "notes":
-            lg = self.current_lesson.LESSON_GROUP_INFO
+            lg = self.current_lesson[1]
             result = TextLineDialog.popup(lg["NOTES"], parent=self)
             if result is not None:
                 db_update_field(
@@ -587,9 +604,11 @@ class CourseEditorPage(Page):
         ### LENGTH (LESSONS) --- own handler: on_lesson_length_ ...
         ### TIME (LESSONS)
         elif object_name == "wish_time":
-            l = self.current_lesson.LESSON_INFO
+            lg = self.current_lesson[1]
+            llist = lg["lessons"]
+            lthis = llist[self.current_lesson[2]]
             result = DayPeriodDialog.popup(
-                start_value=l["TIME"],
+                start_value=lthis["TIME"],
                 parent=self
             )
             if result is not None:
@@ -597,9 +616,9 @@ class CourseEditorPage(Page):
                     "LESSONS",
                     "TIME",
                     result,
-                    id=l["id"]
+                    id=lthis["id"]
                 )
-                l["TIME"] = result
+                lthis["TIME"] = result
             if result is not None:
                 obj.setText(result)
         ### PARALLEL (LESSONS)
@@ -608,7 +627,9 @@ class CourseEditorPage(Page):
                 self.current_parallel_tag, parent=self
             )
             if result is not None:
-                lid=self.current_lesson.LESSON_INFO["id"]
+                lg = self.current_lesson[1]
+                llist = lg["lessons"]
+                lthis = llist[self.current_lesson[2]]
                 if self.current_parallel_tag.TAG:
                     # There is already a parallel record
                     if result.TAG:
@@ -619,20 +640,20 @@ class CourseEditorPage(Page):
                                 ("TAG", result.TAG),
                                 ("WEIGHTING", result.WEIGHTING),
                             ],
-                            lesson_id = lid,
+                            lesson_id = lthis["id"],
                         )
                     else:
                         # Remove the record
                         db_delete_rows(
                             "PARALLEL_LESSONS",
-                            lesson_id = lid,
+                            lesson_id = lthis["id"],
                         )
                 else:
                     assert(result.TAG)
                     # Make a new parallel record
                     db_new_row(
                         "PARALLEL_LESSONS",
-                        lesson_id = lid,
+                        lesson_id = lthis["id"],
                         TAG=result.TAG,
                         WEIGHTING=result.WEIGHTING,
                     )
@@ -644,8 +665,11 @@ class CourseEditorPage(Page):
     @Slot(str)
     def on_lesson_length_textActivated(self, i):
         ival = int(i)
-        if self.current_lesson.LESSON_INFO["LENGTH"] != ival:
-            lesson_select_id = self.current_lesson.LESSON_INFO["id"]
+        lg = self.current_lesson[1]
+        llist = lg["lessons"]
+        lthis = llist[self.current_lesson[2]]
+        if lthis["LENGTH"] != ival:
+            lesson_select_id = lthis["id"]
             db_update_field(
                 "LESSONS",
                 "LENGTH", ival,
@@ -654,6 +678,8 @@ class CourseEditorPage(Page):
             # Redisplay lessons
             self.display_lessons(lesson_select_id)
 
+#TODO: Adapt to new db structure.
+# Consider how to add joint elements (can be of any type)
     @Slot()
     def on_new_element_clicked(self):
         """Add an item type: block, simple lesson or workload/payment.
@@ -663,16 +689,18 @@ class CourseEditorPage(Page):
         or a new completely new course is added, a single lesson is also
         added, together with the other necessary db table entries.
         """
+        raise Bug("TODO: update ...")
         workload = True
         simple = True
         blockset = set()
         for cl in self.course_lessons:
-            if cl.ROW_TYPE == -1:
+            if cl[0] == -1:
                 workload = False
-            elif cl.ROW_TYPE == 0:
+            elif cl[0] == 0:
                 simple = False
-            elif cl.ROW_TYPE > 0:
-                blockset.add(cl.LESSON_GROUP_INFO["BlockTag"])
+            elif cl[0] > 0:
+                blockset.add(cl[1]["blocktag"])
+#TODO ...
         bn = BlockNameDialog.popup(
             workload=workload,
             simple=simple,
@@ -726,11 +754,13 @@ class CourseEditorPage(Page):
         If no element (or a workload element) is selected, this button
         should be disabled.
         """
-        li = self.current_lesson.LESSON_INFO
+        lg = self.current_lesson[1]
+        llist = lg["lessons"]
+        lthis = llist[self.current_lesson[2]]
         newid = db_new_row(
             "LESSONS",
-            lesson_group=li["lesson_group"],
-            LENGTH=li["LENGTH"]
+            lesson_group=lg["lesson_group"],
+            LENGTH=lthis["LENGTH"]
         )
         self.display_lessons(newid)
 
@@ -741,34 +771,50 @@ class CourseEditorPage(Page):
         as well. If no element, a workload element or an element with
         only one lesson is selected, this button should be disabled.
         """
-        li = self.current_lesson.LESSON_INFO
-        lid = li["id"]
-        if self.current_lesson.LESSON_GROUP_INFO["nLessons"] < 2:
+        lg = self.current_lesson[1]
+        llist = lg["lessons"]
+        lthis = llist[self.current_lesson[2]]
+        if lg["nLessons"] < 2:
             raise Bug(
-                f"Tried to delete LESSON with id={lid} although it is"
-                " the only one for this element"
+                f"Tried to delete LESSON with id={lthis['id']}"
+                " although it is the only one for this element"
             )
-        db_delete_rows("LESSONS", id=lid)
+        db_delete_rows("LESSONS", id=lthis["id"])
         newid = db_values(
             "LESSONS",
             "id",
-            lesson_group=li["lesson_group"]
+            lesson_group=lg["lesson_group"]
         )[-1]
         self.display_lessons(newid)
 
     @Slot()
     def on_remove_element_clicked(self):
-        """Remove the current element from the current course.
-        If no other courses reference the element (which is always
-        the case for simple lessons and workload/payment elements),
-        the element (LESSON_GROUPS entry) itself will be deleted.
+        """Remove the current element from the current course –
+        that is the COURSE_WORKLOAD entry.
+        If no other courses reference the WORKLOAD entry, this will
+        also be deleted. That can lead to an unreferenced LESSON_GROUPS
+        entry, which must also be removed.
         """
-        cl = self.current_lesson.COURSE_LESSON_INFO["id"]
-        lg = self.current_lesson.COURSE_LESSON_INFO["lesson_group"]
-        db_delete_rows("COURSE_LESSONS", id=cl)
-        records = db_read_full_table("COURSE_LESSONS", lesson_group=lg)[1]
-        if len(records) == 0:
-            db_delete_rows("LESSON_GROUPS", lesson_group=lg)
+        lg = self.current_lesson[1]
+        db_delete_rows("COURSE_WORKLOAD", id=lg["id"])
+        if not db_values(
+            "COURSE_WORKLOAD",
+            "course",
+            workload=lg["workload"]
+        ):
+            db_delete_rows(
+                "WORKLOAD",
+                workload=lg["workload"]
+            )
+            if not db_values(
+                "WORKLOAD",
+                "lesson_group",
+                lesson_group=lg["lesson_group"]
+            ):
+                db_delete_rows(
+                    "LESSON_GROUPS",
+                    lesson_group=lg["lesson_group"]
+                )
         self.display_lessons(-1)
 
 

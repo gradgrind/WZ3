@@ -6,7 +6,7 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>818</width>
+    <width>849</width>
     <height>601</height>
    </rect>
   </property>
@@ -425,14 +425,17 @@
          <property name="text">
           <string/>
          </property>
+         <property name="textAlignment">
+          <set>AlignCenter</set>
+         </property>
          <property name="icon">
           <iconset>
-           <normaloff>../icons/lesson.svg</normaloff>../icons/lesson.svg</iconset>
+           <normaloff>../icons/cash0a.svg</normaloff>../icons/cash0a.svg</iconset>
          </property>
         </item>
         <item row="0" column="1">
          <property name="text">
-          <string>1</string>
+          <string>–</string>
          </property>
          <property name="textAlignment">
           <set>AlignCenter</set>
@@ -440,15 +443,15 @@
         </item>
         <item row="0" column="2">
          <property name="text">
-          <string/>
-         </property>
-         <property name="textAlignment">
-          <set>AlignCenter</set>
+          <string>!</string>
          </property>
         </item>
         <item row="1" column="0">
          <property name="text">
           <string/>
+         </property>
+         <property name="textAlignment">
+          <set>AlignCenter</set>
          </property>
          <property name="icon">
           <iconset>
@@ -457,7 +460,7 @@
         </item>
         <item row="1" column="1">
          <property name="text">
-          <string>2</string>
+          <string>1</string>
          </property>
          <property name="textAlignment">
           <set>AlignCenter</set>
@@ -467,17 +470,17 @@
          <property name="text">
           <string/>
          </property>
-         <property name="textAlignment">
-          <set>AlignCenter</set>
-         </property>
         </item>
         <item row="2" column="0">
          <property name="text">
           <string/>
          </property>
+         <property name="textAlignment">
+          <set>AlignCenter</set>
+         </property>
          <property name="icon">
           <iconset>
-           <normaloff>../icons/lesson_block.svg</normaloff>../icons/lesson_block.svg</iconset>
+           <normaloff>../icons/lesson.svg</normaloff>../icons/lesson.svg</iconset>
          </property>
         </item>
         <item row="2" column="1">
@@ -490,24 +493,24 @@
         </item>
         <item row="2" column="2">
          <property name="text">
-          <string>GHW @ 07G</string>
-         </property>
-         <property name="textAlignment">
-          <set>AlignCenter</set>
+          <string/>
          </property>
         </item>
         <item row="3" column="0">
          <property name="text">
           <string/>
          </property>
+         <property name="textAlignment">
+          <set>AlignCenter</set>
+         </property>
          <property name="icon">
           <iconset>
-           <normaloff>../icons/cash0a.svg</normaloff>../icons/cash0a.svg</iconset>
+           <normaloff>../icons/lesson_block.svg</normaloff>../icons/lesson_block.svg</iconset>
          </property>
         </item>
         <item row="3" column="1">
          <property name="text">
-          <string>–</string>
+          <string>2</string>
          </property>
          <property name="textAlignment">
           <set>AlignCenter</set>
@@ -515,10 +518,7 @@
         </item>
         <item row="3" column="2">
          <property name="text">
-          <string/>
-         </property>
-         <property name="textAlignment">
-          <set>AlignCenter</set>
+          <string>! GHW @ 07G</string>
          </property>
         </item>
        </widget>

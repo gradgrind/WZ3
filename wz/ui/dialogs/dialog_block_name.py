@@ -84,11 +84,22 @@ class BlockNameDialog(QDialog):
        A new block-name will cause a new block lesson_group to be built
        and a single lesson will be added to it.
 
+    1a) It is also possible to tag onto an existing WORKLOAD entry by
+       selecting an existing JOINT_TAG.
+
+    1b) It may be possible to set a JOINT_TAG on a new entry (it would
+       have to be an unused one).
+
     2) A block lesson_group is to be renamed. This of course applies to
        all courses connected to the lesson_group. The selected block-name
        mustn't already be in use. The current block-name is passed in as
        parameter <blocktag>.
     
+    2a) Any existing entry may have a JOINT_TAG added or an existing one
+       changed. The new tag mustn't be in use already. It is probably
+       not a good idea to allow an existing tag to be removed – that
+       would make it difficult to find the item.
+
     This dialog itself causes no database changes, that must be done by
     the calling code on the basis of the returned value.
     If the dialog is cancelled, <None> is returned and there should be
@@ -193,7 +204,7 @@ class BlockNameDialog(QDialog):
             self.pb_accept.setEnabled(False)
         else:
             # Disable the accept button if the block-name is in
-            # the <self.blocks> list.
+            # the <self.blocks> set.
             for bt in self.blocks:
                 if bt.sid == self.sid and bt.tag == btag:
                     self.pb_accept.setEnabled(False)
@@ -251,7 +262,13 @@ class BlockNameDialog(QDialog):
         simple: bool=False,
         blocks: set[BlockTag]=None
     ) -> Optional[BlockTag]:
-        """Open the dialog.
+        """Open the dialog. Without <blocktag> a new entry is to be
+        created.
+        Otherwise an existing entry is to be modified.
+        If <workload> is true, a new workload/pay entry is possible.
+        If <simple> is true, a new simple lesson item is possible.
+        <blocks> can provide a set of <BlockTag> items which are not
+        acceptable for joining when adding a new entry.
         """
         self.result = None
         self.existing_lesson_group = -1
@@ -272,7 +289,7 @@ class BlockNameDialog(QDialog):
             tag0 = ""
             if not workload:
                 self.only_pay.hide()
-            self.blocks = blocks or []
+            self.blocks = blocks or set()
             self.setWindowTitle(T["NEW_ITEM"])
 
         ## Populate the subject chooser

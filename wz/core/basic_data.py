@@ -1,5 +1,5 @@
 """
-core/basic_data.py - last updated 2023-03-23
+core/basic_data.py - last updated 2023-03-27
 
 Handle caching of the basic data sources
 
@@ -41,12 +41,9 @@ SHARED_DATA = {}
 DECIMAL_SEP = CONFIG["DECIMAL_SEP"]
 __FLOAT = f"[1-9]?[0-9](?:{DECIMAL_SEP}[0-9]{{1,3}})?"
 PAYMENT_FORMAT = QRegularExpression(f"^{__FLOAT}$")
-PAYMENT_MAX = 30.0
 __TAG_CHAR = "[A-Za-z0-9_.]"
 TAG_FORMAT = QRegularExpression(f"^{__TAG_CHAR}+$")
 BLOCK_TAG_FORMAT = QRegularExpression(f"^{__TAG_CHAR}*$")
-PAYMENT_TAG_FORMAT = QRegularExpression(f"^{__TAG_CHAR}*(?:/{__FLOAT})?$")
-NO_SUBJECT = "-----"
 
 ### -----
 
@@ -359,51 +356,55 @@ def get_payment_weights() -> KeyValueList:
     return payment_weights
 
 
-class Workload:
-    def __init__(self, PAY_TAG:str):
+class Workload(NamedTuple):
+    PAY_TAG: str
+    NLESSONS: int
+    PAY_FACTOR_TAG: str
+    PAY_FACTOR: float
+    PAYMENT: float
+
+    @classmethod
+    def build(cls, pay_tag:str):
         """Check the validity of the argument and extract the component
         parts. The results are saved as attributes.
         If any errors are detected, return a special "error" result:
             attribute PAY_TAG is then "!".
         """
-        self.PAY_TAG = PAY_TAG
-        self.NLESSONS = 0
-        self.PAYMENT = 0.0
-        self.PAY_FACTOR_TAG = ""
-        self.PAY_FACTOR = 0.0
-        if PAY_TAG:
+        NL = 0
+        PY = 0.0
+        PFT = ""
+        PF = 0.0
+        if pay_tag:
             try:
-                n, f = PAY_TAG.split("*", 1)
+                n, f = pay_tag.split("*", 1)
             except ValueError:
                 try:
-                    d = float(PAY_TAG.replace(",", "."))
+                    d = float(pay_tag.replace(",", "."))
                     if d < 0.1 or d > 50.0:
                         raise ValueError
                 except ValueError:
-                    self.PAY_TAG = "!"
+                    pay_tag = "!"
                     REPORT(
                         "ERROR",
-                        T["INVALID_PAY_TAG"].format(tag=PAY_TAG)
+                        T["INVALID_PAY_TAG"].format(tag=pay_tag)
                     )
-                    return
-                self.PAYMENT = d
-                return
+                else:
+                    PY = d
             else:
                 if n == ".":
                     # use actual number of lessons
-                    self.NLESSONS = -1
+                    NL = -1
                 else:
                     try:
-                        self.NLESSONS = int(n)
-                        if self.NLESSONS < 1:
+                        NL = int(n)
+                        if NL < 1:
                             raise ValueError
                     except ValueError:
-                        self.PAY_TAG = "!"
+                        pay_tag = "!"
                         REPORT(
                             "ERROR",
-                            T["INVALID_PAY_TAG"].format(tag=PAY_TAG)
+                            T["INVALID_PAY_TAG"].format(tag=pay_tag)
                         )
-                        return
                 try:
                     v = get_payment_weights().map(f)
                     fd = float(v.replace(",", "."))
@@ -414,19 +415,19 @@ class Workload:
                         "ERROR",
                         T["UNKNOWN_PAYMENT_WEIGHT"].format(key=f)
                     )
-                    self.PAY_TAG = "!"
-                    return
+                    pay_tag = "!"
                 except ValueError:
                     REPORT(
                         "ERROR",
                         T["INVALID_PAYMENT_WEIGHT"].format(key=f, val=v)
                     )
-                    self.PAY_TAG = "!"
-                    return
-                self.PAY_FACTOR_TAG = f
-                self.PAY_FACTOR = fd
-                if self.NLESSONS > 0:
-                    self.PAYMENT = fd * self.NLESSONS
+                    pay_tag = "!"
+                else:
+                    PFT = f
+                    PF = fd
+                    if NL > 0:
+                        PY = fd * NL
+        return cls(pay_tag, NL, PFT, PF, PY)
 
     def payment(self, nlessons:int=None):
         if nlessons:

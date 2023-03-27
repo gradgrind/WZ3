@@ -1,7 +1,7 @@
 """
 ui/dialogs/dialog_workload.py
 
-Last updated:  2023-03-26
+Last updated:  2023-03-27
 
 Supporting "dialog" for the course editor – set workload/pay.
 
@@ -42,8 +42,6 @@ if __name__ == "__main__":
 
 from typing import Optional
 from core.basic_data import (
-    PAYMENT_FORMAT,
-    PAYMENT_TAG_FORMAT,
     get_payment_weights,
     Workload,
 )
@@ -53,7 +51,6 @@ from ui.ui_base import (
     QDialogButtonBox,
     ### QtGui:
     ### QtCore:
-    QRegularExpressionValidator,
     ### other
     uic,
     Slot,
@@ -90,9 +87,10 @@ class WorkloadDialog(QDialog):
         self.result = None
         self.suppress_events = True
         self.val0 = start_value
+        self.IN.setText(start_value)
         self.pb_reset.setVisible(bool(self.val0))
         # Check and decode initial value
-        w0 = Workload(start_value)
+        w0 = Workload.build(start_value)
         self.suppress_callbacks = True
         if w0.PAY_FACTOR_TAG:
             self.pay_factor.setCurrentIndex(
@@ -133,7 +131,7 @@ class WorkloadDialog(QDialog):
     @Slot(int)
     def on_toolBox_currentChanged(self, i):
         self.update_val()
-    
+
     @Slot(int)
     def on_nlessons_valueChanged(self, i):
         self.update_val()
@@ -163,9 +161,8 @@ class WorkloadDialog(QDialog):
         elif i == 1:
             # simple number
             self.val = self.payment.cleanText()
-        changed = self.val != self.val0
-        self.pb_accept.setEnabled(changed)
-        # print("NEW VAL:", changed, self.val)
+        self.OUT.setText(self.val)
+        self.pb_accept.setEnabled(self.val != self.val0)
 
     def reset(self):
         """Return an "empty" value."""
@@ -184,6 +181,7 @@ if __name__ == "__main__":
     open_database()
     print("----->", WorkloadDialog.popup(""))
     print("----->", WorkloadDialog.popup(".*HuKl"))
+    print("----->", WorkloadDialog.popup("1,2"))
     print("----->", WorkloadDialog.popup("1.23456"))
     print("----->", WorkloadDialog.popup("1*HuEp"))
     print("----->", WorkloadDialog.popup("Fred"))

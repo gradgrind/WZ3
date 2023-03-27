@@ -11,7 +11,7 @@
    </rect>
   </property>
   <property name="windowTitle">
-   <string>Blocknamen ändern</string>
+   <string>Blocknamen bearbeiten</string>
   </property>
   <layout class="QVBoxLayout" name="verticalLayout_2">
    <item>

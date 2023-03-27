@@ -220,7 +220,8 @@ template_engine.template_sub: {
 }
 
 ui.dialogs.dialog_block_name: {
-    NEW_ITEM:       "Unterricht, Block oder Deputat"
+    NEW_ITEM:       "Neu: Unterricht, Block oder Deputat"
+    UPDATE_ITEM:    "Blockfach oder -kennzeichen ändern"
 }
 
 ui.dialogs.dialog_choose_one_room: {

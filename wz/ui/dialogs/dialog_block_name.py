@@ -48,6 +48,7 @@ from core.basic_data import (
 from core.db_access import (
     db_read_fields,
     db_read_unique_entry,
+    db_read_unique_field,
 )
 from ui.ui_base import (
     ### QtWidgets:
@@ -179,6 +180,7 @@ class BlockNameDialog(QDialog):
         )
         super().accept()
 
+#TODO ...
     def init_courses(self, btag):
         self.course_map = {}
         self.course_ids = []
@@ -191,6 +193,8 @@ class BlockNameDialog(QDialog):
             self.list_lessons.clear()
             self.pb_accept.setEnabled(True)
             return
+
+#TODO: Fix this! There is no COURSE_LESSONS table any more ...
         course_refs = db_read_fields(
             "COURSE_LESSONS",
             ["id", "course", "ROOM"],
@@ -258,13 +262,17 @@ class BlockNameDialog(QDialog):
     def activate(
         self,
         blocktag: BlockTag=None,
+        jointag: str=None,
         workload: bool=False,
         simple: bool=False,
         blocks: set[BlockTag]=None
     ) -> Optional[BlockTag]:
         """Open the dialog. Without <blocktag> a new entry is to be
         created.
-        Otherwise an existing entry is to be modified.
+        If <jointag> is passed (also ""), an existing entry is to be
+        modified.
+        Otherwise a new entry is to be created – in this case also
+        <blocktag> must be empty. 
         If <workload> is true, a new workload/pay entry is possible.
         If <simple> is true, a new simple lesson item is possible.
         <blocks> can provide a set of <BlockTag> items which are not
@@ -274,48 +282,91 @@ class BlockNameDialog(QDialog):
         self.existing_lesson_group = -1
         self.disable_triggers = True
         self.blocktag = blocktag
-        if blocktag:
-            if simple:
-                raise Bug("BlockNameDialog: simple=True with block-tag")
-            if workload:
-                raise Bug("BlockNameDialog: workload=True with block-tag")
-            if blocks:
-                raise Bug("BlockNameDialog: blocks supplied with block-tag")
-            sid0 = blocktag.sid
-            tag0 = blocktag.tag
-            self.only_pay.hide()
-        else:
-            sid0 = ""
-            tag0 = ""
+
+        blocktag_select = True  # flag to enable block-name widgets
+        if jointag is None:
+            # Create a new entry – or "tag on" to an existing one.
+            self.setWindowTitle(T["NEW_ITEM"])
             if not workload:
                 self.only_pay.hide()
+            assert not blocktag, \
+                "Creating entry, not expecting existing block-name"
+            sid0 = ""
+            tag0 = ""
             self.blocks = blocks or set()
-            self.setWindowTitle(T["NEW_ITEM"])
+            print("TODO1")
 
-        ## Populate the subject chooser
-        self.sid_list = []
-        self.block_subject.clear()
-        for sid, name in get_subjects():
-            if sid[0] == "-":
-                continue
-            self.sid_list.append(sid)
-            self.block_subject.addItem(name)
-        if blocktag:
-            i = self.sid_list.index(sid0)
-            self.block_subject.setCurrentIndex(i)
         else:
-            self.block_subject.setCurrentIndex(-1)
+            # Update an existing entry.
+            self.setWindowTitle(T["UPDATE_ITEM"])
+            self.only_pay.hide()
+            assert not simple, \
+                "Updating entry, can't change entry type"
+            assert not workload, \
+                "Updating entry, can't change entry type"
+            assert not blocks, \
+                "Updating entry, forbidden blocks not expected"
+            if blocktag:
+                sid0 = blocktag.sid
+                tag0 = blocktag.tag
+            else:
+                # Either a simple entry or a workload/pay entry
+                blocktag_select = False
+#?
+                sid0 = ""
+                tag0 = ""
+
+            print("TODO2")
+
+        self.block_subject.setEnabled(blocktag_select)
+        self.block_tag.setEnabled(blocktag_select)
+
+
+
+        ## Populate the subject chooser, if enabled
+        self.block_subject.clear()
+        if blocktag_select:
+            self.sid_list = []
+            for sid, name in get_subjects():
+                if sid[0] == "-":
+                    continue
+                self.sid_list.append(sid)
+                self.block_subject.addItem(name)
+            if blocktag:
+                i = self.sid_list.index(sid0)
+                self.block_subject.setCurrentIndex(i)
+            else:
+                self.block_subject.setCurrentIndex(-1)
+
         self.set_sid(sid0)
         self.block_tag.setCurrentText(tag0)
+
         self.table_courses.setRowCount(0)
         self.list_lessons.clear()
         self.disable_triggers = False
         self.pb_accept.setEnabled(simple)
+
+# How to deal with interaction between jointag and blockname?
+
+# Collect existing jointags:
+        jointag_map = {}
+        for j, w, l in db_read_fields(
+            "WORKLOAD",
+            ["JOIN_TAG", "workload", "lesson_group"]
+        ):
+            if j:
+#                db_read_unique_field("LESSON_GROUPS", field
+# Of course, LESSON_GROUPS is also being read elsewhere, for sid ...
+
+                jointag_map[j] = (w, l) # + blockname?
+        print("??? jointag_map:", jointag_map)
+
         if blocktag:
             self.init_courses(tag0)
         self.exec()
         return self.result
 
+#?
     def accept(self):
         i = self.block_subject.currentIndex()
         if i < 0:
@@ -343,10 +394,14 @@ if __name__ == "__main__":
     ))
     print("----->", BlockNameDialog.popup(workload=True, simple=True))
     print("----->", BlockNameDialog.popup(
-        blocktag=BlockTag.build("KoRa", "")
+        blocktag=BlockTag.build("KoRa", ""), jointag=""
     ))
     print("----->", BlockNameDialog.popup(
-        blocktag=BlockTag.build("ZwE", "09G10G")
+        blocktag=BlockTag.build("ZwE", "09G10G"), jointag=""
     ))
-    print("----->", BlockNameDialog.popup(blocktag=BlockTag.build("Hu", "")))
-    print("----->", BlockNameDialog.popup(blocktag=BlockTag.build("XXX", "")))
+    print("----->", BlockNameDialog.popup(
+        blocktag=BlockTag.build("Hu", ""), jointag=""
+    ))
+    print("----->", BlockNameDialog.popup(
+        blocktag=BlockTag.build("XXX", ""), jointag=""
+    ))

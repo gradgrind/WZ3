@@ -13,7 +13,7 @@
   <property name="windowTitle">
    <string>Blocknamen ändern</string>
   </property>
-  <layout class="QVBoxLayout" name="verticalLayout_2" stretch="1,2,1">
+  <layout class="QVBoxLayout" name="verticalLayout_2">
    <item>
     <layout class="QHBoxLayout" name="horizontalLayout" stretch="1,0,1">
      <item>
@@ -31,7 +31,7 @@
        <item>
         <widget class="QLabel" name="label_2">
          <property name="text">
-          <string>Kennzeichen:</string>
+          <string>Block-Kennzeichen:</string>
          </property>
         </widget>
        </item>
@@ -46,29 +46,35 @@
         </widget>
        </item>
        <item>
-        <spacer name="verticalSpacer">
-         <property name="orientation">
-          <enum>Qt::Vertical</enum>
-         </property>
-         <property name="sizeType">
-          <enum>QSizePolicy::MinimumExpanding</enum>
-         </property>
-         <property name="sizeHint" stdset="0">
+        <widget class="QFrame" name="frame">
+         <property name="minimumSize">
           <size>
-           <width>20</width>
-           <height>30</height>
+           <width>0</width>
+           <height>0</height>
           </size>
          </property>
-        </spacer>
-       </item>
-       <item>
-        <widget class="QPushButton" name="only_pay">
-         <property name="toolTip">
-          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;nur Deputat&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+         <property name="frameShape">
+          <enum>QFrame::StyledPanel</enum>
          </property>
-         <property name="text">
-          <string>Ohne Stunden</string>
+         <property name="frameShadow">
+          <enum>QFrame::Raised</enum>
          </property>
+         <layout class="QVBoxLayout" name="verticalLayout_5">
+          <item>
+           <widget class="QLabel" name="label_4">
+            <property name="text">
+             <string>Kurskennung:</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QComboBox" name="JOINT_TAG">
+            <property name="editable">
+             <bool>true</bool>
+            </property>
+           </widget>
+          </item>
+         </layout>
         </widget>
        </item>
       </layout>
@@ -201,14 +207,32 @@
     </layout>
    </item>
    <item>
-    <widget class="QDialogButtonBox" name="buttonBox">
-     <property name="orientation">
-      <enum>Qt::Horizontal</enum>
-     </property>
-     <property name="standardButtons">
-      <set>QDialogButtonBox::Cancel|QDialogButtonBox::Ok</set>
-     </property>
-    </widget>
+    <layout class="QHBoxLayout" name="horizontalLayout_2">
+     <item>
+      <widget class="QPushButton" name="only_pay">
+       <property name="toolTip">
+        <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;nur Deputatsstunden&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+       </property>
+       <property name="text">
+        <string>ohne Stunden</string>
+       </property>
+       <property name="icon">
+        <iconset>
+         <normaloff>../icons/cash0a.svg</normaloff>../icons/cash0a.svg</iconset>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QDialogButtonBox" name="buttonBox">
+       <property name="orientation">
+        <enum>Qt::Horizontal</enum>
+       </property>
+       <property name="standardButtons">
+        <set>QDialogButtonBox::Cancel|QDialogButtonBox::Ok</set>
+       </property>
+      </widget>
+     </item>
+    </layout>
    </item>
   </layout>
  </widget>

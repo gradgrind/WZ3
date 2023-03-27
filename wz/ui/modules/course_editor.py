@@ -689,7 +689,6 @@ class CourseEditorPage(Page):
         or a new completely new course is added, a single lesson is also
         added, together with the other necessary db table entries.
         """
-        raise Bug("TODO: update ...")
         workload = True
         simple = True
         blockset = set()
@@ -700,18 +699,22 @@ class CourseEditorPage(Page):
                 simple = False
             elif cl[0] > 0:
                 blockset.add(cl[1]["blocktag"])
-#TODO ...
         bn = BlockNameDialog.popup(
             workload=workload,
             simple=simple,
             blocks=blockset,
             parent=self,
         )
+        REPORT("WARNING", f"TBI: NEW ELEMENT „{bn}“")
+        return
+
+#TODO ...
+
         if bn:
             btag, lg = bn
             if lg < 0:
                 if btag.sid:
-                    lg = db_new_row(
+                    lesson_group = db_new_row(
                         "LESSON_GROUPS",
                         BLOCK_SID=btag.sid,
                         BLOCK_TAG=btag.tag,
@@ -719,30 +722,37 @@ class CourseEditorPage(Page):
                     )
                 elif btag.tag == "$":
                     # Workload/payment, no lesson_group
-                    cl = db_new_row(
-                        "COURSE_LESSONS",
-                        course=self.course_id,
-                    )
-                    # Redisplay lessons
-                    self.display_lessons(0)
-                    return
+                    lesson_group = None
+                    l = 0
                 else:
                     # "Simple" lesson_group
-                    lg = db_new_row(
+                    lesson_group = db_new_row(
                         "LESSON_GROUPS",
                         NOTES="",
                     )
-                l = db_new_row(
-                    "LESSONS",
-                    lesson_group=lg,
-                    LENGTH=1,
-                )
+                if lesson_group:
+                    l = db_new_row(
+                        "LESSONS",
+                        lesson_group=lesson_group,
+                        LENGTH=1,
+                    )
             else:
                 l = -1
-            cl = db_new_row(
-                "COURSE_LESSONS",
+            if lesson_group:
+                wld = db_new_row(
+                    "WORKLOAD",
+                    lesson_group=lesson_group,
+                    PAY_TAG="",
+                )
+            else:
+                wld = db_new_row(
+                    "WORKLOAD",
+                    PAY_TAG="",
+                )
+            cw = db_new_row(
+                "COURSE_WORKLOAD",
                 course=self.course_id,
-                lesson_group=lg,
+                workload=wld,
             )
             # Redisplay lessons
             self.display_lessons(l)

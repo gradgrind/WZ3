@@ -1,7 +1,7 @@
 """
 core/course_data.py
 
-Last updated:  2023-03-26
+Last updated:  2023-03-27
 
 Support functions dealing with courses, lessons, etc.
 
@@ -43,10 +43,7 @@ from core.db_access import (
     db_read_full_table,
     db_read_unique_entry,
 )
-from core.basic_data import (
-    Workload,
-    BlockTag,
-)
+from core.basic_data import BlockTag
 
 ### -----
 
@@ -69,7 +66,7 @@ def filtered_courses(filter:str, value:str) -> list[dict]:
 
 
 def course_activities(course_id:int
-) -> tuple[Optional[tuple], Optional[tuple], list[dict]]:
+) -> tuple[Optional[dict], Optional[dict], list[dict], dict]:
     """Seek lessons and workload/pament info for the given course
     (<course_id>).
     There can be a (single) workload/payment entry.
@@ -98,28 +95,25 @@ def course_activities(course_id:int
     workload_element = None
     simple_element = None
     block_elements = []
+    workload_map = {}   # record usage of WORKLOAD entries
     fields, records = db_read_full_table(
         "COURSE_WORKLOAD", course=course_id
     )
     for rec in records:
+        # The uniqueness of a COURSES/WORKLOAD connection
+        # should be enforced by the UNIQUE constraint on the
+        # COURSE_WORKLOAD table ("course" + "workload" fields).
         cwdict = {fields[i]: val for i, val in enumerate(rec)}
+        w = cwdict["workload"]
+        workload_map[w] = cwdict
         fields_w, record_w = db_read_unique_entry(
-            "WORKLOAD", workload=cwdict["workload"]
+            "WORKLOAD", workload=w
         )
-        #wdict = {fields_w[i]: val for i, val in enumerate(record_w)}
-        # Combined <dict>
+        ## Combined <dict> for the COURSE_WORKLOAD and WORKLOAD entries
         for i, val in enumerate(record_w):
             cwdict[fields_w[i]] = val
-
-        print("\n  ---", cwdict)
-    return
-
-    if True:
-
-        
-        workload_data = Workload(**cldict)
-        # <cldict> contains workload/payment and room-wish fields
-        lg = cldict["lesson_group"]
+        # <cwdict> contains workload/payment and room-wish fields
+        lg = cwdict["lesson_group"]
         if lg:
             lgfields, lgrecord = db_read_unique_entry(
                 "LESSON_GROUPS", lesson_group=lg
@@ -127,15 +121,14 @@ def course_activities(course_id:int
             lgdata = {
                 lgfields[i]: val for i, val in enumerate(lgrecord)
             }
+            ## Add data from LESSON_GROUPS entry
+            cwdict["lesson_group_data"] = lgdata
             # This contains the block-name, if any
             block_sid = lgdata["BLOCK_SID"]
             block_tag = lgdata["BLOCK_TAG"]
             # The uniqueness of a block name should be enforced by
             # the UNIQUE constraint on the LESSON_GROUPS table
             # ("BLOCK_SID" + "BLOCK_TAG" fields).
-            # The uniqueness of a course/lesson_group connection
-            # should be enforced by the UNIQUE constraint on the
-            # COURSE_LESSONS table ("course" + "lesson_group" fields).
             lfields, lrecords = db_read_full_table(
                 "LESSONS", lesson_group=lg
             )
@@ -143,26 +136,26 @@ def course_activities(course_id:int
                 {lfields[i]: val for i, val in enumerate(lrec)}
                 for lrec in lrecords
             ]
+            ## Add LESSONS data (list)
+            cwdict["lessons"] = lessons
             if block_sid:
-                bt = BlockTag.build(block_sid, block_tag)
-                block_elements.append(
-                    (workload_data, cldict, lgdata, lessons, bt)
-                )
+                cwdict["blocktag"] = BlockTag.build(block_sid, block_tag)
+                block_elements.append(cwdict)
             else:
                 if simple_element:
                     raise Bug(
                         "Multiple entries in COURSE_LESSONS"
                         f"for simple lesson item, course {course_id}"
                     )
-                simple_element = (workload_data, cldict, lgdata, lessons)
+                simple_element = cwdict
         else:
             # payment/workload item
             if workload_element:
                 raise Bug("Multiple entries in COURSE_LESSONS"
                     f"for workload item, course {course_id}"
                 )
-            workload_element = (workload_data, cldict)
-    return (workload_element, simple_element, block_elements)
+            workload_element = cwdict
+    return (workload_element, simple_element, block_elements, workload_map)
 
 
 # --#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#
@@ -173,21 +166,18 @@ if __name__ == "__main__":
 
     for course in filtered_courses("TEACHER", "AE"):
         print("\n\n *** COURSE:", course["course"], course)
-
-        course_activities(course["course"])
-        continue
-
-        w, l, b = course_activities(course["course"])
+        w, l, b, wm = course_activities(course["course"])
         if w:
-            print("  ***", str(w[0]), w[1:])
+            print("  ***", w)
         else:
             print("  ***")
         if l:
-            print("  ---", str(l[0]), l[1:])
+            print("  ---", l)
         else:
             print("  ---")
         if b:
             for bi in b:
-                print("  +++", str(bi[0]) or "-$-", bi[1:])
+                print("  +++", bi)
         else:
             print("  +++ []")
+        print("  ###", list(wm))

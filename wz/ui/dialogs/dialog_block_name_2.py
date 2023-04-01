@@ -57,6 +57,7 @@ from ui.ui_base import (
     QDialogButtonBox,
     QHeaderView,
     QTableWidgetItem,
+    QAbstractItemView,
     ### QtGui:
     ### QtCore:
     Qt,
@@ -186,10 +187,16 @@ class BlockNameDialog(QDialog):
         """
 # This could be quite a lot ... but whether it is more efficient to
 # read just parts is not so clear ...
+        self.workload2courses = {}
+#TODO: id not really necessary in this module
         for _id, course, workload in db_read_fields(
             "COURSE_WORKLOAD", ("id", "course", "workload")
         ):
             print("$CW$$", _id, course, workload)
+            try:
+                self.workload2courses[workload].append(course)
+            except KeyError:
+                self.workload2courses[workload] = [course]
 
         self.lesson_group2workloads = {}
         self.workloads = {}
@@ -220,15 +227,26 @@ class BlockNameDialog(QDialog):
 # Need subject (sid) of course for which the entry is to be made!
 # self.course_sid?
 # Maybe on-demand and cached?
-        self.course_sid = "Ma"
-        for course, CLASS, GRP, TEACHER in db_read_fields(
-            "COURSES", ("course", "CLASS", "GRP", "TEACHER"),
-            SUBJECT=self.course_sid 
-        ):
-            print("$Cs$$", course, CLASS, GRP, TEACHER)
+#        self.course_sid = "Ma"
+#        for course, CLASS, GRP, TEACHER in db_read_fields(
+#            "COURSES", ("course", "CLASS", "GRP", "TEACHER"),
+#            SUBJECT=self.course_sid 
+#        ):
+#            print("$Cs$$", course, CLASS, GRP, TEACHER)
 # and actually only those with corresponding entries ...
 # What about getting the possible workloads first?
 
+        self.course_sid = "Ma"
+        self.same_sid_courses = []
+        self.course_map = {}
+        for course, CLASS, GRP, sid, tid in db_read_fields(
+            "COURSES", ("course", "CLASS", "GRP", "SUBJECT", "TEACHER")
+        ):
+            # print("$Cs$$", course, CLASS, GRP, sid, tid)
+            if sid == self.course_sid:
+                self.same_sid_courses.append((CLASS, GRP, tid, course))
+            self.course_map[course] = (course, CLASS, GRP, sid, tid)
+        print("§same_sid_courses:", self.same_sid_courses)
 
         # Which lesson-group?
 #        if self.choose_block:
@@ -246,32 +264,107 @@ class BlockNameDialog(QDialog):
 
 #TODO
     def set_courses(self):
-        self.table_courses.setRowCount(0)
-
+#TODO? Maybe rather at the beginning of <show_lesssons>?
+        self.list_lessons.clear()
+        self.course_table_data = []
         if self.choose_block:
+            self.table_courses.setSelectionMode(
+                QAbstractItemView.SelectionMode.NoSelection
+            )
             try:
                 lg = self.block2lesson_group[self.block_key]
             except KeyError:
                 # the key is new
-                pass
+                wlist = []
 #TODO
             else:
                 # the key is already defined
-                pass
+                self.show_lessons(lg)
                 wlist = self.lesson_group2workloads[lg]
 #TODO
 
-        elif self.choose_onlypay:
-#TODO
-            wlist = self.lesson_group2workloads[0]
-
         else:
-            # simple lesson
-#TODO
-            wlist = []
-            for lg in self.noblock_lesson_groups:
-                wlist += self.lesson_group2workloads[lg]
+            self.table_courses.setSelectionMode(
+                QAbstractItemView.SelectionMode.SingleSelection
+            )
 
+            if self.choose_onlypay:
+#TODO
+                wlist = self.lesson_group2workloads[0]
+
+            else:
+                # simple lesson
+#TODO
+                wlist = []
+                for lg in self.noblock_lesson_groups:
+                    wl = self.lesson_group2workloads[lg]
+                    assert(len(wl) == 1)
+                    wlist.append(wl[0])
+
+        for w in wlist:
+            cl = self.workload2courses[w]
+            for c in cl:
+                cdata = self.course_map[c]
+                self.course_table_data.append((cdata, w))
+
+
+
+    def show_courses(self):
+        """Display the courses corresponding to the "filter" values.
+        Their data is stored as a list in <self.course_table_data>.
+        """
+        self.table_courses.setRowCount(len(self.course_table_data))
+        for r, cw in enumerate(self.course_table_data):
+            cdata, workload = cw    # cdata: (course, CLASS, GRP, sid, tid)
+            # class field
+            if not (tw := self.table_courses.item(r, 0)):
+                tw = QTableWidgetItem()
+                tw.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+                self.table_courses.setItem(r, 0, tw)
+            tw.setText(cdata[1])
+            # group field
+            if not (tw := self.table_courses.item(r, 1)):
+                tw = QTableWidgetItem()
+                tw.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+                self.table_courses.setItem(r, 1, tw)
+            tw.setText(cdata[2])
+            # subject field
+            if not (tw := self.table_courses.item(r, 2)):
+                tw = QTableWidgetItem()
+                self.table_courses.setItem(r, 2, tw)
+            tw.setText(get_subjects().map(cdata[3]))
+            # teacher field
+            if not (tw := self.table_courses.item(r, 3)):
+                tw = QTableWidgetItem()
+                self.table_courses.setItem(r, 3, tw)
+            tw.setText(get_teachers().name(cdata[4]))
+            # room-choice field
+            if not (tw := self.table_courses.item(r, 4)):
+                tw = QTableWidgetItem()
+                self.table_courses.setItem(r, 4, tw)
+            tw.setText(self.workloads[workload][2])
+
+    def show_lessons(self, lesson_group:int):
+        """Display the individual lessons for the given <lesson_group> value.
+        """
+        for l, t in db_read_fields(
+            "LESSONS",
+            ["LENGTH", "TIME"],
+            lesson_group=lesson_group
+        ):
+            text = str(l)
+            if t:
+                text += f"  @ {t}"
+            self.list_lessons.addItem(text)
+
+
+    def on_table_courses_currentItemChanged(self, newitem, olditem):
+        print("TODO: COURSE ROW", newitem.row())
+        if self.choose_block:
+            print("TODO: Unexpected <on_table_courses_currentItemChanged>")
+            return
+        cdata = self.course_table_data[newitem.row()]
+        self.show_lessons(cdata["lesson_group"])
 
 
     @Slot(int)

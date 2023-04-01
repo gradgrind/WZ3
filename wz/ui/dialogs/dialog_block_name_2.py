@@ -126,11 +126,11 @@ class BlockNameDialog(QDialog):
     the existing LESSON_GROUPS entry for the block tag.
     """
     @classmethod
-    def popup(cls, parent=None, **kargs):
+    def popup(cls, course_data, parent=None, **kargs):
         d = cls(parent)
-        return d.activate(**kargs)
+        return d.activate(course_data, **kargs)
 
-    def __init__(self, parent=None):
+    def __init__(self, course_data, parent=None):
         super().__init__(parent=parent)
         uic.loadUi(APPDATAPATH("ui/dialog_block_name_2.ui"), self)
         self.table_courses.horizontalHeader().setSectionResizeMode(
@@ -185,19 +185,16 @@ class BlockNameDialog(QDialog):
     def read_data(self):
         """Read all course/lesson data ...
         """
+        self.get_courses(self.course_data["SUBJECT"])
+
+        self.get_lesson_groups()
+
+
+        course_course = course_data["course"]
 # This could be quite a lot ... but whether it is more efficient to
 # read just parts is not so clear ...
-        self.workload2courses = {}
-#TODO: id not really necessary in this module
-        for _id, course, workload in db_read_fields(
-            "COURSE_WORKLOAD", ("id", "course", "workload")
-        ):
-            print("$CW$$", _id, course, workload)
-            try:
-                self.workload2courses[workload].append(course)
-            except KeyError:
-                self.workload2courses[workload] = [course]
 
+#TODO: factor out into small methods
         self.lesson_group2workloads = {}
         self.workloads = {}
         for workload, lg, PAY_TAG, ROOM in db_read_fields(
@@ -211,6 +208,21 @@ class BlockNameDialog(QDialog):
             except KeyError:
                 self.lesson_group2workloads[lg] = [workload]
 
+        self.workload2courses = {}
+        self.course_workloads = []
+#TODO: id not really necessary in this module
+        for _id, course, workload in db_read_fields(
+            "COURSE_WORKLOAD", ("id", "course", "workload")
+        ):
+            print("$CW$$", _id, course, workload)
+            try:
+                self.workload2courses[workload].append(course)
+            except KeyError:
+                self.workload2courses[workload] = [course]
+            if course == course_course:
+                self.course_workloads.append(workload)
+
+    def get_lesson_groups(self):
         self.noblock_lesson_groups = []
         self.block2lesson_group = {}
         for lg, BLOCK_SID, BLOCK_TAG in db_read_fields(
@@ -223,44 +235,6 @@ class BlockNameDialog(QDialog):
             else:
                 self.noblock_lesson_groups.append(lg)
         print("$LG$$ {}:", self.noblock_lesson_groups)
-
-# Need subject (sid) of course for which the entry is to be made!
-# self.course_sid?
-# Maybe on-demand and cached?
-#        self.course_sid = "Ma"
-#        for course, CLASS, GRP, TEACHER in db_read_fields(
-#            "COURSES", ("course", "CLASS", "GRP", "TEACHER"),
-#            SUBJECT=self.course_sid 
-#        ):
-#            print("$Cs$$", course, CLASS, GRP, TEACHER)
-# and actually only those with corresponding entries ...
-# What about getting the possible workloads first?
-
-        self.course_sid = "Ma"
-        self.same_sid_courses = []
-        self.course_map = {}
-        for course, CLASS, GRP, sid, tid in db_read_fields(
-            "COURSES", ("course", "CLASS", "GRP", "SUBJECT", "TEACHER")
-        ):
-            # print("$Cs$$", course, CLASS, GRP, sid, tid)
-            if sid == self.course_sid:
-                self.same_sid_courses.append((CLASS, GRP, tid, course))
-            self.course_map[course] = (course, CLASS, GRP, sid, tid)
-        print("§same_sid_courses:", self.same_sid_courses)
-
-        # Which lesson-group?
-#        if self.choose_block:
-#            lg = db_read_unique_field("LESSON_GROUPS", "lesson_group",
-#                BLOCK_SID=self.block_sid,
-#                BLOCK_TAG=self.block_tag!,
-#            )
-#        elif self.choose_onlypay:
-#            lg = 0
-#        else:
-#            lg = -1 # ??? There are (probably) many
-
-
-
 
 #TODO
     def set_courses(self):
@@ -306,6 +280,34 @@ class BlockNameDialog(QDialog):
             for c in cl:
                 cdata = self.course_map[c]
                 self.course_table_data.append((cdata, w))
+
+
+
+# Need subject (sid) of course for which the entry is to be made!
+# self.course_sid?
+# Maybe on-demand and cached?
+#        self.course_sid = "Ma"
+#        for course, CLASS, GRP, TEACHER in db_read_fields(
+#            "COURSES", ("course", "CLASS", "GRP", "TEACHER"),
+#            SUBJECT=self.course_sid 
+#        ):
+#            print("$Cs$$", course, CLASS, GRP, TEACHER)
+# and actually only those with corresponding entries ...
+# What about getting the possible workloads first?
+
+        # Which lesson-group?
+#        if self.choose_block:
+#            lg = db_read_unique_field("LESSON_GROUPS", "lesson_group",
+#                BLOCK_SID=self.block_sid,
+#                BLOCK_TAG=self.block_tag!,
+#            )
+#        elif self.choose_onlypay:
+#            lg = 0
+#        else:
+#            lg = -1 # ??? There are (probably) many
+
+
+
 
 
 
@@ -577,6 +579,7 @@ class BlockNameDialog(QDialog):
 
     def activate(
         self,
+        course_data: dict,
         blocktag: BlockTag=None,
         jointag: str=None,
         workload: bool=False,
@@ -594,7 +597,7 @@ class BlockNameDialog(QDialog):
         <blocks> can provide a set of <BlockTag> items which are not
         acceptable for joining when adding a new entry.
         """
-#?
+        self.course_data = course_data
         self.read_data()
 
         self.result = None
@@ -667,6 +670,8 @@ class BlockNameDialog(QDialog):
         self.disable_triggers = False
         self.pb_accept.setEnabled(simple)
 
+
+
 #TODO: How to deal with interaction between jointag and blockname?
 # When there is a fixed empty blocktag (modifying a non-block),
 # all existing jointags should be blocked.
@@ -690,23 +695,41 @@ class BlockNameDialog(QDialog):
 #       b) simple
 #       c) block
 
-# Collect existing jointags:
-        self.joint_map = {}
-        for j, l in db_read_fields(
-            "WORKLOAD",
-            ["JOIN_TAG", "lesson_group"]
-        ):
-            if j:
-#                db_read_unique_field("LESSON_GROUPS", field
-# Of course, LESSON_GROUPS is also being read elsewhere, for sid ...
-
-                self.joint_map[j] = l
-        print("??? self.joint_map:", self.joint_map)
+## Collect existing jointags:
+#        self.joint_map = {}
+#        for j, l in db_read_fields(
+#            "WORKLOAD",
+#            ["JOIN_TAG", "lesson_group"]
+#        ):
+#            if j:
+##                db_read_unique_field("LESSON_GROUPS", field
+## Of course, LESSON_GROUPS is also being read elsewhere, for sid ...
+#
+#                self.joint_map[j] = l
+#        print("??? self.joint_map:", self.joint_map)
 
         if blocktag:
             self.init_courses(tag0)
         self.exec()
         return self.result
+
+    def get_courses(self, course_sid:str):
+        """Read all COURSES entries to the mapping <self.course_map>:
+            {course: (CLASS, GRP, SUBJECT, TEACHER), ...}.
+        All entries with SUBJECT==course_sid are also placed in the
+        list <self.same_sid_courses> in the form:
+            [(CLASS, GRP, TEACHER, course)]
+        """
+        self.same_sid_courses = []
+        self.course_map = {}
+        for course, CLASS, GRP, sid, tid in db_read_fields(
+            "COURSES", ("course", "CLASS", "GRP", "SUBJECT", "TEACHER")
+        ):
+            # print("$Cs$$", course, CLASS, GRP, sid, tid)
+            if sid == course_sid:
+                self.same_sid_courses.append((CLASS, GRP, tid, course))
+            self.course_map[course] = (CLASS, GRP, sid, tid)
+        # print("§same_sid_courses:", self.same_sid_courses)
 
 #?
     def accept(self):
@@ -728,22 +751,38 @@ class BlockNameDialog(QDialog):
 if __name__ == "__main__":
     from core.db_access import open_database
     open_database()
-    print("----->", BlockNameDialog.popup())
-    print("----->", BlockNameDialog.popup(workload=True))
+    course_data = {
+        "course": 0,  # invalid
+        "CLASS": "10G",
+        "GRP": "*",
+        "SUBJECT": "Ma",
+        "TEACHER": "AE",
+    }
+    print("----->", BlockNameDialog.popup(course_data))
+    print("----->", BlockNameDialog.popup(course_data, workload=True))
     print("----->", BlockNameDialog.popup(
+        course_data,
         simple=True,
         blocks=[BlockTag.build("KoRa", "")]
     ))
-    print("----->", BlockNameDialog.popup(workload=True, simple=True))
     print("----->", BlockNameDialog.popup(
+        course_data,
+        workload=True,
+        simple=True
+    ))
+    print("----->", BlockNameDialog.popup(
+        course_data,
         blocktag=BlockTag.build("KoRa", ""), jointag=""
     ))
     print("----->", BlockNameDialog.popup(
+        course_data,
         blocktag=BlockTag.build("ZwE", "09G10G"), jointag=""
     ))
     print("----->", BlockNameDialog.popup(
+        course_data,
         blocktag=BlockTag.build("Hu", ""), jointag=""
     ))
     print("----->", BlockNameDialog.popup(
+        course_data,
         blocktag=BlockTag.build("XXX", ""), jointag=""
     ))

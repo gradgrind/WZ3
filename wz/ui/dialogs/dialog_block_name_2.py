@@ -39,7 +39,6 @@ T = TRANSLATIONS("ui.dialogs.dialog_block_name")
 ### +++++
 
 from typing import Optional
-from enum import Enum
 from core.basic_data import (
     BLOCK_TAG_FORMAT,
     get_subjects,
@@ -49,7 +48,7 @@ from core.basic_data import (
 from core.db_access import (
     db_read_fields,
 )
-from core.course_data import CourseLessonData
+from core.course_data_2 import CourseLessonData
 from ui.ui_base import (
     ### QtWidgets:
     QDialog,
@@ -65,11 +64,6 @@ from ui.ui_base import (
     ### other
     uic,
 )
-
-class CHOOSE(Enum):
-    NEW = 1
-    TO_BLOCK = 2
-    TO_TEAM = 3
 
 ### -----
 
@@ -124,14 +118,18 @@ class BlockNameDialog(QDialog):
     the existing LESSON_GROUPS entry for the block tag.
     """
     @classmethod
-    def popup(cls, course_data:dict, workload:int=None, parent=None):
+    def popup(
+        cls,
+        course_data:dict,
+        course_lessons:list[dict],
+        lesson_row:int=-1,
+        parent=None):
         d = cls(parent)
-        return d.activate(course_data, workload)
+        return d.activate(course_data, course_lessons, lesson_row)
 
-    def __init__(self, course_data, parent=None):
+    def __init__(self, parent=None):
         super().__init__(parent=parent)
-        uic.loadUi(APPDATAPATH("ui/dialog_block_name_2.ui"), self)
-        self.rb_inspect.hide()
+        uic.loadUi(APPDATAPATH("ui/dialog_block_name_2a.ui"), self)
         self.table_courses.horizontalHeader().setSectionResizeMode(
             QHeaderView.ResizeMode.ResizeToContents
         )
@@ -140,30 +138,53 @@ class BlockNameDialog(QDialog):
         )
         validator = QRegularExpressionValidator(BLOCK_TAG_FORMAT)
         self.BLOCK_TAG.setValidator(validator)
-        self.choose_group.setId(self.rb_new, CHOOSE.NEW.value)
-        self.choose_group.setId(self.rb_add2block, CHOOSE.TO_BLOCK.value)
-        self.choose_group.setId(self.rb_add2team, CHOOSE.TO_TEAM.value)
 
     def activate(
         self,
         this_course: dict,
-        workload: int
+        lesson_list: list[dict],
+        lesson_row: int
 #TODO: return value???
     ) -> Optional[BlockTag]:
         """Open the dialog.
         Without <workload> a new entry is to be created.
         """
         self.result = None
-        cdata = CourseLessonData(this_course)
-        self.this_course_data = cdata
-        self.this_workload = workload
+        self.this_course = this_course
+        self.lesson_list = lesson_list
+        self.lesson_row = lesson_row
         self.disable_triggers = True
         self.set_block_subject_list()
+        if lesson_row >= 0:
+            # "Inspection" mode, no changes possible except block-name
+            self.rb_inspect.setChecked(True)
+#            self.type_chooser.setEnabled(False)
+#            self.cb_block.setEnabled(False)
+            # Determine item type of <workload> entry
+
+
+            this_data = lesson_list[lesson_row]
+            if this_data["lesson_group"]:
+                lessons = this_data["lessons"]
+#TODO: show lessons
+            else:
+                # no lessons
+                pass
+#TODO: clear lessons
+
+#TODO
+
+        else:
+            self.rb_new.setChecked(True)
+#            self.type_chooser.setEnabled(True)
+#            self.cb_block.setEnabled(True)
+            self.rb_simple.setChecked(True) # default choice
+#TODO
+#?
+#        cdata = CourseLessonData(this_course)
+#        self.this_course_data = cdata
         if workload:
 #TODO?
-            self.rb_inspect.setChecked(True)
-            self.type_chooser.setEnabled(False)
-            self.cb_block.setEnabled(False)
             lg = cdata.workloads[workload][0]
             if lg:
                 if lg in cdata.noblock_lesson_groups:
@@ -177,18 +198,20 @@ class BlockNameDialog(QDialog):
                 self.rb_payonly.setChecked(True)
 #TODO
         else:
-            self.rb_new.setChecked(True)
-            self.type_chooser.setEnabled(True)
-            simple, payonly = self.this_course_data.can_add_nonblock()
-            self.rb_simple.setEnabled(simple)
-            self.rb_payonly.setEnabled(payonly)
-            self.rb_simple.setChecked(simple)
-            if simple or payonly:
-                self.cb_block.setChecked(not simple)
-                self.cb_block.setEnabled(True)
-            else:
-                self.cb_block.setChecked(True)
-                self.cb_block.setEnabled(False)
+            pass
+#            simple, payonly = cdata.can_add_nonblock()
+#            self.rb_simple.setEnabled(simple)
+#            self.rb_payonly.setEnabled(payonly)
+#            if simple:
+#                self.rb_simple.setChecked(True)
+#            elif payonly:
+#                self.rb_payonly.setChecked(True)
+#            if simple or payonly:
+#                self.cb_block.setChecked(not simple)
+#                self.cb_block.setEnabled(True)
+#            else:
+#                self.cb_block.setChecked(True)
+#                self.cb_block.setEnabled(False)
         self.disable_triggers = False
         self.set_courses()
         self.exec()
@@ -209,6 +232,10 @@ class BlockNameDialog(QDialog):
 
 #TODO
     def set_courses(self):
+        """Set up the dialog according to the various parameters.
+        """
+#TODO: Should this be the dynamic part? There could be an initial
+# part run only when the dialog is activated. ...
 #TODO? Maybe rather at the beginning of <show_lesssons>?
         self.list_lessons.clear()
 
@@ -216,7 +243,6 @@ class BlockNameDialog(QDialog):
         cdata = self.this_course_data
         if self.cb_block.isChecked():
             self.BLOCK_TAG.setEditable(self.rb_new.isChecked())
-# add workload field to course table?
             self.table_courses.setSelectionMode(
                 QAbstractItemView.SelectionMode.SingleSelection
                 if self.rb_add2team.isChecked() and not self.this_workload
@@ -258,7 +284,9 @@ class BlockNameDialog(QDialog):
                     wlist.append(wl[0])
 #???
         if self.this_workload:
+#TODO: instead of all that above ...
             wlist = [self.this_workload]
+            lg, pt, rm = cdata.workloads[self.this_workload]
         else:
             # If adding to a team, only courses with the same subject
             # are relevant
@@ -634,11 +662,11 @@ if __name__ == "__main__":
     from core.db_access import open_database
     open_database()
     course_data = {
-        "course": 0,  # invalid
-        "CLASS": "10G",
-        "GRP": "*",
-        "SUBJECT": "Ma",
-        "TEACHER": "AE",
+        "course": 2,
+        "CLASS": "--",
+        "GRP": "",
+        "SUBJECT": "KoRa",
+        "TEACHER": "ML",
     }
     print("----->", BlockNameDialog.popup(course_data))
     print("----->", BlockNameDialog.popup(course_data, workload=True))

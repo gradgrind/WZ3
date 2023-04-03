@@ -1,7 +1,7 @@
 """
 ui/modules/course_editor.py
 
-Last updated:  2023-04-02
+Last updated:  2023-04-03
 
 Edit course and blocks+lessons data.
 

@@ -1,7 +1,7 @@
 """
 ui/dialogs/dialog_block_name.py
 
-Last updated:  2023-04-02
+Last updated:  2023-04-03
 
 Supporting "dialog" for the course editor – handle blocks.
 
@@ -47,6 +47,8 @@ from core.basic_data import (
 )
 from core.db_access import (
     db_read_fields,
+    db_values,
+    db_read_unique_field,
 )
 from core.course_data_2 import CourseLessonData
 from ui.ui_base import (
@@ -144,41 +146,68 @@ class BlockNameDialog(QDialog):
         this_course: dict,
         lesson_list: list[dict],
         lesson_row: int
-#TODO: return value???
-    ) -> Optional[BlockTag]:
+    ) -> Optional[dict]:
         """Open the dialog.
-        Without <workload> a new entry is to be created.
+        If lesson_row < 0, a new element is to be created.
+        Otherwise, open in "inspection" mode. The details of the
+        current element will be displayed. The only change possible
+        is to assign a new name to a block.
         """
         self.result = None
+        self.__block_sid_tags = None    # cache for block-names
         self.this_course = this_course
         self.lesson_list = lesson_list
         self.lesson_row = lesson_row
         self.disable_triggers = True
+        self.disable_table_row_select = True
         self.set_block_subject_list()
+        self.pb_accept.setEnabled(False)
         if lesson_row >= 0:
-            # "Inspection" mode, no changes possible except block-name
+            ## "Inspection" mode, no changes possible except block-name
             self.rb_inspect.setChecked(True)
 #            self.type_chooser.setEnabled(False)
 #            self.cb_block.setEnabled(False)
-            # Determine item type of <workload> entry
-
-
-            this_data = lesson_list[lesson_row]
-            if this_data["lesson_group"]:
-                lessons = this_data["lessons"]
-#TODO: show lessons
+            # Determine item type
+            this_lesson = lesson_list[lesson_row]
+            ltype = this_lesson[0]
+            if ltype > 0:
+                # block
+                self.cb_block.setChecked(True)
+                self.BLOCK_TAG.setEditable(True)
+                data = this_lesson[1]
+                bsid = data["BLOCK_SID"]
+                self.block_subject.setCurrentIndex(self.sid_index[bsid])
+                self.set_sid(bsid)
+                self.BLOCK_TAG.setCurrentText(data["BLOCK_TAG"])
             else:
-                # no lessons
-                pass
-#TODO: clear lessons
+                self.cb_block.setChecked(False)
+                if ltype == 0:
+                    self.rb_simple.setChecked(True)
+                else:
+                    self.rb_payonly.setChecked(True)
 
+            self.inspect_courses(this_lesson)
 #TODO
 
         else:
+            ## "New element" mode
             self.rb_new.setChecked(True)
 #            self.type_chooser.setEnabled(True)
 #            self.cb_block.setEnabled(True)
             self.rb_simple.setChecked(True) # default choice
+            for l in lesson_list:
+                if l[0] == 0:
+                    # If there is already a simple lesson, default to block
+                    self.cb_block.setChecked(True)
+                    break
+            else:
+                self.cb_block.setChecked(False)
+
+        self.disable_triggers = False
+#        self.set_courses()
+        self.exec()
+        return self.result
+        return
 #TODO
 #?
 #        cdata = CourseLessonData(this_course)
@@ -229,6 +258,65 @@ class BlockNameDialog(QDialog):
             self.sid_list.append(sid)
             self.block_subject.addItem(name)
         self.block_subject.setCurrentIndex(-1)
+
+    def inspect_courses(self, this_data):
+        """Set up the courses for the "inspect" mode.
+        This is called only once, when initializing this mode, the
+        display doesn't change subsequently.
+        """
+        self.list_lessons.clear()
+        print("!!!", this_data)
+        ltype, data, i = this_data
+        this_w = data["workload"]
+        lg = data["lesson_group"]
+        if lg:
+            lessons = data["lessons"]
+            assert(lessons)
+            ## Show lessons
+            for l in lessons:
+                n = l["LENGTH"]
+                t = l["TIME"]
+                if t:
+                    self.list_lessons.addItem(f"{str(n)}  @ {t}")
+                else:
+                    self.list_lessons.addItem(str(n))
+            ## Get all WORKLOAD entries for this lesson_group
+            wlist = [this_w]
+            for w in db_values(
+                "WORKLOAD",
+                "workload",
+                lesson_group=lg
+            ):
+                if w != this_w:
+                    wlist.append(w)
+            if not data["BLOCK_SID"]:
+                # simple lessons
+                assert(len(wlist) == 1)
+        else:
+            ## no lessons (pay-only)
+            wlist = [data["workload"]]
+        ## Show courses, the current one first
+        this_course = data["course"]
+        courses = [(this_course, this_w)]
+        for w in wlist:
+            for course in db_values("COURSE_WORKLOAD", "course", workload=w):
+                if course != this_course:
+                    courses.append((course, w))
+        self.course_table_data = []
+        for course, w in courses:
+            for cdata in db_read_fields(
+                "COURSES",
+                ("CLASS", "GRP", "SUBJECT", "TEACHER"),
+                course=course
+            ):
+                self.course_table_data.append((cdata, w))
+        self.show_courses()
+        self.table_courses.setSelectionMode(
+            QAbstractItemView.SelectionMode.NoSelection
+        )
+
+
+
 
 #TODO
     def set_courses(self):
@@ -342,20 +430,24 @@ class BlockNameDialog(QDialog):
             if not (tw := self.table_courses.item(r, 5)):
                 tw = QTableWidgetItem()
                 self.table_courses.setItem(r, 5, tw)
-            tw.setText(self.this_course_data.workloads[workload][2])
+            room = db_read_unique_field("WORKLOAD", "ROOM", workload=workload)
+            tw.setText(room)
+
 
     def show_lessons(self, lesson_group:int):
         """Display the individual lessons for the given <lesson_group> value.
         """
-        for l, t in db_read_fields(
-            "LESSONS",
-            ["LENGTH", "TIME"],
-            lesson_group=lesson_group
-        ):
-            text = str(l)
-            if t:
-                text += f"  @ {t}"
-            self.list_lessons.addItem(text)
+        self.list_lessons.clear()
+        if lesson_group:
+            for l, t in db_read_fields(
+                "LESSONS",
+                ["LENGTH", "TIME"],
+                lesson_group=lesson_group
+            ):
+                if t:
+                    self.list_lessons.addItem(f"{str(l)}  @ {t}")
+                else:
+                    self.list_lessons.addItem(str(l))
 
 
 
@@ -396,13 +488,32 @@ class BlockNameDialog(QDialog):
         if self.disable_triggers:
             return
         self.disable_triggers = True
-        sid = self.sid_list[i]
-        self.set_sid(sid)
-#?
+        self.set_sid(self.sid_list[i])
         if self.BLOCK_TAG.count():
             self.BLOCK_TAG.setCurrentIndex(0)
         self.disable_triggers = False
-        self.set_courses()
+        self.on_BLOCK_TAG_currentTextChanged(self.BLOCK_TAG.currentText())        
+        
+    def get_block_sid_tags(self):
+        """Get mapping from BLOCK_SID to the list of defined BLOCK_TAGs
+        for that subject. Also the lesson_group is included:
+            {BLOCK_SID: (BLOCK_TAG, lesson_group), ... }
+        The result is cached to avoid unnecessary action
+        """
+        if self.__block_sid_tags is not None:
+            return self.__block_sid_tags
+        bst = {}
+        for lg, BLOCK_SID, BLOCK_TAG in db_read_fields(
+            "LESSON_GROUPS", ("lesson_group", "BLOCK_SID", "BLOCK_TAG")
+        ):
+            if BLOCK_SID:
+                tag_lg = (BLOCK_TAG, lg)
+                try:
+                    bst[BLOCK_SID].append(tag_lg)
+                except KeyError:
+                    bst[BLOCK_SID] = [tag_lg]
+        self.__block_sid_tags = bst
+        return bst
 
     def set_sid(self, sid):
         """Set up the block-tag widget according to the given subject.
@@ -416,9 +527,11 @@ class BlockNameDialog(QDialog):
         self.sid_block_map = {}
         if sid:
             self.BLOCK_TAG.setEnabled(True)
-            for t, lg in self.this_course_data.blocksid2tags[sid]:
-                self.sid_block_map[t] = lg
-                self.BLOCK_TAG.addItem(t)
+            tags = self.get_block_sid_tags().get(sid)
+            if tags:
+                for t, lg in tags:
+                    self.sid_block_map[t] = lg
+                    self.BLOCK_TAG.addItem(t)
         else:
             self.BLOCK_TAG.setEnabled(False)
         print("???", self.sid_block_map)
@@ -429,6 +542,8 @@ class BlockNameDialog(QDialog):
 
 
     def on_table_courses_currentItemChanged(self, newitem, olditem):
+        if self.disable_table_row_select:
+            return
         print("TODO: COURSE ROW", newitem.row())
         if self.cb_block.isChecked():
             print("TODO: Unexpected <on_table_courses_currentItemChanged>")
@@ -441,10 +556,11 @@ class BlockNameDialog(QDialog):
     def on_choose_group_idClicked(self, i:int):
         if self.disable_triggers:
             return
-        print("§choose_group", CHOOSE(i))
-        self.do_choose(CHOOSE(i))
+        print("§choose_group", i)#CHOOSE(i))
+#        self.do_choose(CHOOSE(i))
+        return
 
-    def do_choose(self, choose:CHOOSE):
+#    def do_choose(self, choose:CHOOSE):
         self.choose = choose
         self.BLOCK_TAG.setEditable(choose == CHOOSE.NEW)
         if choose == CHOOSE.TO_BLOCK:
@@ -496,9 +612,19 @@ class BlockNameDialog(QDialog):
         super().accept()
 
     @Slot(str)
-    def on_BLOCK_TAG_currentTextChanged(self, text): # show courses
+    def on_BLOCK_TAG_currentTextChanged(self, text):
         if self.disable_triggers:
             return
+        if self.lesson_row >= 0:
+            # "inspect" mode, only set enabled state of accept button.
+            if self.BLOCK_TAG.findText(text) < 0:
+                # new tag
+                self.result = {"BLOCK_SID": self.sid, "BLOCK_TAG": text}
+                self.pb_accept.setEnabled(True)
+            else:
+                self.pb_accept.setEnabled(False)
+            return
+#TODO: "new element" mode
         self.set_courses()
 
     def acceptable(self):
@@ -669,6 +795,9 @@ if __name__ == "__main__":
         "TEACHER": "ML",
     }
     print("----->", BlockNameDialog.popup(course_data))
+
+    quit(0)
+
     print("----->", BlockNameDialog.popup(course_data, workload=True))
     print("----->", BlockNameDialog.popup(
         course_data,

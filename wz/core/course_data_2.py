@@ -151,7 +151,7 @@ def course_activities(course_id:int
 
 def courses_in_block(bsid, btag):
     """Find all courses which are members of the given block.
-    Return also the WORKLOAD data.
+    Return also the WORKLOAD and LESSON_GROUPS keys.
     """
     try:
         lg = db_read_unique_field(
@@ -171,22 +171,77 @@ def courses_in_block(bsid, btag):
                 ("CLASS", "GRP", "SUBJECT", "TEACHER"),
                 course=course
             )
-            courses.append((cdata, w, course))
-    return courses, lg
+            courses.append((cdata, w, lg, course))
+    return courses
 
 
-def existing_with_subject(sid, element_type):
-    """Find all courses with lessons in the given subject.
-    <element_type> can be -1 (payment-only), 0 (simple lessons)
-    or 1 (block lessons).
+def simple_with_subject(sid):
+    """Find all courses with simple lessons in the given subject.
     """
-    for w, lg in db_read_fields("WORKLOAD", ("workload", "lesson_group")):
-        if lg:
-            pass
+    lgset = {
+        lg for lg, s in db_read_fields(
+            "LESSON_GROUPS", ("lesson_group", "BLOCK_SID")
+        ) if not s
+    }
+    wmap = {
+        w: lg for w, lg in db_read_fields(
+            "WORKLOAD", ("workload", "lesson_group")
+        ) if lg in lgset
+    }
+    courses = {
+        c: (cl, g, t) for cl, c, g, t in db_read_fields(
+            "COURSES",
+            ("course", "CLASS", "GRP", "TEACHER"),
+            SUBJECT=sid,
+        )
+    }
+    matches = []
+    for c, w in db_read_fields(
+        "COURSE_WORKLOAD",
+        ("course", "workload"),
+    ):
+        try:
+            cl, g, t = courses[c]
+        except KeyError:
+            continue
+        try:
+            lg = wset[w]
+        except KeyError:
+            continue
+        matches.append(((cl, g, sid, t), w, lg, c))
+    return matches
 
-        else:
-            # pay-only
-            pass
+
+def payonly_with_subject(sid):
+    """Find all courses with pay-only elements in the given subject.
+    """
+    wset = {
+        w for w, lg in db_read_fields(
+            "WORKLOAD", ("workload", "lesson_group")
+        ) if not lg
+    }
+    courses = {
+        c: (cl, g, t) for cl, c, g, t in db_read_fields(
+            "COURSES",
+            ("course", "CLASS", "GRP", "TEACHER"),
+            SUBJECT=sid,
+        )
+    }
+    matches = []
+    for c, w in db_read_fields(
+        "COURSE_WORKLOAD",
+        ("course", "workload"),
+    ):
+        if w in wset:
+            try:
+                cl, g, t = courses[c]
+            except KeyError:
+                continue
+            matches.append(((cl, g, sid, t), w, 0, c))
+    return matches
+
+
+
 
 ##OLD VERSION ...
 class CourseLessonData:

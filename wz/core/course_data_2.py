@@ -1,7 +1,7 @@
 """
 core/course_data.py
 
-Last updated:  2023-04-02
+Last updated:  2023-04-03
 
 Support functions dealing with courses, lessons, etc.
 
@@ -43,6 +43,10 @@ from core.db_access import (
     db_read_full_table,
     db_read_unique_entry,
     db_read_fields,
+    db_read_unique,
+    db_read_unique_field,
+    db_values,
+    NoRecord,
 )
 from core.basic_data import BlockTag
 
@@ -143,8 +147,48 @@ def course_activities(course_id:int
             workload_elements.append(cwdict)
     return (workload_elements, simple_elements, block_elements)
 
-######### for new-course dialog #########
+######### for new-course-element dialog #########
 
+def courses_in_block(bsid, btag):
+    """Find all courses which are members of the given block.
+    Return also the WORKLOAD data.
+    """
+    try:
+        lg = db_read_unique_field(
+            "LESSON_GROUPS",
+            "lesson_group",
+            BLOCK_SID=bsid,
+            BLOCK_TAG=btag
+        )
+    except NoRecord:
+        return [], 0
+    wlist = db_values("WORKLOAD", "workload", lesson_group=lg)
+    courses = []
+    for w in wlist:
+        for course in db_values("COURSE_WORKLOAD", "course", workload=w):
+            cdata = db_read_unique(
+                "COURSES",
+                ("CLASS", "GRP", "SUBJECT", "TEACHER"),
+                course=course
+            )
+            courses.append((cdata, w, course))
+    return courses, lg
+
+
+def existing_with_subject(sid, element_type):
+    """Find all courses with lessons in the given subject.
+    <element_type> can be -1 (payment-only), 0 (simple lessons)
+    or 1 (block lessons).
+    """
+    for w, lg in db_read_fields("WORKLOAD", ("workload", "lesson_group")):
+        if lg:
+            pass
+
+        else:
+            # pay-only
+            pass
+
+##OLD VERSION ...
 class CourseLessonData:
     def __init__(self, this_course:dict):
         """Read and link entries in COURSES, COURSE_WORKLOAD,

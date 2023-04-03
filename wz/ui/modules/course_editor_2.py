@@ -573,21 +573,19 @@ class CourseEditorPage(Page):
                 obj.setText(result)
         ### BLOCK (LESSON_GROUPS)
         elif object_name == "block_name":
+            row = self.lesson_table.currentRow()
+            assert(row >= 0)
             result = BlockNameDialog.popup(
                 course_data=self.course_dict,
                 course_lessons=self.course_lessons,
-                lesson_row=self.lesson_table.currentRow(),
+                lesson_row=row,
                 parent=self
             )
-
-#TODO!
             if result is not None:
                 lg = self.current_lesson[1]
-                btag, lgnew = result
-                assert(lgnew < 0)
                 db_update_fields(
                     "LESSON_GROUPS",
-                    [("BLOCK_SID", btag.sid), ("BLOCK_TAG", btag.tag)],
+                    [(r, result[r]) for r in ("BLOCK_SID", "BLOCK_TAG")],
                     lesson_group=lg["lesson_group"]
                 )
                 # Redisplay lessons

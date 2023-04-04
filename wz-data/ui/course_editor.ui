@@ -430,7 +430,7 @@
          </property>
          <property name="icon">
           <iconset>
-           <normaloff>../icons/cash0a.svg</normaloff>../icons/cash0a.svg</iconset>
+           <normaloff>../icons/cash.svg</normaloff>../icons/cash.svg</iconset>
          </property>
         </item>
         <item row="0" column="1">

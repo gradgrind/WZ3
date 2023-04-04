@@ -64,6 +64,7 @@ from core.basic_data import (
     clear_cache,
     get_subjects,
     ParallelTag,
+    get_payment_weights,
 )
 from core.course_data_2 import filtered_courses, course_activities
 from ui.ui_base import (
@@ -582,6 +583,7 @@ class CourseEditorPage(Page):
                 parent=self
             )
             if result is not None:
+                assert(result["type"] == "CHANGE_BLOCK")
                 lg = self.current_lesson[1]
                 db_update_fields(
                     "LESSON_GROUPS",
@@ -682,86 +684,82 @@ class CourseEditorPage(Page):
             # Redisplay lessons
             self.display_lessons(lesson_select_id)
 
-#TODO: Adapt to new db structure.
-# Consider how to add joint elements (can be of any type)
     @Slot()
     def on_new_element_clicked(self):
         """Add an item type: block, simple lesson or workload/payment.
-        The item can only be added when its type is not already present
-        for the course. A block may already exist (just add a reference
-        to this course) or it may be completely new. If a simple lesson
-        or a new completely new course is added, a single lesson is also
-        added, together with the other necessary db table entries.
+        The item can be completely new or share a LESSON_GROUP (block
+        only) or WORKLOAD entry.
+        All the fiddly details are taken care of in <BlockNameDialog>.
+        This should only return valid results.
+        If a completely new simple or block lesson is added, a single
+        lesson is also added to the LESSONS table.
         """
-        workload = True
-        simple = True
-        blockset = set()
-        for cl in self.course_lessons:
-            if cl[0] == -1:
-                workload = False
-            elif cl[0] == 0:
-                simple = False
-            elif cl[0] > 0:
-                blockset.add(cl[1]["blocktag"])
+        print("$$$", get_payment_weights())
         bn = BlockNameDialog.popup(
             course_data=self.course_dict,
             course_lessons=self.course_lessons,
             lesson_row=-1,
             parent=self
         )
-        REPORT("WARNING", f"TBI: NEW ELEMENT „{bn}“")
-        return
-
-
-
-#TODO! ...
-
-        if bn:
-            btag, lg = bn
-            if lg < 0:
-                if btag.sid:
-                    lesson_group = db_new_row(
-                        "LESSON_GROUPS",
-                        BLOCK_SID=btag.sid,
-                        BLOCK_TAG=btag.tag,
-                        NOTES="",
-                    )
-                elif btag.tag == "$":
-                    # Workload/payment, no lesson_group
-                    lesson_group = None
-                    l = 0
-                else:
-                    # "Simple" lesson_group
-                    lesson_group = db_new_row(
-                        "LESSON_GROUPS",
-                        NOTES="",
-                    )
-                if lesson_group:
-                    l = db_new_row(
-                        "LESSONS",
-                        lesson_group=lesson_group,
-                        LENGTH=1,
-                    )
+        if not bn:
+            return
+        wld = None
+        l = -1
+        tp = bn["type"]
+        if tp == "NEW":
+            bsid = bn["BLOCK_SID"]
+            btag = bn["BLOCK_TAG"]
+            if bsid:
+                # new block
+                lesson_group = db_new_row(
+                    "LESSON_GROUPS",
+                    BLOCK_SID=bsid,
+                    BLOCK_TAG=btag,
+                    NOTES="",
+                )
+            elif btag == "$":
+                # new payment-only
+                lesson_group = None
+                wld = db_new_row(
+                    "WORKLOAD",
+                    PAY_TAG="",
+                )
             else:
-                l = -1
+                assert(not btag)
+                # new simple lesson
+                lesson_group = db_new_row(
+                    "LESSON_GROUPS",
+                    NOTES="",
+                )
             if lesson_group:
-                wld = db_new_row(
-                    "WORKLOAD",
+                l = db_new_row(
+                    "LESSONS",
                     lesson_group=lesson_group,
-                    PAY_TAG="",
+                    LENGTH=1,
                 )
             else:
-                wld = db_new_row(
-                    "WORKLOAD",
-                    PAY_TAG="",
-                )
-            cw = db_new_row(
-                "COURSE_WORKLOAD",
-                course=self.course_id,
-                workload=wld,
+                l = 0
+        elif tp == "ADD2BLOCK":
+            lesson_group = bn["lesson_group"]
+        else:
+            assert(tp == "ADD2TEAM")
+            lesson_group = None
+            wld = bn["workload"]
+        if lesson_group:
+            wld = db_new_row(
+                "WORKLOAD",
+                lesson_group=lesson_group,
+                PAY_TAG="",
             )
-            # Redisplay lessons
-            self.display_lessons(l)
+        assert(wld)
+        assert(self.course_id)
+        cw = db_new_row(
+            "COURSE_WORKLOAD",
+            course=self.course_id,
+            workload=wld,
+        )
+        # Redisplay lessons
+        self.display_lessons(l)
 
     @Slot()
     def on_lesson_add_clicked(self):

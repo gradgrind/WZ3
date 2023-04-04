@@ -1,7 +1,7 @@
 """
 ui/dialogs/dialog_block_name.py
 
-Last updated:  2023-04-03
+Last updated:  2023-04-04
 
 Supporting "dialog" for the course editor – handle course elements.
 That is, add new elements or inspect existing ones.
@@ -15,7 +15,7 @@ A new element can be a membership in an existing block. The
 existing LESSON_GROUPS entry for that block will be shared,
 there will be a new entry in COURSE_WORKLOAD and in WORKLOAD.
 Finally, a new element can share an existing WORKLOAD element
-(and thus room and payment details). Here there will obly be
+(and thus room and payment details). Here there will only be
 a new entry in COURSE_WORKLOAD.
 In "inspection mode", no changes can be made, except that a
 block may have its name changed.
@@ -96,10 +96,8 @@ class BlockNameDialog(QDialog):
     There are the following scenarios:
 
     1) A new course/lesson_group connection is to be made.
-       In principle there is the choice between a simple lesson,
-       a block lesson and a payment-only item. However, a simple
-       lesson or a payment-only item may only be added if the course
-       in question currently has no such item.
+       There is the choice between a simple lesson, a block lesson
+       and a payment-only item.
        The new item consists of a new WORKLOAD entry and an entry in
        COURSE_WORKLOAD linking the course to the workload. Unless the
        new item is payment-only, there will also be a new LESSON_GROUPS
@@ -109,8 +107,7 @@ class BlockNameDialog(QDialog):
        lesson_groups in the course editor, using the "+" button.
        A payment-only item doesn't have a lesson group.
 
-    2) A course may "join" an existing block (named lesson_group),
-       as long as it is not already a member.
+    2) A course may "join" an existing block (named lesson_group).
 
     3) A course may "join" an existing workload. All members must have
        the same subject. This covers simple cases of team-teaching and
@@ -119,27 +116,38 @@ class BlockNameDialog(QDialog):
        
     4) The "linkages" of the current course/workload/lesson group can
        be shown.
-       In this case the workload (primary key) is passed as argument.
+       In this case the table row (lesson_row) of the current element
+       is passed as argument (otherwise).
        In the case of a block member, the name of the block may be
        changed (to a completely new one), otherwise no changes are possible.
 
-
-??? Maybe the changes should be done here!
     This dialog itself causes no database changes, that must be done by
     the calling code on the basis of the returned value.
     If the dialog is cancelled, <None> is returned and there should be
     no changes to the database.
-    Otherwise a tuple is returned:
-        (<BlockTag> item, lesson_group key or -1)
-    The block tag can be empty, indicating that a simple-lesson group
-    is to be added. The second tuple element is -1.
-    Alternatively, the block tag can be invalid (sid="", tag="$"), in
-    which case a workload/payment-only entry is to be added. The
-    second tuple element is -1.
-    Otherwise a valid, non-empty block tag is returned.
-    If the second tuple element is -1, the block tag is new.
-    If the second tuple element > 0, this is the lesson_group key of
-    the existing LESSON_GROUPS entry for the block tag.
+    Otherwise a mapping is returned: {"type": type of element, ...}
+    Further entries depend on the type.
+    In "inspection" mode, only one return type is possible:
+        {   "type": "CHANGE_BLOCK",
+            "BLOCK_SID": new block-subject-id,
+            "BLOCK_TAG": new block-tag
+        }
+    In "new element" mode, the following return values are possible:
+    1) A completely new entry:
+        {   "type": "NEW",
+            "BLOCK_SID": ("" or block-subject-id),
+            "BLOCK_TAG": ("", "$" or block-tag)
+        }
+        If BLOCK_SID is empty, BLOCK_TAG must be "" (new simple lesson)
+        or "$" (new payment-only item).
+    2) Add to existing block:
+        {   "type": "ADD2BLOCK",
+            "lesson_group": lesson_group of existing block
+        }
+    3) Add to existing WORKLOAD entry:
+        {   "type": "ADD2TEAM",
+            "workload": self.workload,
+        }
     """
     @classmethod
     def popup(
@@ -181,6 +189,7 @@ class BlockNameDialog(QDialog):
         self.lesson_list = lesson_list
         self.lesson_row = lesson_row
         self.disable_triggers = True
+        self.lesson_group = -1
         self.set_table_use_selection(False)
         self.set_block_subject_list()
         self.pb_accept.setEnabled(False)
@@ -240,16 +249,7 @@ class BlockNameDialog(QDialog):
         self.block_subject.setCurrentIndex(-1)
 
     def set_table_use_selection(self, on:bool):
-        if on:
-            self.disable_table_row_select = False
-            self.table_courses.setSelectionMode(
-                QAbstractItemView.SelectionMode.SingleSelection
-            )     
-        else:
-            self.disable_table_row_select = True
-            self.table_courses.setSelectionMode(
-                QAbstractItemView.SelectionMode.NoSelection
-            )
+        self.disable_table_row_select = not on
 
     def inspect_courses(self, this_data):
         """Set up the courses for the "inspect" mode.
@@ -257,7 +257,6 @@ class BlockNameDialog(QDialog):
         display doesn't change subsequently.
         """
         self.list_lessons.clear()
-        print("!!!", this_data)
         ltype, data, i = this_data
         this_w = data["workload"]
         lg = data["lesson_group"]
@@ -308,11 +307,11 @@ class BlockNameDialog(QDialog):
     def set_courses(self):
         """Set up the dialog according to the various parameters.
         This is only used in "new element" mode and is called
-        whenever a parameter is changed.
+        whenever a parameter is changed (except line change in
+        the course table).
         """
-        self.last_table_row = -1
+        self.course_table_activate_line(-1)
         self.pb_accept.setEnabled(False)
-#        self.course_table_data = []
         if self.rb_add2block.isChecked():
             ## Add an element to an existing block.
             self.cb_block.setEnabled(False)
@@ -324,32 +323,73 @@ class BlockNameDialog(QDialog):
             self.BLOCK_TAG.setEditable(self.rb_new.isChecked())
             btag = self.BLOCK_TAG.currentText()
             self.course_table_data = courses_in_block(self.sid, btag)
-            print("§COURSES:", self.course_table_data)
-#?
-            self.show_courses()
-            lg = self.course_table_data[2]
-#            self.show_lessons(lg)
             if self.rb_add2team.isChecked():
+                # Show just the courses with the given subject
+                sid = self.this_course["SUBJECT"]
+                self.course_table_data = [
+                    ctd for ctd in self.course_table_data
+                    if ctd[0][2] == sid
+                ]
                 self.set_table_use_selection(True)
-                assert(lg)
-                self.table_courses.setCurrentCell(0, 0)
             else:
                 self.set_table_use_selection(False)
         elif self.rb_simple.isChecked():
             ## Dealing with simple lesson element
-            print("TODO")
-            sid = self.this_course["SUBJECT"]
-            self.course_table_data = existing_with_subject(sid, 0)
-            # ...
-
+            if self.rb_new.isChecked():
+                self.course_table_data = []
+                c = self.this_course["course"]
+                cdata = (
+                    self.this_course["CLASS"],
+                    self.this_course["GRP"],
+                    self.this_course["SUBJECT"],
+                    self.this_course["TEACHER"],
+                )
+                for l in self.lesson_list:
+                    if l[0] == 0:
+                        # simple lesson
+                        self.course_table_data.append((
+                            cdata,
+                            l[1]["workload"],
+                            l[1]["lesson_group"],
+                            c
+                        ))
+            else:
+                sid = self.this_course["SUBJECT"]
+                self.course_table_data = simple_with_subject(sid)
+            self.set_table_use_selection(True)
         else:
             ## Dealing with pay-only element
             assert(self.rb_payonly.isChecked())
-            print("TODO")
-
-
-#?
-#         self.show_courses()
+            if self.rb_new.isChecked():
+                self.course_table_data = []
+                c = self.this_course["course"]
+                cdata = (
+                    self.this_course["CLASS"],
+                    self.this_course["GRP"],
+                    self.this_course["SUBJECT"],
+                    self.this_course["TEACHER"],
+                )
+                for l in self.lesson_list:
+                    if l[0] < 0:
+                        # payment-only item
+                        self.course_table_data.append((
+                            cdata,
+                            l[1]["workload"],
+                            0,
+                            c
+                        ))
+                self.set_table_use_selection(False)
+            else:
+                sid = self.this_course["SUBJECT"]
+                self.course_table_data = payonly_with_subject(sid)
+                self.set_table_use_selection(True)
+            self.set_table_use_selection(self.rb_add2team.isChecked())
+        self.show_courses()
+        if self.course_table_data:
+            self.course_table_activate_line(0)
+            if not self.disable_table_row_select:
+                self.table_courses.setCurrentCell(0, 0)
+        self.acceptable()
 
     def show_courses(self):
         """Display the courses corresponding to the "filter" values.
@@ -357,7 +397,6 @@ class BlockNameDialog(QDialog):
         """
         self.table_courses.setRowCount(len(self.course_table_data))
         for r, cw in enumerate(self.course_table_data):
-            print("???~~", cw)
             cdata, workload = cw[:2]    # cdata: (CLASS, GRP, sid, tid)
             # class field
             if not (tw := self.table_courses.item(r, 0)):
@@ -460,26 +499,32 @@ class BlockNameDialog(QDialog):
                     self.BLOCK_TAG.addItem(t)
         else:
             self.BLOCK_TAG.setEnabled(False)
-        print("???", self.sid_block_map)
 
     def on_table_courses_currentCellChanged(
         self, row, col, oldrow, oldcol
     ):
-        print("§§§§§§§§§§§§", row)
         if self.disable_table_row_select:
             return
         if row == self.last_table_row:
             return
-        self.last_table_row = row
-        print("§TABLE ROW:", row)
         assert(row >= 0)
-        cdata, w, lg, c = self.course_table_data[row]
+        self.course_table_activate_line(row)
+        self.acceptable()
+
+    def course_table_activate_line(self, row):
+        self.last_table_row = row
+        if row < 0:
+            lg = 0
+            self.workload = 0
+            self.selected_course = 0
+        else:
+            ctd = self.course_table_data[row]
+            lg = ctd[2]
+            self.workload = ctd[1]
+            self.selected_course = ctd[3]
         if lg != self.lesson_group:
             self.show_lessons(lg)
-        self.workload = w
-        self.lesson_group = lg
-        self.selected_course = c
-        self.acceptable()
+            self.lesson_group = lg
 
     @Slot(int)
     def on_choose_group_idClicked(self, i:int):
@@ -489,7 +534,6 @@ class BlockNameDialog(QDialog):
 
     @Slot(bool)
     def on_cb_block_toggled(self, block:bool):
-        print("§cb_block", block)
         self.blockstack.setCurrentWidget(
             self.page_block if block else self.page_noblock
         )
@@ -501,7 +545,6 @@ class BlockNameDialog(QDialog):
     def on_rb_payonly_toggled(self, payonly:bool):
         if self.disable_triggers:
             return
-        print("§rb_payonly", payonly)
         self.set_courses()
 
     @Slot(str)
@@ -519,6 +562,7 @@ class BlockNameDialog(QDialog):
                 }
                 self.pb_accept.setEnabled(True)
             else:
+                self.value = INVALID_RESULT
                 self.pb_accept.setEnabled(False)
             return
         # "new element" mode
@@ -528,10 +572,9 @@ class BlockNameDialog(QDialog):
         """Determine whether a state is valid as a result.
         Set <self.value> and enable the "accept" button as appropriate.
         """
-        print("§acceptable?")
         if self.rb_new.isChecked():
             if self.cb_block.isChecked():
-                if self.lesson_group:
+                if self.lesson_group or not self.sid:
                     self.value = INVALID_RESULT
                     self.pb_accept.setEnabled(False)
                 else:                        
@@ -545,10 +588,10 @@ class BlockNameDialog(QDialog):
                 self.value = {
                     "type": "NEW",
                     "BLOCK_SID": "",
-                    "BLOCK_TAG": "" if self.rb_simple.isChecked() else "?",
+                    "BLOCK_TAG": "" if self.rb_simple.isChecked() else "$",
                 }
                 self.pb_accept.setEnabled(True)
-        elif self.add2block.isChecked():
+        elif self.rb_add2block.isChecked():
             assert(self.cb_block.isChecked())
             if self.lesson_group:
                 self.value = {
@@ -561,7 +604,7 @@ class BlockNameDialog(QDialog):
                 self.pb_accept.setEnabled(False)
         else:
             # share WORKLOAD entry
-            assert(self.add2team.isChecked())
+            assert(self.rb_add2team.isChecked())
             # Don't allow adding a course to a "workload", if there
             # is already a link.
             if self.workload:
@@ -585,6 +628,7 @@ class BlockNameDialog(QDialog):
                 self.pb_accept.setEnabled(False)
 
     def accept(self):
+        assert(self.value != INVALID_RESULT)
         self.result = self.value
         super().accept()
 
@@ -594,6 +638,8 @@ class BlockNameDialog(QDialog):
 if __name__ == "__main__":
     from core.db_access import open_database
     open_database()
+    # Stand-alone testing is difficult because data from the course
+    # editor is required. It should rather be tested from there.
     course_data = {
         "course": 2,
         "CLASS": "--",
@@ -602,33 +648,11 @@ if __name__ == "__main__":
         "TEACHER": "ML",
     }
     print("----->", BlockNameDialog.popup(course_data, [], -1))
-
-    quit(0)
-
-    print("----->", BlockNameDialog.popup(course_data, workload=True))
-    print("----->", BlockNameDialog.popup(
-        course_data,
-        simple=True,
-        blocks=[BlockTag.build("KoRa", "")]
-    ))
-    print("----->", BlockNameDialog.popup(
-        course_data,
-        workload=True,
-        simple=True
-    ))
-    print("----->", BlockNameDialog.popup(
-        course_data,
-        blocktag=BlockTag.build("KoRa", ""), jointag=""
-    ))
-    print("----->", BlockNameDialog.popup(
-        course_data,
-        blocktag=BlockTag.build("ZwE", "09G10G"), jointag=""
-    ))
-    print("----->", BlockNameDialog.popup(
-        course_data,
-        blocktag=BlockTag.build("Hu", ""), jointag=""
-    ))
-    print("----->", BlockNameDialog.popup(
-        course_data,
-        blocktag=BlockTag.build("XXX", ""), jointag=""
-    ))
+    course_data = {
+        "course": 350,
+        "CLASS": "11G",
+        "GRP": "R",
+        "SUBJECT": "Ma",
+        "TEACHER": "MT",
+    }
+    print("----->", BlockNameDialog.popup(course_data, [], -1))

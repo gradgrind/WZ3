@@ -1,5 +1,5 @@
 """
-core/classes.py - last updated 2023-03-23
+core/classes.py - last updated 2023-04-07
 
 Manage class data.
 
@@ -19,8 +19,6 @@ Copyright 2023 Michael Towers
    limitations under the License.
 =-LICENCE=================================
 """
-
-########################################################################
 
 if __name__ == "__main__":
     import sys, os
@@ -42,8 +40,12 @@ from itertools import combinations, product
 
 from core.db_access import open_database, db_read_fields
 
-### -----
-
+class Subgroup(frozenset):
+    """This <frozenset> wrapper is used for groups and subgroups within
+    a class.
+    """
+    def __str__(self):
+        return '.'.join(sorted(self))
 
 class ClassData(NamedTuple):
     klass: str
@@ -51,6 +53,7 @@ class ClassData(NamedTuple):
     divisions: list[list[str]]
     classroom: str
 
+### -----
 
 class Classes(dict):
     def __init__(self):
@@ -165,7 +168,7 @@ class ClassGroups:
                 else:
                     self.divisions.append(gset)
             self.atomic_groups = frozenset(
-                frozenset(ag) for ag in product(*self.divisions)
+                Subgroup(ag) for ag in product(*self.divisions)
             )
         else:
             self.atomic_groups = frozenset()
@@ -223,8 +226,8 @@ class ClassGroups:
             return f"{divs}-{'-'.join(empties)}"
         return divs
 
-    def group2set(self, g:str) -> frozenset[str]:
-        return frozenset(g.split('.'))
+    def group2set(self, g:str) -> Subgroup[str]:
+        return Subgroup(g.split('.'))
 
     def set2group(self, s:set) -> str:
         glist = []
@@ -241,7 +244,7 @@ class ClassGroups:
 
     def filter_atomic_groups(self) -> list[str]:
         self.filtered_atomic_groups = {
-            frozenset(ag) for ag in self.atomic_groups
+            Subgroup(ag) for ag in self.atomic_groups
         }
         elist = []
         if self.subgroup_empties:
@@ -263,7 +266,7 @@ class ClassGroups:
                 if bg in fag:
                     faglist.append(fag)
             if faglist:
-                gdict[frozenset(faglist)] = frozenset([bg])
+                gdict[frozenset(faglist)] = Subgroup([bg])
             else:
                 elist.append(T["EMPTY_GROUP"].format(g=bg))
         # Add the atomic groups for all possible subgroups, starting
@@ -272,21 +275,20 @@ class ClassGroups:
             c_set = set()
             for fag in self.filtered_atomic_groups:
                 for c in combinations(fag, l):
-                    c_set.add(frozenset(c))
+                    c_set.add(Subgroup(c))
             for c in c_set:
-                cs = frozenset(c)
                 faglist = []
                 for fag in self.filtered_atomic_groups:
-                    if cs < fag:
+                    if c < fag:
                         faglist.append(fag)
                 if faglist:
                     fs = frozenset(faglist)
                     if fs not in gdict:
-                        gdict[fs] = cs
+                        gdict[fs] = c
         # Add atomic groups, if they are not already represented by
         # shorter group tags
         for fag in self.filtered_atomic_groups:
-            fs = frozenset([fag])
+            fs = Subgroup([fag])
             if fs not in gdict:
                 gdict[fs] = fag
         # Reverse the mapping to get the group -> atoms mapping
@@ -302,8 +304,8 @@ def build_group_data(divisions):
     minimal subgroups, independent divisions, group mapping appropriate
     to the independent divisions.
     Return the results as a <dict>.
-    Internally groups are handled as <frozensets>, but the results use
-    dotted strings.
+    Internally groups are handled as <Subgroup>s ("frozensets"), but the
+    results use dotted strings.
     """
 
     def group2string(group):
@@ -318,12 +320,12 @@ def build_group_data(divisions):
     # other groups which are incompatible with each group in a "dot-join"
     # (an intersection).
 
-    # Build "frozensets" of the member groups, splitting dotted items.
+    # Build <Subgroup>s of the member groups, splitting dotted items.
     divsets = []
     for div in divisions:
         gsets = set()
         for g in div:
-            gset = frozenset(g.split("."))
+            gset = Subgroup(g.split("."))
             gsets.add(gset)
             # Add to list of "acceptable" groups
             groups.add(gset)
@@ -607,120 +609,3 @@ if __name__ == "__main__":
                 [cg.set2group(a) for a in alist]
             )
         print("%TEXT%", cg.text_value())
-    quit(0)
-
-# old stuff ...
-
-    # _divs = [("A", "B"), ("G", "R"), ("A", "X", "Y")]
-    # _divs = [("A", "B"), ("G", "R"), ("A", "G")]
-    # _divs = [("A", "B", "C"), ("A", "R"), ("B", "S")]
-    # _divs = [("A", "B"), ("A", "X", "Y"), ("B", "P", "Q")]
-    # _divs = [("A", "B"), ("A", "I", "J"), ("A", "X", "Y"), ("B", "P", "Q")]
-    # _divs = [("A", "B"), ("A", "I", "J"), ("C", "D"), ("C", "P", "Q")]
-    # _divs = [("A", "B"), ("G", "R"), ("A", "B.G", "B.R")]
-    # _divs = [("A", "B.G", "B.R"), ("G", "R"), ("A", "B")]
-    # _divs = [("A", "B.G", "R"), ("G", "R")]
-    # _divs = [("A", "B.G", "R"), ("X", "Y")]
-    # _divs = [("A", "B.G", "R"), ("G", "R"), ("A", "B")]
-    # _divs = [("A.G", "A.R", "B.G", "B.R"), ("G", "R")]
-    # _divs = [("A.G", "A.R", "B.G", "B.R"), ("A", "B")]
-    # _divs = [("A.G", "A.R", "B.G", "B.R"), ("A", "B"), ("G", "R")]
-    # _divs = [("A", "B"), ("A", "B.G", "B.R")]
-    # _divs = [("A", "B"), ("G", "R"), ("A.X", "A.Y", "G.P", "G.Q")]
-    # _divs = [("A", "M"), ("A.X", "N")]
-    # _divs = [("A", "M"), ("A.X", "N"), ("G", "R")]
-    # _divs = [("A", "B.X"), ("P", "B.Y")]
-    # _divs = [("A", "B", "C"), ("A", "X", "Y", "Z")]
-    # _divs = [("G", "R"), ("A", "B"), ("I", "II", "III")]
-    # _divs = [("G", "R"), ("A.G", "A.R", "B.G", "B.R"), ("A", "B"), ("I", "II", "III")]
-    # _divs = [("G", "R"), ("A", "B.G", "B.R"), ("A", "B"), ("I", "II", "III")]
-    _divs = [("G", "R"), ("A", "B.G", "R"), ("A", "B"), ("I", "II", "III")]
-
-    print("\nGROUP DIVISIONS:", _divs, "->")
-    res = build_group_data(_divs)
-    print("\n ... Independent divisions:")
-    divisions = res["INDEPENDENT_DIVISIONS"]
-    for d in divisions:
-        print("  ", d)
-    print("\n ... Group-map:")
-    group_map = res["GROUP_MAP"]
-    for g, l in group_map.items():
-        print(f"  {str(g):20}: {l}")
-#    print("\n ... Groups:", res["GROUPS"])
-    print("\n ... Basic:", res["BASIC"])
-    atoms = res["MINIMAL_SUBGROUPS"]
-    print("\n ... Atoms:", atoms)
-
-    group2atoms = atomic_maps(atoms, list(group_map))
-    print("\n ... group -> atoms:")
-    for g, a in group2atoms.items():
-        print("       ::", g, "->", a)
-    a2glist = atoms2groups(divisions, group2atoms)
-    print("\n ... atoms -> groups:")
-    for a, g in a2glist.items():
-        print("       ::", a, "->", g)
-
-    print("\n ... basics -> groups:")
-    a2g = atoms2groups(divisions, group_map, with_divisions=True)
-    for a, g in a2g.items():
-        print("       ::", a, "->", g)
-
-
-    all_groups = list(group_map)
-    import random
-    ng = random.randint(1, len(all_groups))
-    groups = random.sample(all_groups, ng)
-    print("\n$$$ IN:", groups)
-
-    chipdata = class_divisions(
-        groups,
-        group_map,
-        divisions
-    )
-    print("    GROUPS:", chipdata.groups)
-    print("    SET:", chipdata.basic_groups)
-    print(f"    {chipdata.num}/{chipdata.den} @ {chipdata.offset}")
-    print("    REST:", chipdata.rest_groups)
-
-    # quit(0)
-
-    print("\n -------------------------------\n")
-    print("\nCLASS DATA:")
-
-    open_database()
-    _classes = Classes()
-    for cdata in _classes.values():
-        print("\n", cdata)
-
-    print("\n -------------------------------\n")
-
-    for k, v in _classes.get_class_list(False):
-        try:
-            print(f" ::: {k:6}: {v} // {_classes.get_classroom(k)}")
-        except Bug as e:
-            print(f" ::: {k:6}: {v} // {e}")
-
-    _klass = "10G"
-    print("\n -------------------------------\nGROUP INFO for class", _klass)
-    res = _classes.group_info(_klass)
-    print("\n ... Independent divisions:")
-    divisions = res["INDEPENDENT_DIVISIONS"]
-    for d in divisions:
-        print("  ", d)
-    print("\n ... Group-map:")
-    group_map = res["GROUP_MAP"]
-    for g, l in group_map.items():
-        print(f"  {str(g):20}: {l}")
-#    print("\n ... Groups:", res["GROUPS"])
-    print("\n ... Basic:", res["BASIC"])
-    atoms = res["MINIMAL_SUBGROUPS"]
-    print("\n ... Atoms:", atoms)
-
-    group2atoms = atomic_maps(atoms, list(group_map))
-    print("\n ... group -> atoms:", group2atoms)
-    for g, a in group2atoms.items():
-        print("       ::", g, "->", a)
-    a2glist = atoms2groups(divisions, group2atoms)
-    print("\n ... atoms -> groups:")
-    for a, g in a2glist.items():
-        print("       ::", a, "->", g)

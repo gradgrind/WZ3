@@ -170,7 +170,7 @@ def teacher_workload(activity_list: list[dict]) -> tuple[int, float]:
 
 
 def class_workload(klass:str, activity_list: list[tuple[str, dict]]
-) -> dict[Subgroup, int]:
+) -> list[tuple[Subgroup, int]]:
     """Calculate the total number of lessons for the pupils.
     The results should cover all (sub-)groups.
     """
@@ -179,11 +179,8 @@ def class_workload(klass:str, activity_list: list[tuple[str, dict]]
     lgsets = {}
     class_groups = get_classes()[klass].divisions
     g2fags = class_groups.group2atoms
-    all_fags = class_groups.filtered_atomic_groups
-    print("§ all_fags:", klass, all_fags)
-    print("§ g2fags", g2fags)
     fag2lessons = {}
-    for fag in all_fags:
+    for fag in class_groups.filtered_atomic_groups:
         fag2lessons[fag] = 0
         lgsets[fag] = set()
     for g, data in activity_list:
@@ -194,17 +191,25 @@ def class_workload(klass:str, activity_list: list[tuple[str, dict]]
         for l in (data.get("lessons") or []):
             lessons += l["LENGTH"]
         if lessons:
-            if g == "*":
-                fags = all_fags    # set[Subgroup]
-            else:
-                fags = g2fags[Subgroup(g.split('.'))]
+            fags = g2fags[Subgroup(g.split('.'))]   # set[Subgroup]
             for fag in fags:
                 if lg in lgsets[fag]: continue
                 lgsets[fag].add(lg)
                 fag2lessons[fag] += lessons
-#TODO: simplify groups
-
-    return fag2lessons
+    # Simplify groups
+    ln_lists = {}
+    for fag, l in fag2lessons.items():
+        try:
+            ln_lists[l].append(fag)
+        except KeyError:
+            ln_lists[l] = [fag]
+    fags2g = class_groups.atoms2group
+    result = [
+        (str(fags2g[frozenset(fags)]), l)
+        for l, fags in ln_lists.items()
+    ]
+    result.sort()
+    return result
 
 
 ######### for new-course-element dialog #########

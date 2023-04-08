@@ -675,7 +675,7 @@ class CourseEditorPage(Page):
                         activities.append((g, data))
             totals = class_workload(self.filter_value, activities)
             self.total.setText(
-                " ;  ".join((f"{g}: {n}") for g, n in totals.items())
+                " ;  ".join((f"{g}: {n}") for g, n in totals)
             )
             self.total.setEnabled(True)
         elif self.filter_field == "TEACHER":

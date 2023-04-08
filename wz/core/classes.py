@@ -47,6 +47,11 @@ class Subgroup(frozenset):
     def __str__(self):
         return '.'.join(sorted(self))
 
+class Groupset(frozenset):
+    """A <frozenset> wrapper  modifying the <__str__> method."""
+    def __str__(self):
+        return f"<<{' + '.join(sorted((str(m) for m in self)))}>>"
+
 ### -----
 
 class Classes(dict):
@@ -139,11 +144,11 @@ class ClassGroups:
                         return e
                 else:
                     self.divisions.append(gset)
-            self.atomic_groups = frozenset(
+            self.atomic_groups = Groupset(
                 Subgroup(ag) for ag in product(*self.divisions)
             )
         else:
-            self.atomic_groups = frozenset()
+            self.atomic_groups = Groupset()
         return ""
 
     def check_division(
@@ -215,7 +220,7 @@ class ClassGroups:
         return ".".join(glist)
 
     def filter_atomic_groups(self) -> list[str]:
-        self.filtered_atomic_groups = {
+        filtered_atomic_groups = {
             Subgroup(ag) for ag in self.atomic_groups
         }
         elist = []
@@ -224,7 +229,7 @@ class ClassGroups:
             duds = set()
             for fs, sub in self.subgroup_empties.items():
                 try:
-                    self.filtered_atomic_groups.remove(fs)
+                    filtered_atomic_groups.remove(fs)
                 except KeyError:
                     duds.add(fs)
                     elist.append(T["FILTER_NOT_ATOM"].format(sub=sub))
@@ -234,35 +239,38 @@ class ClassGroups:
         gdict = {}
         for bg in self.primary_groups:
             faglist = []
-            for fag in self.filtered_atomic_groups:
+            for fag in filtered_atomic_groups:
                 if bg in fag:
                     faglist.append(fag)
             if faglist:
-                gdict[frozenset(faglist)] = Subgroup([bg])
+                gdict[Groupset(faglist)] = Subgroup([bg])
             else:
                 elist.append(T["EMPTY_GROUP"].format(g=bg))
         # Add the atomic groups for all possible subgroups, starting
         # with the shortest
         for l in range(2, len(self.divisions)):
             c_set = set()
-            for fag in self.filtered_atomic_groups:
+            for fag in filtered_atomic_groups:
                 for c in combinations(fag, l):
                     c_set.add(Subgroup(c))
             for c in c_set:
                 faglist = []
-                for fag in self.filtered_atomic_groups:
+                for fag in filtered_atomic_groups:
                     if c < fag:
                         faglist.append(fag)
                 if faglist:
-                    fs = frozenset(faglist)
+                    fs = Groupset(faglist)
                     if fs not in gdict:
                         gdict[fs] = c
+        self.filtered_atomic_groups = Groupset(filtered_atomic_groups)
         # Add atomic groups, if they are not already represented by
         # shorter group tags
-        for fag in self.filtered_atomic_groups:
-            fs = Subgroup([fag])
+        for fag in filtered_atomic_groups:
+            fs = Groupset([fag])
             if fs not in gdict:
                 gdict[fs] = fag
+        gdict[self.filtered_atomic_groups] = Subgroup(["*"])
+        self.atoms2group = gdict
         # Reverse the mapping to get the group -> atoms mapping
         self.group2atoms = {v: k for k, v in gdict.items()}
         return elist
@@ -290,8 +298,10 @@ if __name__ == "__main__":
         print("divisions:", cg.divisions)
         for g, alist in cg.group2atoms.items():
             print(
-                cg.set2group(g),
+#                cg.set2group(g),
+                g,
                 "::",
-                [cg.set2group(a) for a in alist]
+#                [cg.set2group(a) for a in alist]
+                alist
             )
         print("%TEXT%", cg.text_value())

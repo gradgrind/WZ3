@@ -36,14 +36,11 @@ core.basic_data: {
 }
 
 core.classes: {
-#TODO: not yet fully adapted for WZ3?
-    INVALID_GROUP_FIELD: "Die Gruppenangabe (Feld DIVISIONS) für Klasse {klass} ist fehlerhaft"
-    GROUP_INFO_ERROR:  "Klasse {klass}, Gruppenangabe (Feld DIVISIONS): {e}"
-    INDEPENDENT_GROUPS_MISMATCH: "Untergruppe {group} fehlt"
+    GROUP_ERRORS:       "Fehlerhafte Gruppenangabe: {source}\n{prefix}{errors}"
+    CLASS_GROUPS_ERROR: "Fehler in Klassengruppen: {text}\n\n{e}"
     INVALID_GROUP_TAG:  "Klassenteilung „{div}“: ungültige Gruppenbezeichnung: „{g}“"
     REPEATED_GROUP:     "Klassenteilung „{div}“: wiederholte Gruppenbezeichnung: „{g}“"
     TOO_FEW_GROUPS:     "Klassenteilung „{div}“: mindestens zwei Gruppen erforderlich"
-    CLASS_GROUPS_ERROR: "Fehler in Klassengruppen: {text}\n\n{e}"
     FILTER_NOT_ATOM:    "„{sub}“ ist keine Elementargruppe"
     EMPTY_GROUP:        "Schülergruppe „{g}“ ist als leer konfiguriert"
 }
@@ -317,6 +314,7 @@ ui.modules.class_editor: {
 ui.modules.course_editor: {
     UNKNOWN_VALUE_IN_FIELD: "{cid}': '{cell_value}"
     REALLY_DELETE:  "Soll dieser „Kurs“ wirklich gelöscht werden?"
+    TEACHER_TOTAL:  "Stundenplanbelegung: {n} Stunden ;  Deputatsstunden: {total}"
 }
 
 ui.modules.grades_manager: {

@@ -58,8 +58,8 @@ from core.db_access import (
     NoRecord,
 )
 from core.teachers import Teachers
-from core.classes import Classes
 from core.basic_data import (
+    get_classes,
     Workload,
     clear_cache,
     get_subjects,
@@ -70,7 +70,8 @@ from core.basic_data import (
 from core.course_data import (
     filtered_courses,
     course_activities,
-    teacher_pay,
+    teacher_workload,
+    class_workload,
 )
 from ui.ui_base import (
     ### QtWidgets:
@@ -190,7 +191,7 @@ class CourseEditorPage(Page):
     def  init_data(self):
         teachers = Teachers()
         self.filter_list = {
-            "CLASS": Classes().get_class_list(skip_null=False),
+            "CLASS": get_classes().get_class_list(skip_null=False),
             "SUBJECT": get_subjects(),
             "TEACHER": [
                 (tid, teachers.name(tid))
@@ -665,20 +666,29 @@ class CourseEditorPage(Page):
         For classes, the (sub-)groups will be taken into consideration.
         """
         if self.filter_field == "CLASS":
-            REPORT("WARNING", "TODO: Calculation of class workload totals")
-        elif self.filter_field == "TEACHER":
-            total = 0.0
             activities = []
             for c in self.courses:
-                (   pay_only_l,
-                    simple_lesson_l,
-                    block_lesson_l
-                ) = course_activities(c["course"])
-                activities += pay_only_l
-                activities += simple_lesson_l
-                activities += block_lesson_l
-            total = teacher_pay(activities)
-            self.total.setText(str(total).replace('.', DECIMAL_SEP))
+                g = c["GRP"]
+                if not g: continue  # No pupils involved
+                for ctype in course_activities(c["course"]):
+                    for data in ctype:
+                        activities.append((g, data))
+            totals = class_workload(self.filter_value, activities)
+            self.total.setText(
+                " ;  ".join((f"{g}: {n}") for g, n in totals.items())
+            )
+            self.total.setEnabled(True)
+        elif self.filter_field == "TEACHER":
+            activities = []
+            for c in self.courses:
+                for ctype in course_activities(c["course"]):
+                    for data in ctype:
+                        activities.append(data)
+            nlessons, total = teacher_workload(activities)
+            self.total.setText(T["TEACHER_TOTAL"].format(
+                n=nlessons, total=str(total).replace('.', DECIMAL_SEP)
+            ))
+            self.total.setEnabled(True)
         else:
             self.total.clear()
             self.total.setEnabled(False)

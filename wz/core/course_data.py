@@ -48,7 +48,8 @@ from core.db_access import (
     db_values,
     NoRecord,
 )
-from core.basic_data import BlockTag, Workload
+from core.basic_data import BlockTag, Workload, get_classes
+from core.classes import Subgroup
 
 ### -----
 
@@ -147,21 +148,63 @@ def course_activities(course_id:int
     return (workload_elements, simple_elements, block_elements)
 
 
-def teacher_pay(activity_list):
-    """Calculate the total pay-relevant workload
+def teacher_workload(activity_list: list[dict]) -> tuple[int, float]:
+    """Calculate the total number of lessons and the pay-relevant
+    workload.
     """
+    # Each WORKLOAD entry must be counted only once, so keep track:
     wset = set()
     total = 0.0
+    nlessons = 0
     for data in activity_list:
         w = data["workload"]
-        if w in wset: continue  # only count a WORKLOAD entry once
+        if w in wset: continue
         wset.add(w)
         lessons = 0
         for l in (data.get("lessons") or []):
             lessons += l["LENGTH"]
+        nlessons += lessons
         pay = Workload.build(data["PAY_TAG"]).payment(lessons)
         total += pay
-    return total
+    return (nlessons, total)
+
+
+def class_workload(klass:str, activity_list: list[tuple[str, dict]]
+) -> dict[Subgroup, int]:
+    """Calculate the total number of lessons for the pupils.
+    The results should cover all (sub-)groups.
+    """
+    # Each LESSON_GROUPS entry must be counted only once FOR EACH GROUP,
+    # so keep track:
+    lgsets = {}
+    class_groups = get_classes()[klass].divisions
+    g2fags = class_groups.group2atoms
+    all_fags = class_groups.filtered_atomic_groups
+    print("§ all_fags:", klass, all_fags)
+    print("§ g2fags", g2fags)
+    fag2lessons = {}
+    for fag in all_fags:
+        fag2lessons[fag] = 0
+        lgsets[fag] = set()
+    for g, data in activity_list:
+        lg = data["lesson_group"]
+        if not lg:  # no lessons (payment-only entry)
+            continue
+        lessons = 0
+        for l in (data.get("lessons") or []):
+            lessons += l["LENGTH"]
+        if lessons:
+            if g == "*":
+                fags = all_fags    # set[Subgroup]
+            else:
+                fags = g2fags[Subgroup(g.split('.'))]
+            for fag in fags:
+                if lg in lgsets[fag]: continue
+                lgsets[fag].add(lg)
+                fag2lessons[fag] += lessons
+#TODO: simplify groups
+
+    return fag2lessons
 
 
 ######### for new-course-element dialog #########

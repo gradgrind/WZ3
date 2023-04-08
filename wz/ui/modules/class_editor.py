@@ -1,7 +1,7 @@
 """
 ui/modules/class_editor.py
 
-Last updated:  2023-03-25
+Last updated:  2023-04-08
 
 Edit class data.
 
@@ -115,7 +115,7 @@ class ClassEditorPage(Page):
             return False
         if (event.type() == QEvent.Type.MouseButtonPress
             and event.button() == Qt.MouseButton.LeftButton
-        ) or (event.type() == QEvent.KeyPress
+        ) or (event.type() == QEvent.Type.KeyPress
             and event.key() == Qt.Key.Key_Return
         ):
 #            oname = obj.objectName()

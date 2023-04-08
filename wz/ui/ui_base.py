@@ -1,7 +1,7 @@
 """
 ui/ui_base.py
 
-Last updated:  2023-03-24
+Last updated:  2023-04-08
 
 Support stuff for the GUI: application initialization, dialogs, etc.
 
@@ -44,17 +44,17 @@ if __name__ == "__main__":
 #    os.environ['PYSIDE_DESIGNER_PLUGINS'] = this
 
 # Import all qt stuff
-from qtpy.QtWidgets import *
-from qtpy.QtGui import *
-from qtpy.QtCore import *
-from qtpy.QtSql import *
-from qtpy import uic
+from PyQt6.QtWidgets import *
+from PyQt6.QtGui import *
+from PyQt6.QtCore import *
+Signal = pyqtSignal
+Slot = pyqtSlot
+from PyQt6.QtSql import *
+from PyQt6 import uic
 
 #__locale = locale.setlocale(locale.LC_ALL, "")
 __locale = locale.setlocale(locale.LC_ALL, "de_DE.UTF-8")
 print("LOCALE:", __locale)
-import qtpy
-print("qtpy:", qtpy.API_NAME, qtpy.QT_VERSION)
 
 #print("STYLES:", QStyleFactory.keys())
 QApplication.setStyle('Fusion')
@@ -65,12 +65,14 @@ QLocale.setDefault(qlocale)
 print("uiLanguages:", qlocale.uiLanguages())
 print("system uiLanguages:", QLocale.uiLanguages(QLocale.system()))
 
-path = QLibraryInfo.location(QLibraryInfo.TranslationsPath)
+path = QLibraryInfo.path(QLibraryInfo.LibraryPath.TranslationsPath)
 translator = QTranslator(APP)
 if translator.load(qlocale, "qtbase", "_", path):
     APP.installTranslator(translator)
 # ?
-SETTINGS = QSettings(QSettings.IniFormat, QSettings.UserScope, "MT", "WZ")
+SETTINGS = QSettings(
+    QSettings.Format.IniFormat, QSettings.Scope.UserScope, "MT", "WZ"
+)
 
 # This seems to deactivate activate-on-single-click in filedialog
 # (presumably elsewhere as well?)

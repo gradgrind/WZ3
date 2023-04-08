@@ -1,7 +1,7 @@
 """
 ui/edi_table.py
 
-Last updated:  2023-03-23
+Last updated:  2023-04-08
 
 An editable table widget using QTableWidget as base class. Only text
 cells are handled.
@@ -29,20 +29,18 @@ Copyright 2023 Michael Towers
 =-LICENCE=================================
 """
 
-from qtpy.QtWidgets import (
+from PyQt6.QtWidgets import (
     QApplication,
     QTableWidget,
     QTableWidgetItem,
     QMessageBox,
     QStyledItemDelegate,
     QStyleOptionViewItem,
+    QAbstractItemView,
 )
-from qtpy.QtCore import Qt, QPointF, QRectF, QSize, QLocale
-from qtpy.QtGui import QKeySequence
-try:
-    from qtpy.QtGui import QAction      # Qt6
-except:
-    from qtpy.QtWidgets import QAction  # Qt5
+from PyQt6.QtCore import Qt, QPointF, QRectF, QSize, QLocale
+from PyQt6.QtGui import QKeySequence
+from PyQt6.QtGui import QAction      # was in QtWidgets in Qt5
 
 
 class RangeError(Exception):
@@ -219,7 +217,7 @@ class EdiTableWidget(QTableWidget):
         # action.setIcon(
         if shortcut:
             action.setShortcut(shortcut)
-        # action.setShortcutContext(Qt.WidgetShortcut)
+        # action.setShortcutContext(Qt.ShortcutContext.WidgetShortcut)
         if function:
             action.triggered.connect(function)
         self.addAction(action)
@@ -245,7 +243,9 @@ class EdiTableWidget(QTableWidget):
     def __init__(self, parent=None):
         super().__init__(parent=parent)
         self.setItemPrototype(ValidatingWidgetItem())
-        self.setSelectionMode(self.ContiguousSelection)
+        self.setSelectionMode(
+            QAbstractItemView.SelectionMode.ContiguousSelection
+        )
         self.has_selection = False
         self.align_centre = False
         self.on_selection_state_change = self.__on_selection_state_change
@@ -259,7 +259,7 @@ class EdiTableWidget(QTableWidget):
         self.select_all = self.new_action(
             text=T["SELECT_ALL"],
             tooltip=T["TTSELECT_ALL"],
-            shortcut=QKeySequence(Qt.CTRL | Qt.Key_A),
+            shortcut=QKeySequence(Qt.Modifier.CTRL | Qt.Key.Key_A),
             function=self.selectAll,
         )
 
@@ -267,7 +267,9 @@ class EdiTableWidget(QTableWidget):
         self.unselect = self.new_action(
             text=T["UNSELECT"],
             tooltip=T["TTUNSELECT"],
-            shortcut=QKeySequence(Qt.CTRL | Qt.SHIFT | Qt.Key_A),
+            shortcut=QKeySequence(
+                Qt.Modifier.CTRL | Qt.Modifier.SHIFT | Qt.Key.Key_A
+            ),
             function=self.clearSelection,
         )
 
@@ -277,7 +279,7 @@ class EdiTableWidget(QTableWidget):
         self.copyCellsAction = self.new_action(
             text=T["COPYSELECTION"],
             tooltip=T["TTCOPYSELECTION"],
-            shortcut=QKeySequence(Qt.CTRL | Qt.Key_C),
+            shortcut=QKeySequence(Qt.Modifier.CTRL | Qt.Key.Key_C),
             function=self.copyCellsToClipboard,
         )
 
@@ -285,7 +287,7 @@ class EdiTableWidget(QTableWidget):
         self.pasteCellsAction = self.new_action(
             text=T["PASTE"],
             tooltip=T["TTPASTE"],
-            shortcut=QKeySequence(Qt.CTRL | Qt.Key_V),
+            shortcut=QKeySequence(Qt.Modifier.CTRL | Qt.Key.Key_V),
             function=self.pasteCellFromClipboard,
         )
 
@@ -293,7 +295,7 @@ class EdiTableWidget(QTableWidget):
         self.cutCellsAction = self.new_action(
             text=T["CUTSELECTION"],
             tooltip=T["TTCUTSELECTION"],
-            shortcut=QKeySequence(Qt.CTRL | Qt.Key_X),
+            shortcut=QKeySequence(Qt.Modifier.CTRL | Qt.Key.Key_X),
             function=self.cutCellsToClipboard,
         )
 
@@ -303,7 +305,7 @@ class EdiTableWidget(QTableWidget):
         self.insertRowAction = self.new_action(
             text=T["INSERTROW"],
             tooltip=T["TTINSERTROW"],
-            shortcut=QKeySequence(Qt.CTRL | Qt.Key_N),
+            shortcut=QKeySequence(Qt.Modifier.CTRL | Qt.Key.Key_N),
             function=self.insert_row,
         )
 
@@ -311,7 +313,7 @@ class EdiTableWidget(QTableWidget):
         self.deleteRowsAction = self.new_action(
             text=T["DELETEROWS"],
             tooltip=T["TTDELETEROWS"],
-            shortcut=QKeySequence(Qt.CTRL | Qt.Key_U),
+            shortcut=QKeySequence(Qt.Modifier.CTRL | Qt.Key.Key_U),
             function=self.delete_rows,
         )
 
@@ -321,7 +323,9 @@ class EdiTableWidget(QTableWidget):
         self.insertColumnAction = self.new_action(
             text=T["INSERTCOLUMN"],
             tooltip=T["TTINSERTCOLUMN"],
-            shortcut=QKeySequence(Qt.CTRL | Qt.SHIFT | Qt.Key_N),
+            shortcut=QKeySequence(
+                Qt.Modifier.CTRL | Qt.Modifier.SHIFT | Qt.Key.Key_N
+            ),
             function=self.insert_column,
         )
 
@@ -329,7 +333,9 @@ class EdiTableWidget(QTableWidget):
         self.deleteColumnsAction = self.new_action(
             text=T["DELETECOLUMNS"],
             tooltip=T["TTDELETECOLUMNS"],
-            shortcut=QKeySequence(Qt.CTRL | Qt.SHIFT | Qt.Key_U),
+            shortcut=QKeySequence(
+                Qt.Modifier.CTRL | Qt.Modifier.SHIFT | Qt.Key.Key_U
+            ),
             function=self.delete_columns,
         )
 
@@ -339,7 +345,7 @@ class EdiTableWidget(QTableWidget):
         self.undoAction = self.new_action(
             text=T["UNDO"],
             tooltip=T["TTUNDO"],
-            shortcut=QKeySequence(Qt.CTRL | Qt.Key_Z),
+            shortcut=QKeySequence(Qt.Modifier.CTRL | Qt.Key.Key_Z),
             function=self.undo,
         )
 
@@ -347,7 +353,9 @@ class EdiTableWidget(QTableWidget):
         self.redoAction = self.new_action(
             text=T["REDO"],
             tooltip=T["TTREDO"],
-            shortcut=QKeySequence(Qt.CTRL | Qt.SHIFT | Qt.Key_Z),
+            shortcut=QKeySequence(
+                Qt.Modifier.CTRL | Qt.Modifier.SHIFT | Qt.Key.Key_Z
+            ),
             function=self.redo,
         )
 
@@ -411,7 +419,7 @@ class EdiTableWidget(QTableWidget):
         self.insertColumnAction.setEnabled(False)
         self.deleteColumnsAction.setEnabled(False)
 
-        self.setContextMenuPolicy(Qt.ActionsContextMenu)
+        self.setContextMenuPolicy(Qt.ContextMenuPolicy.ActionsContextMenu)
 
         #self.cellChanged.connect(self.cell_changed)
         self.cellClicked.connect(self.cell_clicked)
@@ -462,7 +470,7 @@ class EdiTableWidget(QTableWidget):
                 if isinstance(val, str):
                     item = ValidatingWidgetItem(val)
                     if self.align_centre:
-                        item.setTextAlignment(Qt.AlignCenter)
+                        item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
                     self.setItem(r, c, item)
                 else:
                     raise Bug("Only string data is accepted")
@@ -612,7 +620,8 @@ class EdiTableWidget(QTableWidget):
     def cell_clicked(self, row, col):
         """Ctrl-Click "activates" the cell."""
         if (
-            QApplication.keyboardModifiers() & Qt.ControlModifier
+            QApplication.keyboardModifiers()
+            & Qt.KeyboardModifier.ControlModifier
         ) and self.get_selection()[0] == 1:
             self.activated(row, col)
 #        self.editItem(self.item(row, col))
@@ -638,17 +647,23 @@ class EdiTableWidget(QTableWidget):
         return event.position().toPoint()
 
     def mousePressEvent(self, event):
-        if event.button() == Qt.LeftButton:
+        if event.button() == Qt.MouseButton.LeftButton:
             self.clearSelection()
             self.setCurrentIndex(self.indexAt(self._get_point(event)))
-            if QApplication.keyboardModifiers() & Qt.ControlModifier:
+            if (
+                QApplication.keyboardModifiers()
+                & Qt.KeyboardModifier.ControlModifier
+            ):
                 return
         super().mousePressEvent(event)
 
     def mouseReleaseEvent(self, event):
         if (
-            event.button() == Qt.LeftButton
-            and QApplication.keyboardModifiers() & Qt.ControlModifier
+            event.button() == Qt.MouseButton.LeftButton
+            and (
+                QApplication.keyboardModifiers()
+                & Qt.KeyboardModifier.ControlModifier
+            )
         ):
             if self.get_selection()[0] == 1:
                 ix = self.indexAt(self._get_point(event))
@@ -659,14 +674,17 @@ class EdiTableWidget(QTableWidget):
         super().mouseReleaseEvent(event)
 
     def keyPressEvent(self, event):
-        if self.state() != self.EditingState:
+        if self.state() != self.State.EditingState:
             key = event.key()
-            if key == Qt.Key_Delete:
+            if key == Qt.Key.Key_Delete:
                 if self.cut_selection() is None:
                     self.set_text(self.currentRow(), self.currentColumn(), "")
                 return  # in this case don't call the base class method
-            if key == Qt.Key_Return and self.get_selection()[0] == 1:
-                if QApplication.keyboardModifiers() & Qt.ControlModifier:
+            if key == Qt.Key.Key_Return and self.get_selection()[0] == 1:
+                if (
+                    QApplication.keyboardModifiers()
+                    & Qt.KeyboardModifier.ControlModifier
+                ):
                     self.activated(self.currentRow(), self.currentColumn())
                 else:
                     self.editItem(self.currentItem())
@@ -934,7 +952,7 @@ class ValidatingWidgetItem(QTableWidgetItem):
         return ValidatingWidgetItem()
 
     def setData(self, role, value):
-        if role != Qt.EditRole:
+        if role != Qt.ItemDataRole.EditRole:
             super().setData(role, value)
             return
         if self.__validate:

@@ -1,7 +1,7 @@
 """
 ui/week_table.py
 
-Last updated:  2023-03-20
+Last updated:  2023-04-08
 
 A manager for the weekly availability tables.
 
@@ -83,8 +83,8 @@ class WeekTable:
         self.__table.setMinimumWidth(Hw + Vw + 10)
         self.__table.setFixedHeight(Vh + Hh + 10)
         # self.__table.setMaximumHeight(Vh + Hh + 10)
-        Hhd.setSectionResizeMode(QHeaderView.Stretch)
-        Vhd.setSectionResizeMode(QHeaderView.Stretch)
+        Hhd.setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        Vhd.setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
 
     def text(self):
         table = self.__table.read_all()

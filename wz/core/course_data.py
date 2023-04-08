@@ -1,7 +1,7 @@
 """
 core/course_data.py
 
-Last updated:  2023-04-04
+Last updated:  2023-04-08
 
 Support functions dealing with courses, lessons, etc.
 
@@ -48,7 +48,7 @@ from core.db_access import (
     db_values,
     NoRecord,
 )
-from core.basic_data import BlockTag
+from core.basic_data import BlockTag, Workload
 
 ### -----
 
@@ -145,6 +145,24 @@ def course_activities(course_id:int
             # pay-only item
             workload_elements.append(cwdict)
     return (workload_elements, simple_elements, block_elements)
+
+
+def teacher_pay(activity_list):
+    """Calculate the total pay-relevant workload
+    """
+    wset = set()
+    total = 0.0
+    for data in activity_list:
+        w = data["workload"]
+        if w in wset: continue  # only count a WORKLOAD entry once
+        wset.add(w)
+        lessons = 0
+        for l in (data.get("lessons") or []):
+            lessons += l["LENGTH"]
+        pay = Workload.build(data["PAY_TAG"]).payment(lessons)
+        total += pay
+    return total
+
 
 ######### for new-course-element dialog #########
 

@@ -1,7 +1,7 @@
 """
 ui/modules/course_editor.py
 
-Last updated:  2023-04-03
+Last updated:  2023-04-08
 
 Edit course and blocks+lessons data.
 
@@ -65,8 +65,13 @@ from core.basic_data import (
     get_subjects,
     ParallelTag,
     get_payment_weights,
+    DECIMAL_SEP,
 )
-from core.course_data import filtered_courses, course_activities
+from core.course_data import (
+    filtered_courses,
+    course_activities,
+    teacher_pay,
+)
 from ui.ui_base import (
     ### QtWidgets:
     QLineEdit,
@@ -177,9 +182,7 @@ class CourseEditorPage(Page):
         if self.filter_field == "CLASS": pb = self.pb_CLASS
         elif self.filter_field == "TEACHER": pb = self.pb_TEACHER
         else: pb = self.pb_SUBJECT
-        self.disable_action = True
         pb.setChecked(True)
-        self.disable_action = False
         self.set_combo(self.filter_field)
 
 # ++++++++++++++ The widget implementation fine details ++++++++++++++
@@ -199,7 +202,7 @@ class CourseEditorPage(Page):
     @Slot(QAbstractButton)
     def on_buttonGroup_buttonClicked(self, pb):
         # CLASS, SUBJECT or TEACHER
-        if self.disable_action: return
+        # Note: not called when <setChecked> is called on a member button
         oname = pb.objectName() 
         self.set_combo(oname.split("_", 1)[1])
 
@@ -208,13 +211,11 @@ class CourseEditorPage(Page):
         Choose the initial value selection on the basis of the last
         selected course.
         """
-        try:
-            fv = self.last_course.get(field)
-        except AttributeError:
-            fv = None
+        fv = self.last_course.get(field) if self.last_course else None
         self.filter_field = field
         # class, subject, teacher
         self.select_list = self.filter_list[self.filter_field]
+        self.suppress_handlers = True
         self.combo_class.clear()
         self.select2index.clear()
         for n, kv in enumerate(self.select_list):
@@ -223,6 +224,10 @@ class CourseEditorPage(Page):
         self.combo_class.setCurrentIndex(
             self.select2index.get(fv, 0)
         )
+        self.suppress_handlers = False
+        self.on_combo_class_currentIndexChanged(
+            self.combo_class.currentIndex()
+        )
 
     @Slot(int)
     def on_combo_class_currentIndexChanged(self, i):
@@ -230,12 +235,11 @@ class CourseEditorPage(Page):
         The method name is a bit of a misnomer, as the selector can be
         class, teacher or subject.
         """
-        if i >= 0:
-            self.load_course_table(i, 0)
+        if self.suppress_handlers or i < 0: return
+        self.load_course_table(i, 0)
 
     def load_course_table(self, select_index, table_row):
         self.filter_value = self.select_list[select_index][0]
-        self.suppress_handlers = True
         self.courses = filtered_courses(self.filter_field, self.filter_value)
         ## Populate the course table
         self.course_table.setRowCount(len(self.courses))
@@ -269,7 +273,6 @@ class CourseEditorPage(Page):
                 else:
                     item.setText(cell_value)
                 c += 1
-        self.suppress_handlers = False
         self.course_table.setCurrentCell(-1, 0)
         self.course_dict = None
         self.pb_delete_course.setEnabled(False)
@@ -279,6 +282,7 @@ class CourseEditorPage(Page):
             if table_row >= len(self.courses):
                 table_row = len(self.courses) - 1
             self.course_table.setCurrentCell(table_row, 0)
+        self.total_calc()
 
     def on_course_table_itemSelectionChanged(self):
         row = self.course_table.currentRow()
@@ -311,7 +315,7 @@ class CourseEditorPage(Page):
             clist = db_values("COURSE_WORKLOAD", "course", workload=key)
             return f"[{key}] " if len(clist) > 1 else ""
 
-        self.lesson_table_suppress_update = True
+        self.suppress_handlers = True
         self.lesson_table.setRowCount(0)
         self.course_lessons = []
         ### Build a list of entries
@@ -373,7 +377,7 @@ class CourseEditorPage(Page):
                     row_to_select = row
                 row += 1
         self.lesson_table.setCurrentCell(row_to_select, 0)
-        self.lesson_table_suppress_update = False
+        self.suppress_handlers = False
         self.on_lesson_table_itemSelectionChanged()
 
     @Slot()
@@ -453,11 +457,11 @@ class CourseEditorPage(Page):
         return self.course_field_editor.activate(course_dict)
 
     def on_lesson_table_itemSelectionChanged(self):
-        row = self.lesson_table.currentRow()
-        if self.lesson_table_suppress_update:
+        if self.suppress_handlers:
             return
         # Populate the form fields
         self.lesson_sub.setEnabled(False)
+        row = self.lesson_table.currentRow()
         if row < 0:
             self.current_lesson = (-2, None, -1)
             self.lesson_add.setEnabled(False)
@@ -539,6 +543,7 @@ class CourseEditorPage(Page):
                 )
                 cl["PAY_TAG"] = result
                 obj.setText(result)
+                self.total_calc()
         ### ROOM (COURSE_LESSONS)
         elif object_name == "wish_room":
             cl = self.current_lesson[1]
@@ -655,6 +660,29 @@ class CourseEditorPage(Page):
         else:
             raise Bug(f"Click event on object {object_name}")
 
+    def total_calc(self):
+        """For teachers and classes determine the total workload.
+        For classes, the (sub-)groups will be taken into consideration.
+        """
+        if self.filter_field == "CLASS":
+            REPORT("WARNING", "TODO: Calculation of class workload totals")
+        elif self.filter_field == "TEACHER":
+            total = 0.0
+            activities = []
+            for c in self.courses:
+                (   pay_only_l,
+                    simple_lesson_l,
+                    block_lesson_l
+                ) = course_activities(c["course"])
+                activities += pay_only_l
+                activities += simple_lesson_l
+                activities += block_lesson_l
+            total = teacher_pay(activities)
+            self.total.setText(str(total).replace('.', DECIMAL_SEP))
+        else:
+            self.total.clear()
+            self.total.setEnabled(False)
+
     @Slot(str)
     def on_lesson_length_textActivated(self, i):
         ival = int(i)
@@ -670,6 +698,7 @@ class CourseEditorPage(Page):
             )
             # Redisplay lessons
             self.display_lessons(lesson_select_id)
+            self.total_calc()
 
     @Slot()
     def on_new_element_clicked(self):
@@ -746,6 +775,7 @@ class CourseEditorPage(Page):
         )
         # Redisplay lessons
         self.display_lessons(l)
+        self.total_calc()
 
     @Slot()
     def on_lesson_add_clicked(self):
@@ -763,6 +793,7 @@ class CourseEditorPage(Page):
             LENGTH=lthis["LENGTH"]
         )
         self.display_lessons(newid)
+        self.total_calc()
 
     @Slot()
     def on_lesson_sub_clicked(self):
@@ -786,6 +817,7 @@ class CourseEditorPage(Page):
             lesson_group=lg["lesson_group"]
         )[-1]
         self.display_lessons(newid)
+        self.total_calc()
 
     @Slot()
     def on_remove_element_clicked(self):
@@ -816,6 +848,7 @@ class CourseEditorPage(Page):
                     lesson_group=lg["lesson_group"]
                 )
         self.display_lessons(-1)
+        self.total_calc()
 
 
 # --#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#

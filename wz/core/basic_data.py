@@ -1,5 +1,5 @@
 """
-core/basic_data.py - last updated 2023-03-27
+core/basic_data.py - last updated 2023-04-08
 
 Handle caching of the basic data sources
 
@@ -430,9 +430,8 @@ class Workload(NamedTuple):
         return cls(pay_tag, NL, PFT, PF, PY)
 
     def payment(self, nlessons:int=None):
-        if nlessons:
-            assert(self.NLESSONS == -1)
-            assert(self.PAY_FACTOR > 0.0)
+        # print("§Workload:", self)
+        if self.NLESSONS == -1 and nlessons > 0:
             return self.PAY_FACTOR * nlessons
         return self.PAYMENT
 

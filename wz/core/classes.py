@@ -1,5 +1,5 @@
 """
-core/classes.py - last updated 2023-04-07
+core/classes.py - last updated 2023-04-14
 
 Manage class data.
 
@@ -57,7 +57,6 @@ class Groupset(frozenset):
 class Classes(dict):
     def __init__(self):
         super().__init__()
-        self.__group_info = {}
         # ?    open_database()
         for klass, name, classroom, divisions in db_read_fields(
             "CLASSES",

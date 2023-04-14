@@ -1,7 +1,7 @@
 """
 ui/dialogs/dialog_course_fields.py
 
-Last updated:  2023-03-01
+Last updated:  2023-04-14
 
 Supporting "dialog", for the course editor – edit course fields.
 
@@ -33,7 +33,7 @@ T = TRANSLATIONS("ui.dialogs.dialog_course_fields")
 from core.db_access import (
     db_check_unique_entry,
 )
-from core.classes import Classes
+from core.basic_data import get_classes
 from ui.ui_base import (
     ### QtWidgets:
     QDialog,
@@ -150,11 +150,13 @@ class CourseEditorForm(QDialog):
         if klass != "--":
             # N.B. The null class should have no groups.
             self.cb_group.addItem("*")
-            groups = Classes().group_info(klass)["GROUP_MAP"]
+            class_groups = get_classes()[klass].divisions
             # <groups> is a mapping to the atomic groups
+            # (keys and values are <Subgroup> instances, not strings)
             #print("§GROUPS:", groups)
+            groups = class_groups.group2atoms
             if groups:
-                self.cb_group.addItems(sorted(groups))
+                self.cb_group.addItems(sorted(str(g) for g in groups))
             if group in groups:
                 self.cb_group.setCurrentText(group)
             elif group == '*':

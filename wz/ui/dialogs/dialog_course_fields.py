@@ -149,18 +149,15 @@ class CourseEditorForm(QDialog):
         self.cb_group.addItem("")
         if klass != "--":
             # N.B. The null class should have no groups.
-            self.cb_group.addItem("*")
             class_groups = get_classes()[klass].divisions
             # <groups> is a mapping to the atomic groups
             # (keys and values are <Subgroup> instances, not strings)
-            #print("§GROUPS:", groups)
             groups = class_groups.group2atoms
             if groups:
-                self.cb_group.addItems(sorted(str(g) for g in groups))
-            if group in groups:
+                glist = sorted(str(g) for g in groups)
+                self.cb_group.addItems(glist)
+            if group in glist:
                 self.cb_group.setCurrentText(group)
-            elif group == '*':
-                self.cb_group.setCurrentIndex(1)
             elif group:
                 raise Bug(f"Unknown group in class '{klass}': '{group}'")
 

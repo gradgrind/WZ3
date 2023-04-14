@@ -206,6 +206,7 @@ class ClassGroups:
         return Subgroup(g.split('.'))
 
     def set2group(self, s:set) -> str:
+        if str(s) == "*": return "*"
         glist = []
         for d in self.divisions:
             isct = s & d

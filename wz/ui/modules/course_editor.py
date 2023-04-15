@@ -550,7 +550,7 @@ class CourseEditorPage(Page):
         ### ROOM (COURSE_LESSONS)
         elif object_name == "wish_room":
             cl = self.current_lesson[1]
-            classroom = Classes().get_classroom(
+            classroom = get_classes().get_classroom(
                 self.course_dict["CLASS"], null_ok=True
             )
             result = RoomDialog.popup(
@@ -754,7 +754,7 @@ class CourseEditorPage(Page):
                 lesson_group = None
                 wld = db_new_row(
                     "WORKLOAD",
-                    PAY_TAG="",
+                    PAY_TAG=f"1*{get_payment_weights()[0][0]}",
                 )
             else:
                 assert(not btag)
@@ -782,6 +782,7 @@ class CourseEditorPage(Page):
                 "WORKLOAD",
                 lesson_group=lesson_group,
                 PAY_TAG=f".*{get_payment_weights()[0][0]}",
+                ROOM="$"
             )
         assert(wld)
         assert(self.course_id)

@@ -1,7 +1,7 @@
 """
 ui/ui_base.py
 
-Last updated:  2023-04-08
+Last updated:  2023-04-15
 
 Support stuff for the GUI: application initialization, dialogs, etc.
 
@@ -512,10 +512,13 @@ def _popupConfirm(question):
             None,
             T["CONFIRMATION"],
             " " * 100 + "\n" + question.rstrip() + "\n",
-            buttons=QMessageBox.Ok | QMessageBox.Cancel,
-            defaultButton=QMessageBox.Ok,
+            buttons=(
+                QMessageBox.StandardButton.Ok
+                | QMessageBox.StandardButton.Cancel
+            ),
+            defaultButton=QMessageBox.StandardButton.Ok,
         )
-        == QMessageBox.Ok
+        == QMessageBox.StandardButton.Ok
     )
 
 

@@ -239,7 +239,14 @@
        <item>
         <widget class="QPushButton" name="pb_new_course">
          <property name="text">
-          <string>neu</string>
+          <string>neuer Kurs</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QPushButton" name="pb_delete_course">
+         <property name="text">
+          <string>Kurs löschen</string>
          </property>
         </widget>
        </item>
@@ -257,16 +264,16 @@
         </spacer>
        </item>
        <item>
-        <widget class="QPushButton" name="pb_delete_course">
+        <widget class="QPushButton" name="pb_change_all">
          <property name="text">
-          <string>löschen</string>
+          <string>alle ändern</string>
          </property>
         </widget>
        </item>
        <item>
         <widget class="QPushButton" name="pb_edit_course">
          <property name="text">
-          <string>bearbeiten</string>
+          <string>Kurs bearbeiten</string>
          </property>
         </widget>
        </item>
@@ -816,7 +823,6 @@
   </layout>
  </widget>
  <tabstops>
-  <tabstop>pb_delete_course</tabstop>
   <tabstop>pb_edit_course</tabstop>
   <tabstop>lesson_table</tabstop>
   <tabstop>new_element</tabstop>

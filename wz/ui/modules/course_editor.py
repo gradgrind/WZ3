@@ -90,6 +90,7 @@ from ui.ui_base import (
     uic,
 )
 from ui.dialogs.dialog_course_fields import CourseEditorForm
+from ui.dialogs.dialog_courses_field_mod import FieldChangeForm
 from ui.dialogs.dialog_day_period import DayPeriodDialog
 from ui.dialogs.dialog_room_choice import RoomDialog
 from ui.dialogs.dialog_workload import WorkloadDialog
@@ -199,6 +200,7 @@ class CourseEditorPage(Page):
             ]
         }
         self.course_field_editor = None
+        self.course_field_changer = None
 
     @Slot(QAbstractButton)
     def on_buttonGroup_buttonClicked(self, pb):
@@ -404,6 +406,32 @@ class CourseEditorPage(Page):
     @Slot()
     def on_pb_edit_course_clicked(self):
         self.edit_course(self.course_table.currentRow())
+
+    @Slot()
+    def on_pb_change_all_clicked(self):
+        if not self.course_dict:
+            return
+        if not self.course_field_changer:
+            # Initialize dialog
+            self.course_field_changer = FieldChangeForm(
+                self.filter_list, self
+            )
+        changes = self.course_field_changer.activate(
+            self.course_dict, self.filter_field
+        )
+        if changes:
+            cid, tid, field, newval = changes
+            chlist = [
+                cdata["course"]
+                for cdata in self.courses
+                if cdata["CLASS"] == cid and cdata["TEACHER"] == tid
+            ]
+            for course in chlist:
+                db_update_field("COURSES", field, newval, course=course)
+            self.load_course_table(
+                self.combo_class.currentIndex(),
+                self.course_table.currentRow()
+            )
 
     def edit_course(self, row):
         """Activate the course field editor."""

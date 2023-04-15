@@ -1,7 +1,7 @@
 """
 core/course_data.py
 
-Last updated:  2023-04-08
+Last updated:  2023-04-15
 
 Support functions dealing with courses, lessons, etc.
 
@@ -50,6 +50,9 @@ from core.db_access import (
 )
 from core.basic_data import BlockTag, Workload, get_classes
 from core.classes import Subgroup
+
+WHOLE_CLASS = "*"
+WHOLE_CLASS_SG = Subgroup([WHOLE_CLASS])
 
 ### -----
 
@@ -177,13 +180,21 @@ def class_workload(klass:str, activity_list: list[tuple[str, dict]]
     # Each LESSON_GROUPS entry must be counted only once FOR EACH GROUP,
     # so keep track:
     lgsets = {}
+    fag2lessons = {}
     class_groups = get_classes()[klass].divisions
     g2fags = class_groups.group2atoms
-    fag2lessons = {}
-    for fag in class_groups.filtered_atomic_groups:
-        fag2lessons[fag] = 0
-        lgsets[fag] = set()
+    no_subgroups = not class_groups.filtered_atomic_groups
+    if no_subgroups:
+        # Add whole-class target
+        fag2lessons[WHOLE_CLASS_SG] = 0
+        lgsets[WHOLE_CLASS_SG] = set()
+    else:
+        for fag in class_groups.filtered_atomic_groups:
+            fag2lessons[fag] = 0
+            lgsets[fag] = set()
+    # Collect lessons per group
     for g, data in activity_list:
+        assert g, "This function shouldn't receive activities with no group"
         lg = data["lesson_group"]
         if not lg:  # no lessons (payment-only entry)
             continue
@@ -191,11 +202,19 @@ def class_workload(klass:str, activity_list: list[tuple[str, dict]]
         for l in (data.get("lessons") or []):
             lessons += l["LENGTH"]
         if lessons:
-            fags = g2fags[Subgroup(g.split('.'))]   # set[Subgroup]
-            for fag in fags:
-                if lg in lgsets[fag]: continue
-                lgsets[fag].add(lg)
-                fag2lessons[fag] += lessons
+            if g == WHOLE_CLASS and no_subgroups:
+                if lg in lgsets[WHOLE_CLASS_SG]: continue
+                lgsets[WHOLE_CLASS_SG].add(lg)
+                fag2lessons[WHOLE_CLASS_SG] += lessons
+            else:
+                for fag in g2fags[Subgroup(g.split('.'))]:
+                    if lg in lgsets[fag]: continue
+                    lgsets[fag].add(lg)
+                    fag2lessons[fag] += lessons
+    if no_subgroups:
+        ln = fag2lessons.pop(WHOLE_CLASS_SG)
+        assert not fag2lessons, "group lessons in class without subgroups???"
+        return [("", ln)]
     # Simplify groups
     ln_lists = {}
     for fag, l in fag2lessons.items():
@@ -204,10 +223,13 @@ def class_workload(klass:str, activity_list: list[tuple[str, dict]]
         except KeyError:
             ln_lists[l] = [fag]
     fags2g = class_groups.atoms2group
-    result = [
-        (str(fags2g[frozenset(fags)]), l)
-        for l, fags in ln_lists.items()
-    ]
+    result = []
+    for l, fags in ln_lists.items():
+        g = str(fags2g[frozenset(fags)])
+        if g == WHOLE_CLASS:
+            assert len(ln_lists) == 1, "WHOLE_CLASS *and* group lessons???"
+            return [("", l)]
+        result.append((str(fags2g[frozenset(fags)]), l))
     result.sort()
     return result
 

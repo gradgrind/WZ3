@@ -1,7 +1,7 @@
 """
 ui/modules/course_editor.py
 
-Last updated:  2023-04-08
+Last updated:  2023-04-15
 
 Edit course and blocks+lessons data.
 
@@ -308,7 +308,7 @@ class CourseEditorPage(Page):
         """Fill the lesson table for the current course (<self.course_id>).
         If <lesson_select_id> is 0, select the workload/payment element.
         If <lesson_select_id> is above 0, select the lesson with the given id.
-        Otherwise select no element.
+        Otherwise select the first element (if there is one).
         """
         def is_shared_workload(key:int) -> str:
             """Determine whether a WORKLOAD entry is used by multiple courses.
@@ -377,6 +377,8 @@ class CourseEditorPage(Page):
                 if ldata["id"] == lesson_select_id:
                     row_to_select = row
                 row += 1
+        if row_to_select < 0 and row > 0:
+            row_to_select = 0
         self.lesson_table.setCurrentCell(row_to_select, 0)
         self.suppress_handlers = False
         self.on_lesson_table_itemSelectionChanged()
@@ -663,7 +665,8 @@ class CourseEditorPage(Page):
 
     def total_calc(self):
         """For teachers and classes determine the total workload.
-        For classes, the (sub-)groups will be taken into consideration.
+        For classes, the (sub-)groups will be taken into consideration, so
+        that groups with differing total will be shown.
         """
         if self.filter_field == "CLASS":
             activities = []
@@ -674,9 +677,13 @@ class CourseEditorPage(Page):
                     for data in ctype:
                         activities.append((g, data))
             totals = class_workload(self.filter_value, activities)
-            self.total.setText(
-                " ;  ".join((f"{g}: {n}") for g, n in totals)
-            )
+            if len(totals) == 1:
+                g, n = totals[0]
+                assert not g, "unexpected single group"
+                text = str(n)
+            else:
+                text = " ;  ".join((f"{g}: {n}") for g, n in totals)
+            self.total.setText(text)
             self.total.setEnabled(True)
         elif self.filter_field == "TEACHER":
             activities = []

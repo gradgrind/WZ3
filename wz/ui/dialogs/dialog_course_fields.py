@@ -76,7 +76,7 @@ class CourseEditorForm(QDialog):
         c = course_data["CLASS"]
         for i, cdata in enumerate(self.classes):
             if c == cdata[0]:
-                print("§CLASS:", cdata)
+                # print("§CLASS:", cdata)
                 self.class0 = i
                 self.cb_class.setCurrentIndex(i)
                 self.init_groups(c, course_data["GRP"])

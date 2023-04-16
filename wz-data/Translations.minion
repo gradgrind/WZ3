@@ -208,6 +208,10 @@ local.abitur: {
     EMPTY_SLOTS:    "Keine Daten für {n} Felder"
 }
 
+tables.pdf_table: {
+    Repeated_page_title: "In PDF-Dokument, wiederholte Kopfzeile / Seitenkennung: „{ref}“"
+}
+
 template_engine.template_sub: {
 #TODO ... not yet implemented/adapted
     # Messages

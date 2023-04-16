@@ -41,33 +41,18 @@ T = TRANSLATIONS("core.list_activities")
 
 from typing import NamedTuple, Optional
 from io import BytesIO
-from reportlab.platypus import (
-    SimpleDocTemplate,
-    Paragraph,
-    PageBreak,
-    Table,
-    TableStyle,
-)
-from reportlab.lib.pagesizes import A4, landscape
-from reportlab.lib.styles import getSampleStyleSheet
-from reportlab.lib.units import mm
-from reportlab.lib import colors
-from reportlab.pdfbase.pdfmetrics import stringWidth
 
 from core.base import class_group_join
+from core.classes import Subgroup
 from core.basic_data import (
     Workload,
     BlockTag,
     get_subjects,
     get_teachers,
-
-#? ...
-    get_group_info,
     get_classes,
-    sublessons,
 )
 from core.db_access import db_read_fields
-from core.course_data import WHOLE_CLASS
+from core.course_data import WHOLE_CLASS, WHOLE_CLASS_SG
 import lib.pylightxl as xl
 
 DECIMAL_SEP = CONFIG["DECIMAL_SEP"]
@@ -102,7 +87,8 @@ class ClassData(NamedTuple):
     group: str
     teacher_id: str
     blocktag: Optional[BlockTag]
-    workgroup: int  # the WORKLOAD index
+    workgroup: int      # the WORKLOAD index
+    lesson_group: int   # the LESSON_GROUPS index
     room: str
     lessons: str
     nlessons: int
@@ -244,6 +230,7 @@ def class_list(clist: list[ActivityItem]):
             tid,
             data.blocktag,
             data.workload,
+            data.lesson_group,
             data.room,  #?
             t_lessons,
             nlessons,
@@ -253,8 +240,190 @@ def class_list(clist: list[ActivityItem]):
     return courses
 
 
-#TODO ...
+def make_teacher_table(activity_lists):
+    db = xl.Database()
+    teachers = get_teachers()
+    for t, datalist in activity_lists.items():
+        tname = teachers.name(t)
+        items = teacher_list(datalist)
+        # Add "worksheet" to table builder
+        db.add_ws(ws=tname)
+        sheet = db.ws(ws=tname)
+        headers = [
+            "Gruppe",
+            "Fach",
+            "Blockfach",
+            "Blockkennung",
+            "„Team“",
+            "Raum",
+            "Stunden",
+            "Anzahl",
+            "Deputat0",
+            "Deputat",
+        ]
+        for col_id, field in enumerate(headers, start=1):
+            sheet.update_index(row=1, col=col_id, val=field)
+        workgroups = set()
+        row_id = 2
+        payments = 0.0
+        for data in items:
+            if data.blocktag:
+                bs = data.blocktag.subject
+                bt = data.blocktag.tag
+            else:
+                bs, bt = "", ""
+            cg = print_class_group(data.klass, data.group)
+            # Take "teams" into account.
+            # A minimum would be to suppress the pay columns for all items
+            # belonging to a team except the first:
+            w = data.workgroup
+            if w in workgroups:
+                pay0 = ""
+                pay1 = f"[{w}]"
+                pay2 = 0.0
+            else:
+                workgroups.add(w)
+                pay0 = data.paynum
+                pay1 = data.paystr
+                pay2 = data.pay
+            payments += pay2
+            line = [
+                cg, 
+                data.subject, 
+                bs, 
+                bt, 
+                data.workgroup, 
+                data.room, 
+                data.lessons,
+                pay0,
+                pay1,
+                pay2,
+            ]
+            for col_id, field in enumerate(line, start=1):
+                sheet.update_index(row=row_id, col=col_id, val=field)
+            row_id += 1
+        # Total
+        lastcol = len(headers)
+        sheet.update_index(row=row_id, col=lastcol, val=payments)
+        sheet.update_index(row=row_id, col=lastcol - 1, val="insgesamt")
+    return db
 
+
+def make_class_table(activity_lists):
+    db = xl.Database()
+    # teachers = get_teachers()
+    for c in sorted(activity_lists):
+        datalist = activity_lists[c]
+        items = class_list(datalist)
+        # Calculate the total number of lessons for the pupils.
+        # The results should cover all (sub-)groups.
+        # Each LESSON_GROUPS entry must be counted only once FOR
+        # EACH GROUP, so keep track:
+        lgsets = {}
+        fag2lessons = {}
+        class_groups = get_classes()[c].divisions
+        g2fags = class_groups.group2atoms
+        no_subgroups = not class_groups.filtered_atomic_groups
+        if no_subgroups:
+            # Add whole-class target
+            fag2lessons[WHOLE_CLASS_SG] = 0
+            lgsets[WHOLE_CLASS_SG] = set()
+        else:
+            for fag in class_groups.filtered_atomic_groups:
+                fag2lessons[fag] = 0
+                lgsets[fag] = set()
+        # Add "worksheet" to table builder
+        db.add_ws(ws=c)
+        sheet = db.ws(ws=c)
+        headers = [
+            "Fach",
+            "Gruppe",
+            "Lehrer",
+            "Blockfach",
+            "Blockkennung",
+            "„Team“",
+            "Raum",
+            "Stunden",
+        ]
+        for col_id, field in enumerate(headers, start=1):
+            sheet.update_index(row=1, col=col_id, val=field)
+        row_id = 2
+        for data in items:
+            # Allocate the lessons to the minimal subgroups
+            if (
+                (g := data.group)
+                and (lg := data.lesson_group)
+                and (lessons := data.nlessons)
+            ):
+                if g == WHOLE_CLASS and no_subgroups:
+                    if lg not in lgsets[WHOLE_CLASS_SG]:
+                        lgsets[WHOLE_CLASS_SG].add(lg)
+                        fag2lessons[WHOLE_CLASS_SG] += lessons
+                else:
+                    for fag in g2fags[Subgroup(g.split('.'))]:
+                        if lg not in lgsets[fag]:
+                            lgsets[fag].add(lg)
+                            fag2lessons[fag] += lessons
+            # Gather the display info for this line
+            if data.blocktag:
+                bs = data.blocktag.subject
+                bt = data.blocktag.tag
+            else:
+                bs, bt = "", ""
+            line = [
+                data.subject,
+                data.group,
+                data.teacher_id,
+                bs, 
+                bt, 
+                data.workgroup, 
+                data.room, 
+                data.lessons,
+            ]
+            for col_id, field in enumerate(line, start=1):
+                sheet.update_index(row=row_id, col=col_id, val=field)
+            row_id += 1
+        # Collate the lesson counts
+        if no_subgroups:
+            ln = fag2lessons.pop(WHOLE_CLASS_SG)
+            assert not fag2lessons, "group lessons in class without subgroups???"
+            group_data = [("", ln)]
+        else:
+            # Simplify groups
+            ln_lists = {}
+            for fag, l in fag2lessons.items():
+                try:
+                    ln_lists[l].append(fag)
+                except KeyError:
+                    ln_lists[l] = [fag]
+            fags2g = class_groups.atoms2group
+            group_data = []
+            for l, fags in ln_lists.items():
+                g = str(fags2g[frozenset(fags)])
+                if g == WHOLE_CLASS:
+                    assert len(ln_lists) == 1, "WHOLE_CLASS *and* group lessons???"
+                    group_data = [("", l)]
+                    break
+                group_data.append((str(fags2g[frozenset(fags)]), l))
+            else:
+                group_data.sort()
+        # Total
+        lastcol = len(headers)
+        for g, l in group_data:
+            sheet.update_index(row=row_id, col=lastcol, val=l)
+            sheet.update_index(
+                row=row_id,
+                col=lastcol - 1,
+                val=g if g else "insgesamt"
+            )
+            row_id += 1
+    return db
+
+
+#######################################################################
+
+#TODO ...
+# This is old stuff ...
 
 
 def print_rooms(rooms):
@@ -648,246 +817,6 @@ def print_classes(class_data, tag2classes):
     )
 
 
-class TPrTuple(NamedTuple):
-    CLASS: str          # short name
-    BLOCKTAG: BlockTag  # invalid for "pay-only" ("#$") and "simple" ("~#")
-    SUBJECT: str    # full name
-    GROUP: str      # '*' for whole class, empty for "none"
-    RIDS: str       # room-ids
-    LENGTHS: tuple  # integer values, or empty
-    WORKLOAD: Workload
-
-#?
-    def pay(self, nlessons:int):
-        w = self.WORKLOAD
-        if w.WORKLOAD:
-            n = w.nd
-        else:
-            assert (nlessons >= 0)
-            n = nlessons
-        return (n, w.fd, n*w.fd)
-
-    def __str__(self):
-        if self.BLOCKTAG.sid and self.BLOCKTAG.tag:
-            # valid block-tag
-            prefix = f"[{str(self.BLOCKTAG)}] "
-        else:
-            prefix = ""
-        g = f".{self.GROUP}" if self.GROUP else ""
-        ll = ",".join(str(l) for l in self.LENGTHS)
-        if self.WORKLOAD.WORKLOAD:
-            nw = self.WORKLOAD.nd
-#TODO: This is declared as a <float> ... but shouldn't it be an <int>?
-# Also look at the setting-dialog ...
-        else:
-            nw = sum(self.LENGTHS)
-        f = self.WORKLOAD.fd
-        pay = f"{nw}x{self.WORKLOAD.PAY_FACTOR} = {nw*f}"
-        return f"{self.CLASS}{g}|{prefix}{self.SUBJECT}|{self.RIDS}|{ll}|{pay}"
-
-def list_one_teacher(tid):
-    tname = get_teachers().name(tid)
-    subjects = get_subjects()
-    classes = get_classes()
-    collect = []
-    for course in filtered_courses("TEACHER", tid):
-        w, l, b = course_activities(course["course"])
-        cl = course["CLASS"]
-        cr = classes.get_classroom(cl)
-        if w:
-            prtuple = TPrTuple(
-                cl,                 # CLASS (short name)
-                BlockTag("", "$", ""), # invalid block-type
-                subjects.map(course["SUBJECT"]), # SUBJECT (full name)
-                course["GRP"],      # GROUP
-                "",                 # RIDS: room-ids
-                (),                 # LENGTHS
-                w[0],               # WORKLOAD                 
-            )
-            collect.append(prtuple)
-        if l:
-            prtuple = TPrTuple(
-                course["CLASS"],    # CLASS (short name)
-                BlockTag("~", "", ""), # invalid blocktag
-                subjects.map(course["SUBJECT"]), # SUBJECT (full name)
-                course["GRP"],      # GROUP
-                l[1]["ROOM"].replace('$', cr), # RIDS: room-ids
-                tuple(l["LENGTH"] for l in l[3]), # LENGTHS
-                l[0],               # WORKLOAD                 
-            )
-            collect.append(prtuple)
-        for bi in b:
-            prtuple = TPrTuple(
-                course["CLASS"],    # CLASS (short name)
-                bi[4],              # blocktag
-                subjects.map(course["SUBJECT"]), # SUBJECT (full name)
-                course["GRP"],      # GROUP
-                bi[1]["ROOM"].replace('$', cr), # RIDS: room-ids
-                tuple(l["LENGTH"] for l in bi[3]), # LENGTHS
-                bi[0],               # WORKLOAD                 
-            )
-            print("  +++", prtuple)
-            collect.append(prtuple)
-
-
-
-def make_teacher_table(activity_lists):
-    db = xl.Database()
-    teachers = get_teachers()
-    for t, datalist in activity_lists.items():
-        tname = teachers.name(t)
-        # print("\n******", tname)
-        # for data in datalist:
-        #     print(" --", data)
-        items = teacher_list(datalist)
-        # for data in items:
-        #     print(" ++", data)
-        
-        db.add_ws(ws=tname)
-        sheet = db.ws(ws=tname)
-        headers = [
-            "Gruppe",
-            "Fach",
-            "Blockfach",
-            "Blockkennung",
-            "„Team“",
-            "Raum",
-            "Stunden",
-            "Anzahl",
-            "Deputat0",
-            "Deputat",
-        ]
-        for col_id, field in enumerate(headers, start=1):
-            sheet.update_index(row=1, col=col_id, val=field)
-        workgroups = set()
-        row_id = 2
-        payments = 0.0
-        for data in items:
-            if data.blocktag:
-                bs = data.blocktag.subject
-                bt = data.blocktag.tag
-            else:
-                bs, bt = "", ""
-            cg = print_class_group(data.klass, data.group)
-            # Take "teams" into account.
-            # A minimum would be to suppress the pay columns for all items
-            # belonging to a team except the first:
-            w = data.workgroup
-            if w in workgroups:
-                pay0 = ""
-                pay1 = f"[{w}]"
-                pay2 = 0.0
-            else:
-                workgroups.add(w)
-                pay0 = data.paynum
-                pay1 = data.paystr
-                pay2 = data.pay
-            payments += pay2
-            line = [
-                cg, 
-                data.subject, 
-                bs, 
-                bt, 
-                data.workgroup, 
-                data.room, 
-                data.lessons,
-                pay0,
-                pay1,
-                pay2,
-            ]
-            for col_id, field in enumerate(line, start=1):
-                sheet.update_index(row=row_id, col=col_id, val=field)
-            row_id += 1
-        # Total
-        lastcol = len(headers)
-        sheet.update_index(row=row_id, col=lastcol, val=payments)
-        sheet.update_index(row=row_id, col=lastcol - 1, val="insgesamt")
-    return db
-
-
-#TODO
-def make_class_table(activity_lists):
-    db = xl.Database()
-    # teachers = get_teachers()
-    for c, datalist in activity_lists.items():
-        # for data in datalist:
-        #     print(" --", data)
-        items = class_list(datalist)
-        # for data in items:
-        #     print(" ++", data)
-#TODO--  
-        continue
-        
-        db.add_ws(ws=c)
-        sheet = db.ws(ws=c)
-
-#    subject: str
-#    group: str
-#    teacher_id: str
-#    blocktag: Optional[BlockTag]
-#    workgroup: int  # the WORKLOAD index
-#    room: str
-#    lessons: str
-#    nlessons: int
-
-        headers = [
-            "Fach",
-            "Gruppe",
-            "Lehrer",
-            "Blockfach",
-            "Blockkennung",
-            "„Team“",
-            "Raum",
-            "Stunden",
-        ]
-        for col_id, field in enumerate(headers, start=1):
-            sheet.update_index(row=1, col=col_id, val=field)
-        workgroups = set()
-        row_id = 2
-        for data in items:
-            if data.blocktag:
-                bs = data.blocktag.subject
-                bt = data.blocktag.tag
-            else:
-                bs, bt = "", ""
-#TODO
-            # Take atomic groups and "teams" into account.
-# See how it's done in the course editor.
-
-            w = data.workgroup
-            if w in workgroups:
-                pass
-
-            else:
-                workgroups.add(w)
-                pass
-            
-
-#TODO
-            line = [
-                cg, 
-                data.subject, 
-                bs, 
-                bt, 
-                data.workgroup, 
-                data.room, 
-                data.lessons,
-                pay0,
-                pay1,
-                pay2,
-            ]
-            for col_id, field in enumerate(line, start=1):
-                sheet.update_index(row=row_id, col=col_id, val=field)
-            row_id += 1
-        # Total
-        lastcol = len(headers)
-
-#TODO: for the individual groups, where they differ ...
-        sheet.update_index(row=row_id, col=lastcol, val=payments)
-        sheet.update_index(row=row_id, col=lastcol - 1, val="insgesamt")
-    return db
-
-
 # --#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#
 
 if __name__ == "__main__":
@@ -907,6 +836,12 @@ if __name__ == "__main__":
 
     cdb = make_class_table(cl_lists)
 
+    filepath = saveDialog("Excel-Datei (*.xlsx)", "Klassenstunden")
+    if filepath and os.path.isabs(filepath):
+        if not filepath.endswith(".xlsx"):
+            filepath += ".xlsx"
+        xl.writexl(db=cdb, fn=filepath)
+        print("  --->", filepath)
 
     quit(0)
 

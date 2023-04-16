@@ -59,11 +59,11 @@ from core.basic_data import (
     Workload,
     BlockTag,
     get_subjects,
+    get_teachers,
 
 #? ...
     get_group_info,
     get_classes,
-    get_teachers,
     sublessons,
 )
 from core.db_access import db_read_fields
@@ -83,6 +83,7 @@ class ActivityItem(NamedTuple):
     paytag: Optional[str] # ??? Object?
     room: str
 
+
 class TeacherData(NamedTuple):
     klass: str
     subject: str
@@ -94,6 +95,18 @@ class TeacherData(NamedTuple):
     paynum: int     # for blocks/"Epochen" *can* be the number
     paystr: str
     pay: float
+
+
+class ClassData(NamedTuple):
+    subject: str
+    group: str
+    teacher_id: str
+    blocktag: Optional[BlockTag]
+    workgroup: int  # the WORKLOAD index
+    room: str
+    lessons: str
+    nlessons: int
+
 
 def read_db():
     """Read all the relevant data from the database tables concerning
@@ -166,9 +179,7 @@ def teacher_list(tlist: list[ActivityItem]):
     for a lesson + pay list sorted according to class and subject.
     """
     subjects = get_subjects()
-    # by_workload = {}    # {workload: []}
     courses = []
-    # by_block = {}       # {block_tag: []}
     for data in tlist:
         klass, group, sid, tid = data.course_data
         lessons = data.lessons
@@ -216,344 +227,34 @@ def print_class_group(klass, group):
     return f"({klass})"
 
 
-'''
-This is used in the course editor:
-
-    def total_calc(self):
-        """For teachers and classes determine the total workload.
-        For classes, the (sub-)groups will be taken into consideration, so
-        that groups with differing total will be shown.
-        """
-        if self.filter_field == "CLASS":
-            activities = []
-            for c in self.courses:
-                g = c["GRP"]
-                if not g: continue  # No pupils involved
-                for ctype in course_activities(c["course"]):
-                    for data in ctype:
-                        activities.append((g, data))
-            totals = class_workload(self.filter_value, activities)
-            if len(totals) == 1:
-                g, n = totals[0]
-                assert not g, "unexpected single group"
-                text = str(n)
-            else:
-                text = " ;  ".join((f"{g}: {n}") for g, n in totals)
-            self.total.setText(text)
-            self.total.setEnabled(True)
-        elif self.filter_field == "TEACHER":
-            activities = []
-            for c in self.courses:
-                for ctype in course_activities(c["course"]):
-                    for data in ctype:
-                        activities.append(data)
-            nlessons, total = teacher_workload(activities)
-            self.total.setText(T["TEACHER_TOTAL"].format(
-                n=nlessons, total=str(total).replace('.', DECIMAL_SEP)
-            ))
-            self.total.setEnabled(True)
-        else:
-            self.total.clear()
-            self.total.setEnabled(False)
-'''
+def class_list(clist: list[ActivityItem]):
+    """Deal with the data for a single class. Return the data needed
+    for a lesson + teacher list sorted according to subject.
+    """
+    subjects = get_subjects()
+    courses = []
+    for data in clist:
+        klass, group, sid, tid = data.course_data
+        lessons = data.lessons
+        nlessons = sum(lessons)
+        t_lessons = ','.join(str(l) for l in lessons)
+        cdata = ClassData(
+            subjects.map(sid),
+            group,
+            tid,
+            data.blocktag,
+            data.workload,
+            data.room,  #?
+            t_lessons,
+            nlessons,
+        )
+        courses.append(cdata)
+    courses.sort()
+    return courses
 
 
+#TODO ...
 
-class ClassBlockInfo(NamedTuple):
-#    course: CourseData
-    block: BlockTag
-    lessons: list[int]
-    periods: float  # (per week, averaged over the year)
-    notes: str
-
-
-class TeacherClassCourses:#(Courses):
-    def teacher_class_subjects(self):
-        """Organize the data according to teachers and classes, keeping
-        data for real lessons and payment-only entries separate.
-        Return an ordered list of the teachers, each with his/her own data.
-        The entries in this list are tuples:
-            teacher-id: str
-            teacher-name: str
-            lesson-data: {class -> {tag -> [BlockInfo, ... ]}}
-            payment-only-data: {class -> [(CourseData, PaymentData), ... ]}
-            partner-courses: {partner-tag -> [CourseData, ... ]}
-        For "continuous" items, a partner-tag is just the block-tag; if
-        there is a pay-tag, the partner-tag is "block-tag+sid%pay-tag".
-        """
-        teachers = get_teachers()
-        tlist = []
-        already_warned = set()  # for limiting warnings
-        for tid in teachers:
-            tname = teachers.name(tid)
-            ### Divide the data into classes
-            ## lesson data
-            c2tags = {}
-            tag2courses = {}  # {partner-tag -> [course, ... ]}
-            for tag, blockinfolist in (self.tid2tags.get(tid) or {}).items():
-                continuous = None
-                total_length = 0
-                tagged = {}
-                for blockinfo in blockinfolist:
-                    payinfo = blockinfo.payment_data
-                    course = blockinfo.course
-
-                    if not blockinfo.block.sid:
-                        ## A "plain" lesson
-                        # No block-sid, nothing parallel
-                        if len(blockinfolist) > 1:
-                            REPORT(
-                                "ERROR",
-                                T["BAD_PLAIN_BLOCK"].format(
-                                    course=course, tag=tag
-                                ),
-                            )
-                            continue
-
-                    elif payinfo.number:
-                        if payinfo.tag:
-                            stkey = f"{course.sid}%{payinfo.tag}"
-                            try:
-                                clist, pay, rooms = tagged[stkey]
-                            except KeyError:
-                                __courses = [course]
-                                tagged[stkey] = (
-                                    __courses,
-                                    (payinfo.number, payinfo.factor),
-                                    blockinfo.rooms,
-                                )
-                                tag2courses[f"{tag}+{stkey}"] = __courses
-                            else:
-                                if pay != (payinfo.number, payinfo.factor):
-                                    REPORT(
-                                        "ERROR",
-                                        T["PARTNER_PAY_MISMATCH"].format(
-                                            course1=clist[0],
-                                            course2=course,
-                                            tag=tag,
-                                        ),
-                                    )
-                                    continue
-                                if (
-                                    rooms
-                                    and blockinfo.rooms
-                                    and blockinfo.rooms != rooms
-                                ):
-                                    REPORT(
-                                        "ERROR",
-                                        T["PARTNER_ROOM_MISMATCH"].format(
-                                            course1=clist[0],
-                                            course2=course,
-                                            tag=tag,
-                                        ),
-                                    )
-                                    continue
-                                clist.append(course)
-
-                        # else: A normal block member
-
-                        total_length += payinfo.number_val
-
-                    else:
-                        # All parallel items must have the same subject
-                        # and payment, and same (or null) rooms
-                        if payinfo.tag:
-                            # A pay-tag would be superfluous as only one
-                            # "continuous" item is allowed anyway.
-                            REPORT(
-                                "ERROR",
-                                T["CONTINUOUS_BLOCK_TAG"].format(
-                                    course=course, tag=tag
-                                ),
-                            )
-                            continue
-                        if continuous:
-                            if continuous[1] != (
-                                payinfo.number,
-                                payinfo.factor,
-                            ):
-                                REPORT(
-                                    "ERROR",
-                                    T["PARTNER_PAY_MISMATCH"].format(
-                                        course1=continuous[0][0],
-                                        course2=course,
-                                        tag=tag,
-                                    ),
-                                )
-                                continue
-                            if continuous[0][0].sid != course.sid:
-                                REPORT(
-                                    "ERROR",
-                                    T["PARTNER_SID_MISMATCH"].format(
-                                        course1=continuous[0][0],
-                                        course2=course,
-                                        tag=tag,
-                                    ),
-                                )
-                                continue
-                            if (
-                                continuous[2]
-                                and blockinfo.rooms
-                                and blockinfo.rooms != continuous[2]
-                            ):
-                                REPORT(
-                                    "ERROR",
-                                    T["PARTNER_ROOM_MISMATCH"].format(
-                                        course1=continuous[0][0],
-                                        course2=course,
-                                        tag=tag,
-                                    ),
-                                )
-                                continue
-                            continuous[0].append(course)
-                        else:
-                            continuous = (
-                                [course],
-                                (payinfo.number, payinfo.factor),
-                                blockinfo.rooms,
-                            )
-                            tag2courses[tag] = continuous[0]
-
-                    klass = blockinfo.course.klass
-                    try:
-                        tag2blockinfo = c2tags[klass]
-                    except KeyError:
-                        c2tags[klass] = {tag: [blockinfo]}
-                    else:
-                        try:
-                            tag2blockinfo[tag].append(blockinfo)
-                        except KeyError:
-                            tag2blockinfo[tag] = [blockinfo]
-
-                if continuous:
-                    if total_length:
-                        REPORT(
-                            "ERROR",
-                            T["CONTINUOUS_PLUS_OTHERS"].format(
-                                course=continuous[0][0], tag=tag
-                            ),
-                        )
-                else:
-                    lessons = [sl.LENGTH for sl in sublessons(tag)]
-                    suml = sum(lessons)
-                    if suml:
-                        if total_length > suml:
-                            REPORT(
-                                "ERROR",
-                                T["BLOCK_TOO_FULL"].format(
-                                    teacher=tname, tag=tag
-                                ),
-                            )
-                    elif tag not in already_warned:
-                        REPORT("WARNING", T["BLOCK_NO_LESSONS"].format(tag=tag))
-                        already_warned.add(tag)
-
-            ## Payment-only data
-            c2paydata = {}
-            for course_pay_data in self.tid2paydata.get(tid) or []:
-                klass = course_pay_data[0].klass
-                try:
-                    c2paydata[klass].append(course_pay_data)
-                except KeyError:
-                    c2paydata[klass] = [course_pay_data]
-            ### Add teacher data to list of all teachers
-            tlist.append((tid, tname, c2tags, c2paydata, tag2courses))
-        return tlist
-
-    def read_class_blocks(self):
-        """Organize the data according to classes.
-        This method isolates the actual lessons taught in the various
-        classes – as far as the available information allows.
-        Payment-only entries are ignored.
-        Return an ordered list of the classes, each with its own data.
-        The entries in this list are tuples:
-            class: str
-            name: str
-            lesson-data: {tag -> [ClassBlockInfo, ... ]}
-            period-counts: {basic-group -> average number of periods per week}
-        """
-        classes = get_classes()
-        clist = []
-        tag2classes = {}  # {tag -> {klass}}
-        self.tag2classes = tag2classes
-        for klass, kname in classes.get_class_list():
-            tag2blocks = {}  # {tag -> [ClassBlockInfo, ... ]}
-            # Prepare group data – the null class is excluded
-            group_info = get_group_info(klass)
-            basic_groups = group_info["BASIC"]
-            if basic_groups:
-                group2basic = group_info["GROUP_MAP"]
-            else:
-                # If no class divisions, add an entry for the whole class
-                basic_groups = {"*"}
-                group2basic = {"*": ["*"]}
-            # Counters for number of periods per basic-group:
-            group_counts = {g: 0.0 for g in basic_groups}
-            # Read blocklist for each tag
-            try:
-                tag2blocklist = self.klass2tags[klass]
-            except KeyError:
-                clist.append((klass, kname, tag2blocks, group_counts))
-                continue
-            for tag, blockinfolist in tag2blocklist.items():
-                try:
-                    tag2classes[tag].add(klass)
-                except KeyError:
-                    tag2classes[tag] = {klass}
-                lessons = [sl.LENGTH for sl in sublessons(tag)]
-                lesson_sum = sum(lessons)
-                groups = set()
-                blocks = []
-                tag2blocks[tag] = blocks
-                for blockinfo in blockinfolist:
-                    course = blockinfo.course
-                    if not blockinfo.block.sid:
-                        ## A "plain" lesson
-                        # No block-sid, nothing parallel
-                        if len(blockinfolist) > 1:
-                            REPORT(
-                                "ERROR",
-                                T["BAD_PLAIN_BLOCK"].format(
-                                    course=course, tag=tag
-                                ),
-                            )
-                            continue
-
-                    # Only include info if there are real pupils
-                    if course.group:
-                        # Add number of periods to totals for basic groups
-                        if course.group == "*":
-                            groups.update(basic_groups)
-                        else:
-                            groups.update(group2basic[course.group])
-                        payinfo = blockinfo.payment_data
-                        if payinfo.number and blockinfo.block.sid:
-                            n = payinfo.number_val
-                        else:
-                            n = lesson_sum
-                        # Collect the necessary information about the block
-                        blocks.append(
-                            ClassBlockInfo(
-                                course,
-                                blockinfo.block,
-                                lessons,
-                                n,
-                                blockinfo.notes,
-                            )
-                        )
-                if lesson_sum:
-                    for g in groups:
-                        group_counts[g] += lesson_sum
-
-            ## Payment-only data is not collected for classes
-
-            ### Add class data to list of all classes
-            clist.append((klass, kname, tag2blocks, group_counts))
-            # if klass == '07G':
-            #     print(f"$$$ {klass}:", group_counts)
-            #     for k, v in tag2blocks.items():
-            #         print(f"\n  +++ {k}:", v)
-        return clist
 
 
 def print_rooms(rooms):
@@ -947,172 +648,6 @@ def print_classes(class_data, tag2classes):
     )
 
 
-PAGESIZE = A4
-PAGESIZE_L = landscape(PAGESIZE)
-BASE_MARGIN = 20 * mm
-
-
-class MyDocTemplate(SimpleDocTemplate):
-    """This is adapted to emit an "outline" for the teacher pages."""
-
-    def __init__(self, *args, **kargs):
-        self.key = 0
-        super().__init__(*args, **kargs)
-
-    def handle_flowable(self, flowables):
-        if flowables:
-            flowable = flowables[0]
-            try:
-                flowable.toc(self.canv)
-            except AttributeError:
-                pass
-        super().handle_flowable(flowables)
-
-
-tablestyle0 = [
-    ("FONT", (0, 0), (-1, -1), "Helvetica"),
-    ("FONTSIZE", (0, 0), (-1, -1), 12),
-    ("LINEABOVE", (0, -1), (-1, -1), 1, colors.lightgrey),
-]
-
-tablestyle = [
-    #         ('ALIGN', (0, 1), (-1, -1), 'RIGHT'),
-    ("LINEBELOW", (0, 0), (-1, 0), 1, colors.black),
-    ("LINEBELOW", (0, -1), (-1, -1), 1, colors.black),
-    ("FONT", (0, 0), (-1, 0), "Helvetica-Bold"),
-    #         ('LINEABOVE', (0,-1), (-1,-1), 1, colors.black),
-    ("FONT", (0, 1), (-1, -1), "Helvetica"),
-    #         ('BACKGROUND', (1, 1), (-2, -2), colors.white),
-    ("TEXTCOLOR", (0, 0), (1, -1), colors.black),
-    ("FONTSIZE", (0, 0), (-1, -1), 11),
-]
-
-
-class PdfCreator:
-    def add_page_number(self, canvas, doc):
-        canvas.saveState()
-        font_name = "Helvetica"
-        font_size = 11
-        canvas.setFont(font_name, font_size)
-        page_number_text = str(doc.page)
-        w = stringWidth(page_number_text, font_name, font_size)
-        x = (self.pagesize[0] - w) / 2
-        canvas.drawCentredString(x, 10 * mm, page_number_text)
-        canvas.restoreState()
-
-    def build_pdf(
-        self,
-        pagelist,
-        title,
-        author,
-        headers,
-        colwidths=None,
-        do_landscape=False,
-    ):
-        all_refs = set()
-
-        class PageHeader(Paragraph):
-            # class PageHeader(Preformatted):
-            def __init__(self, text, ref):
-                if ref in all_refs:
-                    REPORT("ERROR", T["Repeated_page_title"].format(ref=ref))
-                    self.ref = None
-                else:
-                    self.ref = ref
-                    all_refs.add(ref)
-                super().__init__(text, heading_style)
-
-            def toc(self, canvas):
-                if self.ref:
-                    canvas.bookmarkPage(self.ref)
-                    canvas.addOutlineEntry(self.ref, self.ref, 0, 0)
-
-        pdf_buffer = BytesIO()
-        self.pagesize = PAGESIZE_L if do_landscape else PAGESIZE
-        my_doc = MyDocTemplate(
-            pdf_buffer,
-            title=title,
-            author=author,
-            pagesize=self.pagesize,
-            topMargin=BASE_MARGIN,
-            leftMargin=BASE_MARGIN,
-            rightMargin=BASE_MARGIN,
-            bottomMargin=BASE_MARGIN,
-        )
-        sample_style_sheet = getSampleStyleSheet()
-        body_style = sample_style_sheet["BodyText"]
-        # body_style = sample_style_sheet["Code"]
-        body_style.fontSize = 11
-        # body_style.leading = 14
-        # body_style.leftIndent = 0
-
-        # body_style_2 = copy.deepcopy(body_style)
-        # body_style.spaceBefore = 10
-        # body_style_2.alignment = TA_RIGHT
-
-        heading_style = sample_style_sheet["Heading1"]
-        # print("????????????", heading_style.fontName)
-        # heading_style = copy.deepcopy(body_style)
-        heading_style.fontName = "Helvetica-Bold"
-        heading_style.fontSize = 14
-        heading_style.spaceAfter = 24
-
-        # sect_style = sample_style_sheet["Heading2"]
-        # sect_style.fontSize = 13
-        # sect_style.spaceBefore = 20
-        # print("\n STYLES:", sample_style_sheet.list())
-
-        flowables = []
-        for pagehead, plist in pagelist:
-            # print("§§§", repr(pagehead))
-            tstyle = tablestyle.copy()
-            # h = Paragraph(pagehead, heading_style)
-            h = PageHeader(pagehead, pagehead)  # .split("(", 1)[0].rstrip())
-            flowables.append(h)
-            lines = [headers]
-            nh = len(headers)
-            for secthead, slist in plist:
-                if secthead == "#":
-                    table = Table(slist)
-                    table_style = TableStyle(tablestyle0)
-                    table.setStyle(table_style)
-                    flowables.append(table)
-                    continue
-                lines.append("")
-                for sline in slist:
-                    r = len(lines)
-                    if sline:
-                        if sline[0].startswith("[["):
-                            tstyle.append(("SPAN", (0, r), (2, r)))
-                        elif sline[0] == "-----":
-                            tstyle.append(
-                                ("LINEABOVE", (0, r), (-1, r), 1, colors.black),
-                            )
-                            sline = sline[1:]
-                        lines.append(sline[:nh])
-                    else:
-                        lines.append("")
-
-            kargs = {"repeatRows": 1}
-            if colwidths:
-                kargs["colWidths"] = [w * mm for w in colwidths]
-            table = Table(lines, **kargs)
-            table_style = TableStyle(tstyle)
-            table.setStyle(table_style)
-            flowables.append(table)
-
-            flowables.append(PageBreak())
-        my_doc.build(
-            flowables,
-            onFirstPage=self.add_page_number,
-            onLaterPages=self.add_page_number,
-        )
-        pdf_value = pdf_buffer.getvalue()
-        pdf_buffer.close()
-        return pdf_value
-
-
-
 class TPrTuple(NamedTuple):
     CLASS: str          # short name
     BLOCKTAG: BlockTag  # invalid for "pay-only" ("#$") and "simple" ("~#")
@@ -1195,26 +730,18 @@ def list_one_teacher(tid):
             collect.append(prtuple)
 
 
-# --#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#
 
-if __name__ == "__main__":
-    from core.db_access import open_database
-    from ui.ui_base import saveDialog
-
-    open_database()
-    cl_lists, t_lists = read_db()
-    
+def make_teacher_table(activity_lists):
     db = xl.Database()
-
     teachers = get_teachers()
-    for t, datalist in t_lists.items():
+    for t, datalist in activity_lists.items():
         tname = teachers.name(t)
-        print("\n******", tname)
-        for data in datalist:
-            print(" --", data)
+        # print("\n******", tname)
+        # for data in datalist:
+        #     print(" --", data)
         items = teacher_list(datalist)
-        for data in items:
-            print(" ++", data)
+        # for data in items:
+        #     print(" ++", data)
         
         db.add_ws(ws=tname)
         sheet = db.ws(ws=tname)
@@ -1227,7 +754,7 @@ if __name__ == "__main__":
             "Raum",
             "Stunden",
             "Anzahl",
-            "",
+            "Deputat0",
             "Deputat",
         ]
         for col_id, field in enumerate(headers, start=1):
@@ -1268,7 +795,6 @@ if __name__ == "__main__":
                 pay1,
                 pay2,
             ]
-            
             for col_id, field in enumerate(line, start=1):
                 sheet.update_index(row=row_id, col=col_id, val=field)
             row_id += 1
@@ -1276,14 +802,110 @@ if __name__ == "__main__":
         lastcol = len(headers)
         sheet.update_index(row=row_id, col=lastcol, val=payments)
         sheet.update_index(row=row_id, col=lastcol - 1, val="insgesamt")
+    return db
 
+
+#TODO
+def make_class_table(activity_lists):
+    db = xl.Database()
+    # teachers = get_teachers()
+    for c, datalist in activity_lists.items():
+        # for data in datalist:
+        #     print(" --", data)
+        items = class_list(datalist)
+        # for data in items:
+        #     print(" ++", data)
+#TODO--  
+        continue
+        
+        db.add_ws(ws=c)
+        sheet = db.ws(ws=c)
+
+#    subject: str
+#    group: str
+#    teacher_id: str
+#    blocktag: Optional[BlockTag]
+#    workgroup: int  # the WORKLOAD index
+#    room: str
+#    lessons: str
+#    nlessons: int
+
+        headers = [
+            "Fach",
+            "Gruppe",
+            "Lehrer",
+            "Blockfach",
+            "Blockkennung",
+            "„Team“",
+            "Raum",
+            "Stunden",
+        ]
+        for col_id, field in enumerate(headers, start=1):
+            sheet.update_index(row=1, col=col_id, val=field)
+        workgroups = set()
+        row_id = 2
+        for data in items:
+            if data.blocktag:
+                bs = data.blocktag.subject
+                bt = data.blocktag.tag
+            else:
+                bs, bt = "", ""
+#TODO
+            # Take atomic groups and "teams" into account.
+# See how it's done in the course editor.
+
+            w = data.workgroup
+            if w in workgroups:
+                pass
+
+            else:
+                workgroups.add(w)
+                pass
+            
+
+#TODO
+            line = [
+                cg, 
+                data.subject, 
+                bs, 
+                bt, 
+                data.workgroup, 
+                data.room, 
+                data.lessons,
+                pay0,
+                pay1,
+                pay2,
+            ]
+            for col_id, field in enumerate(line, start=1):
+                sheet.update_index(row=row_id, col=col_id, val=field)
+            row_id += 1
+        # Total
+        lastcol = len(headers)
+
+#TODO: for the individual groups, where they differ ...
+        sheet.update_index(row=row_id, col=lastcol, val=payments)
+        sheet.update_index(row=row_id, col=lastcol - 1, val="insgesamt")
+    return db
+
+
+# --#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#
+
+if __name__ == "__main__":
+    from core.db_access import open_database
+    from ui.ui_base import saveDialog
+
+    open_database()
+    cl_lists, t_lists = read_db()
+    tdb = make_teacher_table(t_lists)
 
     filepath = saveDialog("Excel-Datei (*.xlsx)", "Deputate")
     if filepath and os.path.isabs(filepath):
         if not filepath.endswith(".xlsx"):
             filepath += ".xlsx"
-        xl.writexl(db=db, fn=filepath)
+        xl.writexl(db=tdb, fn=filepath)
         print("  --->", filepath)
+
+    cdb = make_class_table(cl_lists)
 
 
     quit(0)

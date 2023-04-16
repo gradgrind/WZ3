@@ -55,22 +55,150 @@ from reportlab.lib import colors
 from reportlab.pdfbase.pdfmetrics import stringWidth
 
 from core.basic_data import (
+    Workload,
+    BlockTag,
+
+#? ...
     get_group_info,
     get_classes,
     get_teachers,
     get_subjects,
     sublessons,
-    Workload,
-    BlockTag,
-#    PaymentData,
 )
-from core.course_data import filtered_courses, course_activities
+from core.db_access import db_read_fields
+
+#from core.course_data import filtered_courses, course_activities
 
 DECIMAL_SEP = CONFIG["DECIMAL_SEP"]
 
 ### -----
 
+class ActivityItem(NamedTuple):
+    course_data: tuple[str, str, str, str]
+    workload: int
+    lesson_group: int
+    blocktag: Optional[BlockTag]
+    lessons: list[int]
+    paytag: Optional[str] # ??? Object?
+    room: str
+
+
+def read_db():
+    """Read all the relevant data from the database tables concerning
+    the workload of classes and teachers.
+    """
+    cl_lists = {}
+    t_lists = {}
+    
+    c_2_cl_g_s_t = {}
+    w_2_lg_p_r = {}
+    lg_2_ll = {}
+    lg_2_bt_ll = {}
+
+    for c, cl, g, s, t in db_read_fields(
+        "COURSES",
+        ("course", "CLASS", "GRP", "SUBJECT", "TEACHER")
+    ):
+        c_2_cl_g_s_t[c] = (cl, g, s, t)
+
+    for w, lg, paytag, room in db_read_fields(
+        "WORKLOAD",
+        ("workload", "lesson_group", "PAY_TAG", "ROOM")
+    ):
+        w_2_lg_p_r[w] = (lg, Workload.build(paytag), room)
+
+    for lg, l in db_read_fields(
+        "LESSONS",
+        ("lesson_group", "LENGTH")
+    ):
+        try:
+            lg_2_ll[lg].append(l)
+        except KeyError:
+            lg_2_ll[lg] = [l]
+        
+    for lg, bsid, btag in db_read_fields(
+        "LESSON_GROUPS",
+        ("lesson_group", "BLOCK_SID", "BLOCK_TAG")
+    ):
+        lg_2_bt_ll[lg] = (
+            BlockTag.build(bsid, btag) if bsid else None,
+            lg_2_ll[lg]     # assumes each lg has lessons!
+        )
+    
+    for c, w in db_read_fields(
+        "COURSE_WORKLOAD",
+        ("course", "workload")
+    ):
+        cdata = c_2_cl_g_s_t[c]
+        lg, p, r = w_2_lg_p_r[w]
+        if lg:
+            bt, ll = lg_2_bt_ll[lg]
+        else:
+            bt, ll = None, []
+        cl = cdata[0]
+        t = cdata[3]
+        data = ActivityItem(cdata, w, lg, bt, ll, p, r)
+        print(" --", data)
+        try:
+            t_lists[t].append(data)
+        except KeyError:
+            t_lists[t] = [data]
+        try:
+            cl_lists[cl].append(data)
+        except KeyError:
+            cl_lists[cl] = [data]
+    return (cl_lists, t_lists)
+
+
 #TODO ...
+# For a teacher I need lessons, blocks, teams and pay-onlys
+# Ideally theses should be organized by class.
+# However, teams can include multiple classes.
+
+
+
+'''
+This is used in the course editor:
+
+    def total_calc(self):
+        """For teachers and classes determine the total workload.
+        For classes, the (sub-)groups will be taken into consideration, so
+        that groups with differing total will be shown.
+        """
+        if self.filter_field == "CLASS":
+            activities = []
+            for c in self.courses:
+                g = c["GRP"]
+                if not g: continue  # No pupils involved
+                for ctype in course_activities(c["course"]):
+                    for data in ctype:
+                        activities.append((g, data))
+            totals = class_workload(self.filter_value, activities)
+            if len(totals) == 1:
+                g, n = totals[0]
+                assert not g, "unexpected single group"
+                text = str(n)
+            else:
+                text = " ;  ".join((f"{g}: {n}") for g, n in totals)
+            self.total.setText(text)
+            self.total.setEnabled(True)
+        elif self.filter_field == "TEACHER":
+            activities = []
+            for c in self.courses:
+                for ctype in course_activities(c["course"]):
+                    for data in ctype:
+                        activities.append(data)
+            nlessons, total = teacher_workload(activities)
+            self.total.setText(T["TEACHER_TOTAL"].format(
+                n=nlessons, total=str(total).replace('.', DECIMAL_SEP)
+            ))
+            self.total.setEnabled(True)
+        else:
+            self.total.clear()
+            self.total.setEnabled(False)
+'''
+
+
 
 class ClassBlockInfo(NamedTuple):
 #    course: CourseData
@@ -443,6 +571,7 @@ def print_teachers(teacher_data, block_tids=None, show_workload=False):
         if tid in blocked_tids:
             REPORT("INFO", T["TEACHER_SUPPRESSED"].format(tname=tname))
             continue
+#?
         if not (c2tags or c2paydata):
             REPORT("INFO", T["TEACHER_NO_ACTIVITIES"].format(tname=tname))
             continue
@@ -457,11 +586,14 @@ def print_teachers(teacher_data, block_tids=None, show_workload=False):
                 pass
             else:
                 for tag, blockinfolist in tags.items():
+#++ lesson lengths
                     lessonlist = [sl.LENGTH for sl in sublessons(tag)]
                     lessons = ",".join(map(str, lessonlist))
                     lesson_sum = sum(lessonlist)
+                  
                     # print("???TAG", tag)
                     block = blockinfolist[0].block
+#++ block tag
                     if block.sid:
                         bname = block.subject
                         for blockinfo in blockinfolist:
@@ -485,6 +617,7 @@ def print_teachers(teacher_data, block_tids=None, show_workload=False):
                                 if payment.number_val >= lesson_sum:
                                     if course.sid == block.sid:
                                         class_list.append(
+#++ what is collected?
                                             (
                                                 sname,
                                                 course.class_group(),
@@ -1010,7 +1143,9 @@ if __name__ == "__main__":
     from ui.ui_base import saveDialog
 
     open_database()
-    list_one_teacher("AE")
+    read_db()
+
+#    list_one_teacher("AE")
     quit(0)
 
 

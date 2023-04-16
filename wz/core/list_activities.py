@@ -1,7 +1,7 @@
 """
 core/list_activities.py
 
-Last updated:  2023-03-25
+Last updated:  2023-04-16
 
 Present information on activities for teachers and classes/groups.
 The information is formatted in pdf documents using the reportlab
@@ -54,20 +54,21 @@ from reportlab.lib.units import mm
 from reportlab.lib import colors
 from reportlab.pdfbase.pdfmetrics import stringWidth
 
+from core.base import class_group_join
 from core.basic_data import (
     Workload,
     BlockTag,
+    get_subjects,
 
 #? ...
     get_group_info,
     get_classes,
     get_teachers,
-    get_subjects,
     sublessons,
 )
 from core.db_access import db_read_fields
-
-#from core.course_data import filtered_courses, course_activities
+from core.course_data import WHOLE_CLASS
+import lib.pylightxl as xl
 
 DECIMAL_SEP = CONFIG["DECIMAL_SEP"]
 
@@ -82,6 +83,17 @@ class ActivityItem(NamedTuple):
     paytag: Optional[str] # ??? Object?
     room: str
 
+class TeacherData(NamedTuple):
+    klass: str
+    subject: str
+    group: str
+    blocktag: Optional[BlockTag]
+    workgroup: int  # the WORKLOAD index
+    room: str
+    lessons: str
+    paynum: int     # for blocks/"Epochen" *can* be the number
+    paystr: str
+    pay: float
 
 def read_db():
     """Read all the relevant data from the database tables concerning
@@ -138,7 +150,6 @@ def read_db():
         cl = cdata[0]
         t = cdata[3]
         data = ActivityItem(cdata, w, lg, bt, ll, p, r)
-        print(" --", data)
         try:
             t_lists[t].append(data)
         except KeyError:
@@ -150,11 +161,59 @@ def read_db():
     return (cl_lists, t_lists)
 
 
-#TODO ...
-# For a teacher I need lessons, blocks, teams and pay-onlys
-# Ideally theses should be organized by class.
-# However, teams can include multiple classes.
+def teacher_list(tlist: list[ActivityItem]):
+    """Deal with the data for a single teacher. Return the data needed
+    for a lesson + pay list sorted according to class and subject.
+    """
+    subjects = get_subjects()
+    # by_workload = {}    # {workload: []}
+    courses = []
+    # by_block = {}       # {block_tag: []}
+    for data in tlist:
+        klass, group, sid, tid = data.course_data
+        lessons = data.lessons
+        nlessons = sum(lessons)
+        t_lessons = ','.join(str(l) for l in lessons)
+        paytag = data.paytag
+        t_pay = paytag.PAYMENT
+        if paytag.PAY_FACTOR_TAG:
+            if paytag.NLESSONS == -1:
+                t_paystr = f"{nlessons} x {paytag.PAY_FACTOR_TAG}"
+                if nlessons > 0:
+                    t_pay = paytag.PAY_FACTOR * nlessons
+            else:
+                t_paystr = f"{paytag.NLESSONS} x {paytag.PAY_FACTOR_TAG}"
+        else:
+            t_paystr = ""
+        tdata = TeacherData(
+            klass,
+            subjects.map(sid),
+            group,
+            data.blocktag,
+            data.workload,
+            data.room,
+            t_lessons,
+            paytag.NLESSONS,    # for blocks/"Epochen" *can* be the number
+            t_paystr,
+            t_pay
+        )
+        courses.append(tdata)
+    courses.sort()
+    return courses
 
+
+def print_class_group(klass, group):
+    """Return a representation of the class and group for the
+    teacher-lists.
+    If there is no group, return the class in brackets.
+    If the group is the whole class, just return the class.
+    Otherwise return the standard form for class + cgroup.
+    """
+    if group:
+        if group == WHOLE_CLASS:
+            return klass
+        return class_group_join(klass, group)
+    return f"({klass})"
 
 
 '''
@@ -1143,9 +1202,90 @@ if __name__ == "__main__":
     from ui.ui_base import saveDialog
 
     open_database()
-    read_db()
+    cl_lists, t_lists = read_db()
+    
+    db = xl.Database()
 
-#    list_one_teacher("AE")
+    teachers = get_teachers()
+    for t, datalist in t_lists.items():
+        tname = teachers.name(t)
+        print("\n******", tname)
+        for data in datalist:
+            print(" --", data)
+        items = teacher_list(datalist)
+        for data in items:
+            print(" ++", data)
+        
+        db.add_ws(ws=tname)
+        sheet = db.ws(ws=tname)
+        headers = [
+            "Gruppe",
+            "Fach",
+            "Blockfach",
+            "Blockkennung",
+            "„Team“",
+            "Raum",
+            "Stunden",
+            "Anzahl",
+            "",
+            "Deputat",
+        ]
+        for col_id, field in enumerate(headers, start=1):
+            sheet.update_index(row=1, col=col_id, val=field)
+        workgroups = set()
+        row_id = 2
+        payments = 0.0
+        for data in items:
+            if data.blocktag:
+                bs = data.blocktag.subject
+                bt = data.blocktag.tag
+            else:
+                bs, bt = "", ""
+            cg = print_class_group(data.klass, data.group)
+            # Take "teams" into account.
+            # A minimum would be to suppress the pay columns for all items
+            # belonging to a team except the first:
+            w = data.workgroup
+            if w in workgroups:
+                pay0 = ""
+                pay1 = f"[{w}]"
+                pay2 = 0.0
+            else:
+                workgroups.add(w)
+                pay0 = data.paynum
+                pay1 = data.paystr
+                pay2 = data.pay
+            payments += pay2
+            line = [
+                cg, 
+                data.subject, 
+                bs, 
+                bt, 
+                data.workgroup, 
+                data.room, 
+                data.lessons,
+                pay0,
+                pay1,
+                pay2,
+            ]
+            
+            for col_id, field in enumerate(line, start=1):
+                sheet.update_index(row=row_id, col=col_id, val=field)
+            row_id += 1
+        # Total
+        lastcol = len(headers)
+        sheet.update_index(row=row_id, col=lastcol, val=payments)
+        sheet.update_index(row=row_id, col=lastcol - 1, val="insgesamt")
+
+
+    filepath = saveDialog("Excel-Datei (*.xlsx)", "Deputate")
+    if filepath and os.path.isabs(filepath):
+        if not filepath.endswith(".xlsx"):
+            filepath += ".xlsx"
+        xl.writexl(db=db, fn=filepath)
+        print("  --->", filepath)
+
+
     quit(0)
 
 

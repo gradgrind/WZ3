@@ -1,7 +1,7 @@
 """
 tables/pdf_table.py
 
-Last updated:  2023-04-07
+Last updated:  2023-04-19
 
 Generate tabular reports as PDF files with multiple pages.
 
@@ -74,15 +74,21 @@ class MyDocTemplate(SimpleDocTemplate):
                 pass
         super().handle_flowable(flowables)
 
-
+# Table coordinates are 0-based cells: (column, row).
+# Positive coordinates are from (left, top),
+# negative coordinates are from (right, bottom).
 tablestyle0 = [
+    # Simple table with grey line above bottom row, 12pt text
     ("FONT", (0, 0), (-1, -1), "Helvetica"),
     ("FONTSIZE", (0, 0), (-1, -1), 12),
     ("LINEABOVE", (0, -1), (-1, -1), 1, colors.lightgrey),
 ]
 
 tablestyle = [
+    # A somewhat fancier table with black lines below the first and
+    # last lines, bold titles, 11pt text.
     #         ('ALIGN', (0, 1), (-1, -1), 'RIGHT'),
+    ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
     ("LINEBELOW", (0, 0), (-1, 0), 1, colors.black),
     ("LINEBELOW", (0, -1), (-1, -1), 1, colors.black),
     ("FONT", (0, 0), (-1, 0), "Helvetica-Bold"),
@@ -112,7 +118,7 @@ class PdfCreator:
         title,
         author,
         headers,
-        colwidths=None,
+        colwidths=None,     # to specify column widths: list of sizes in mm
         do_landscape=False,
     ):
         all_refs = set()
@@ -146,6 +152,8 @@ class PdfCreator:
             bottomMargin=BASE_MARGIN,
         )
         sample_style_sheet = getSampleStyleSheet()
+
+# body_style is not used at present!
         body_style = sample_style_sheet["BodyText"]
         # body_style = sample_style_sheet["Code"]
         body_style.fontSize = 11
@@ -156,6 +164,7 @@ class PdfCreator:
         # body_style.spaceBefore = 10
         # body_style_2.alignment = TA_RIGHT
 
+        # style for PageHeader
         heading_style = sample_style_sheet["Heading1"]
         # print("????????????", heading_style.fontName)
         # heading_style = copy.deepcopy(body_style)
@@ -171,13 +180,17 @@ class PdfCreator:
         flowables = []
         for pagehead, plist in pagelist:
             print("§§§", repr(pagehead), plist)
+            # Need a copy of the style because it might be extended
             tstyle = tablestyle.copy()
             # h = Paragraph(pagehead, heading_style)
+            # The second argument is the outline tag:
             h = PageHeader(pagehead, pagehead)  # .split("(", 1)[0].rstrip())
             flowables.append(h)
             lines = [headers]
             nh = len(headers)
             for secthead, slist in plist:
+                # With the special "section header" "#" add a table styled
+                # by <tablestyle0>
                 if secthead == "#":
                     table = Table(slist)
                     table_style = TableStyle(tablestyle0)
@@ -188,6 +201,7 @@ class PdfCreator:
                 for sline in slist:
                     r = len(lines)
                     if sline:
+# This is rather specialized ... !
                         if sline[0].startswith("[["):
                             tstyle.append(("SPAN", (0, r), (2, r)))
                         elif sline[0] == "-----":
@@ -195,7 +209,9 @@ class PdfCreator:
                                 ("LINEABOVE", (0, r), (-1, r), 1, colors.black),
                             )
                             sline = sline[1:]
-                        lines.append(sline[:nh])
+                        lines.append(
+                            [Paragraph(l, body_style) for l in sline[:nh]]
+                        )
                     else:
                         lines.append("")
 
@@ -216,3 +232,42 @@ class PdfCreator:
         pdf_value = pdf_buffer.getvalue()
         pdf_buffer.close()
         return pdf_value
+
+
+if __name__ == "__main__":
+
+    pagelist = [
+        ("Page 1",
+            [
+                ('#', 
+                    [   
+                        ("1", "2", "3"),
+                        ("2.1", "2.2", "2.3"),
+                        ("Longer item", "Very long item indeed", "3.3"),
+                        "",
+                    ]
+                ),
+                
+                ('XXX',
+                    [
+                        ("First", "Second", "Third", "Last, but very long and most certainly not least"),
+                        "",
+                    ]
+                ),
+            ]
+        ),
+    ]
+    pdf = PdfCreator()
+    pdfbytes = pdf.build_pdf(
+        pagelist,
+        "TestPdfCreator",
+        "Gradgrind",
+        ["A", "B", "C", "D"],
+        colwidths = [30, 30, 50, 50]
+    )
+    filepath = DATAPATH("testing/tmp/pdftable1.pdf")
+    odir = os.path.dirname(filepath)
+    os.makedirs(odir, exist_ok = True)
+    with open(filepath, "wb") as fh:
+        fh.write(pdfbytes)
+    print("  --->", filepath)

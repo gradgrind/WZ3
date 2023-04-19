@@ -675,6 +675,8 @@ def print_teachers(teacher_data, block_tids=None, show_workload=False):
         # print(classlists)
         teacherlists.append((teacherline, classlists))
 
+
+#TODO: Still usable?
     pdf = PdfCreator()
     headers = [
         T[h] for h in ("H_group", "H_subject", "H_room", "H_lessons_blocks")

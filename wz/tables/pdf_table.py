@@ -99,6 +99,13 @@ tablestyle = [
     ("FONTSIZE", (0, 0), (-1, -1), 11),
 ]
 
+#?????
+# Seems to work, but positioning is wrong (needs shifting right)
+class RotatedParagraph(Paragraph):
+    def draw(self):
+        self.canv.rotate(90)
+        super().draw()
+
 
 class PdfCreator:
     def add_page_number(self, canvas, doc):
@@ -186,6 +193,7 @@ class PdfCreator:
             # The second argument is the outline tag:
             h = PageHeader(pagehead, pagehead)  # .split("(", 1)[0].rstrip())
             flowables.append(h)
+#            lines = [[RotatedParagraph(h, heading_style) for h in headers]]
             lines = [headers]
             nh = len(headers)
             for secthead, slist in plist:

@@ -46,7 +46,31 @@ core.classes: {
 }
 
 core.list_activities: {
-#TODO ... not yet implemented/adapted
+#TODO ... not yet fully adapted
+    
+    # output
+#    continuous: durchgehend
+    H_class:            Klasse
+    H_group:            Gruppe
+    H_block_subject:    Blockfach
+    H_block_tag:        Block-Kennzeichen
+    H_subject:          Fach
+    H_team:             „Team“
+    H_room:             Raum
+    H_units:            Einheiten
+    H_npay:             Anzahl
+    H_workload:         Stunden
+    H_pay:              Anteil
+    
+    
+    H_lessons_blocks: "St./[Epochen]"
+#    H_workload: Deputat
+    H_teacher:  Lehrer
+    H_lessons:  Stunden
+    H_total:    insgesamt
+#    classes-subjects: "Klassen-Fächer"
+#    teachers-subjects: "Lehrer-Fächer"
+
     TEACHER_SUPPRESSED: "Lehrkraft ausgeschlossen: {tname}"
     TEACHER_NO_ACTIVITIES: "Lehrkraft ohne „Aktivitäten“: {tname}"
     CONTINUOUS_BLOCK_TAG: "Durchgehende Kurse dürfen keine Deputatskennung haben: {course} mit Kennzeichen {tag}"
@@ -62,18 +86,6 @@ core.list_activities: {
     Repeated_page_title: "Seitentitel wurde doppelt verwendet: {ref}"
     TAG_NO_LESSONS: "{course}, Kennzeichen {tag}: Keine Aktivitäten"
     
-    # output
-    continuous: durchgehend
-    H_group:    Gruppe
-    H_subject:  Fach
-    H_room:     Raum
-    H_lessons_blocks: "St./[Epochen]"
-    H_workload: Deputat
-    H_teacher:  Lehrer
-    H_lessons:  Stunden
-    H_total:    insgesamt
-    classes-subjects: "Klassen-Fächer"
-    teachers-subjects: "Lehrer-Fächer"
 }
 
 core.db_access: {

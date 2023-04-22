@@ -1,7 +1,7 @@
 """
 core/list_activities.py
 
-Last updated:  2023-04-20
+Last updated:  2023-04-22
 
 Present information on activities for teachers and classes/groups.
 The information is formatted in pdf documents using the reportlab
@@ -54,10 +54,19 @@ from core.basic_data import (
 from core.db_access import db_read_fields
 from core.course_data import WHOLE_CLASS, WHOLE_CLASS_SG
 import lib.pylightxl as xl
+from tables.pdf_table import TablePages
 
 DECIMAL_SEP = CONFIG["DECIMAL_SEP"]
-
+        
 ### -----
+
+
+def PAY_FORMAT(pay):
+    if type(pay) == float:
+        return f"{pay:.3f}".replace(".", DECIMAL_SEP)
+    else:
+        return pay
+
 
 class ActivityItem(NamedTuple):
     course_data: tuple[str, str, str, str]
@@ -165,11 +174,9 @@ def read_db():
 def teacher_list(tlist: list[ActivityItem]):
     """Deal with the data for a single teacher. Return the data needed
     for a lesson + pay list sorted according to class and subject.
-    A second return value is the set of referenced WORKLOAD indexes.
-    A third return value is the total of the pay fields.
     """
-    subjects = get_subjects()
     courses = []
+    subjects = get_subjects()
     for data in tlist:
         klass, group, sid, tid = data.course_data
         lessons = data.lessons
@@ -179,7 +186,7 @@ def teacher_list(tlist: list[ActivityItem]):
         t_pay = paytag.PAYMENT
         if paytag.PAY_FACTOR_TAG:
             if paytag.NLESSONS == -1:
-                t_paystr = f"{nlessons} x {paytag.PAY_FACTOR_TAG}"
+                t_paystr = f"[{nlessons}] x {paytag.PAY_FACTOR_TAG}"
                 if nlessons > 0:
                     t_pay = paytag.PAY_FACTOR * nlessons
             else:
@@ -191,7 +198,7 @@ def teacher_list(tlist: list[ActivityItem]):
             bt = data.blocktag.tag
         else:
             bs, bt = "", ""
-        tdata = [
+        tdata = TeacherData(
             klass,
             bs,
             bt,
@@ -203,29 +210,10 @@ def teacher_list(tlist: list[ActivityItem]):
             str(paytag.NLESSONS), # for blocks/"Epochen" *can* be the number
             t_paystr,
             t_pay
-        ]
+        )
         courses.append(tdata)
     courses.sort()
-    # Process further to take the "teams" into account. Items sharing a
-    # WORKLOAD entry should only have thier lessons/pay counted once.
-    # Present this information for the first item of a "team", then for
-    # subsequent items, refer to the team index.
-    workgroups = set()
-    teams = set()
-    payments = 0.0
-    _courses = []
-    for cdata in courses:
-        w = cdata[-4]
-        if w in workgroups:
-            teams.add(w)
-            cdata[-3] = ""
-            cdata[-2] = f"[{w}]"
-            cdata[-1] = ""
-        else:
-            workgroups.add(w)
-            payments += cdata[-1]
-        _courses.append(TeacherData(*cdata))
-    return _courses, teams, payments
+    return courses
 
 
 def print_class_group(klass, group):
@@ -297,7 +285,7 @@ def make_teacher_table_xlsx(activity_lists):
         except KeyError:
             continue    # skip teachers without entries
         tname = teachers.name(t)
-        items, teams, payments = teacher_list(datalist)
+        items = teacher_list(datalist)
         # Add "worksheet" to table builder
         db.add_ws(ws=tname)
         sheet = db.ws(ws=tname)
@@ -305,13 +293,20 @@ def make_teacher_table_xlsx(activity_lists):
             sheet.update_index(row=1, col=col_id, val=T[field])
         # Add data to spreadsheet table
         row_id = 2
+        pay_total = 0.0
+        workgroups = set()
         for line in items:
+            if line.workgroup in workgroups:
+                line = line._replace(paynum="", paystr="*", pay="")
+            else:
+                workgroups.add(line.workgroup)
+                pay_total += line.pay
             for col_id, field in enumerate(line, start=1):
                 sheet.update_index(row=row_id, col=col_id, val=field)
             row_id += 1
         # Total
         lastcol = len(headers)
-        sheet.update_index(row=row_id, col=lastcol, val=payments)
+        sheet.update_index(row=row_id, col=lastcol, val=pay_total)
         sheet.update_index(row=row_id, col=lastcol - 1, val="insgesamt")
     return db
 
@@ -735,21 +730,39 @@ def print_teachers(teacher_data, block_tids=None, show_workload=False):
 
 
 def make_teacher_table_pay(activity_lists):
+    """Construct a pdf with a table for each teacher, each such table
+    starting on a new page.
+    The sorting within a teacher table is first class, then block,
+    then subject.
+    """
+    def add_simple_items():
+        for item in noblocklist:
+            # The "team" tag is shown only when it is referenced later
+            pdf.add_line(item)
+        noblocklist.clear()
+
     headers = []
     colwidths = []
     for h, w in (
-        ("H_team_tag",          20),
+        ("H_team_tag",          15),
         ("H_group",             20),
-        ("H_subject",           50),
-        ("H_lessons_blocks",    30),
-        ("H_workload",          30),
+        ("H_subject",           60),
+        ("H_units",             30),
+        ("H_workload",          25),
         ("H_pay",               20),
     ):
         headers.append(T[h])
         colwidths.append(w)
 
-#    pdf = start_table_pdf(headers, colwidths) # and so on ...
+    pdf = TablePages(
+        title=T["teacher_workload_pay"],
+        author=CONFIG["SCHOOL_NAME"],
+        headers=headers,
+        colwidths=colwidths,
+        align=((5, "r"), (1, "l"), (2, "p")),
+    )
 
+    noblocklist = []
     teachers = get_teachers()
     for t in teachers:
         try:
@@ -757,38 +770,67 @@ def make_teacher_table_pay(activity_lists):
         except KeyError:
             continue    # skip teachers without entries
         tname = teachers.name(t)
-        items, teams, payments = teacher_list(datalist)
+        pdf.add_page(tname)
+        items = teacher_list(datalist)
 
-#TODO
-# Would be nice to have the team tag only when it is referenced later
-# Space between classes?
-# Blocks first, but classes before blocks?
+        workgroups = {} # for detecting parallel groups
+        pay_total = 0.0
+        for item in items:
+            w = item.workgroup
+            if w in workgroups:
+                workgroups[w] = 1
+            else:
+                workgroups[w] = 0
+                pay_total += item.pay
+        pdf.add_paragraph(f"Deputat, insgesamt: {PAY_FORMAT(pay_total)}")
+        pdf.add_vspace(5)
 
-        noblocklist = []
         klass = None
         for item in items:
-            item = items[i]
-            i += 1
-            if item.klass != klass:
-                for item in noblocklist:
-                    pass    # add simple items
-
-
-# Add space before new class?
-                klass = item.klass
-                noblocklist.clear()
-                continue
-
-            if item.block_subject:
-                pass    # add block item
-
-
+            # The "team" tag is shown only when it is referenced later
+            if workgroups[item.workgroup] > 0:
+                # first time, show pay and workgroup
+                paystr = item.paystr
+                pay = PAY_FORMAT(item.pay)
+                w = f"[{item.workgroup}]"
+                workgroups[item.workgroup] = -1
+            elif workgroups[item.workgroup] < 0:
+                # second time, show reference to workgroup
+                paystr = f"→ [{item.workgroup}]"
+                pay = ""
+                w = ""
             else:
-                noblocklist.append(item)
+                paystr = item.paystr
+                pay = PAY_FORMAT(item.pay)
+                w = ""
+            
+            if item.klass != klass:
+                add_simple_items()
+                # Add space before new class
+                pdf.add_line(("",) * 6)
+                klass = item.klass
 
-        for item in noblocklist:
-            pass    # add simple items
-
+            # Combine class and group
+            cg = print_class_group(item.klass, item.group)
+            if item.block_subject:
+                ## Add block item
+                pdf.add_line((
+                    w,
+                    cg,
+                    f"{item.block_subject}::{item.subject}",
+                    item.lessons,
+                    paystr,
+                    pay,
+                ))
+            else:
+                noblocklist.append(
+                    (w, cg, item.subject, item.lessons, paystr, pay)
+                )
+        if noblocklist:
+            add_simple_items()
+        # Add space before final underline
+        pdf.add_line(("",) * 6)
+    return pdf.build_pdf()
 
 
 ###############################
@@ -901,19 +943,24 @@ def print_classes(class_data, tag2classes):
         countlines.append([""])
         classlists.append((classline, [("#", countlines), ("", all_items)]))
 
-    pdf = PdfCreator()
     headers = [
         T[h]
         for h in ("H_subject", "H_group", "H_teacher", "H_lessons", "H_total")
     ]
     colwidths = (75, 20, 20, 30, 25)
+
+    pdf = TablePages(
+        title=T["classes-subjects"],
+        author=CONFIG["SCHOOL_NAME"],
+        headers=headers,
+        colwidths=colwidths,
+    )
     return pdf.build_pdf(
         classlists,
         title=T["classes-subjects"],
         author=CONFIG["SCHOOL_NAME"],
         headers=headers,
         colwidths=colwidths,
-        #        do_landscape=True
     )
 
 
@@ -926,11 +973,16 @@ if __name__ == "__main__":
     open_database()
     cl_lists, t_lists = read_db()
 
+    pdfbytes = make_teacher_table_pay(t_lists)
+    filepath = saveDialog("pdf-Datei (*.pdf)", T["teacher_workload_pay"])
+    if filepath and os.path.isabs(filepath):
+        if not filepath.endswith(".pdf"):
+            filepath += ".pdf"
+        with open(filepath, "wb") as fh:
+            fh.write(pdfbytes)
+        print("  --->", filepath)
 
-#TODO pdf tables ...
-
-
-
+#    quit(0)
 
     tdb = make_teacher_table_xlsx(t_lists)
 

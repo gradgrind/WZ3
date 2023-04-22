@@ -61,6 +61,9 @@ core.list_activities: {
     H_npay:             Anzahl
     H_workload:         Stunden
     H_pay:              Anteil
+    H_team_tag:         //
+    
+    teacher_workload_pay: "Deputate"
     
     
     H_lessons_blocks: "St./[Epochen]"

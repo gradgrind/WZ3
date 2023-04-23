@@ -86,6 +86,7 @@ class TeacherData(NamedTuple):
     group: str
     room: str
     lessons: str
+    nlessons: int
     workgroup: int  # the WORKLOAD index
     paynum: str     # for blocks/"Epochen" *can* be the number
     paystr: str
@@ -203,7 +204,7 @@ def teacher_list(tlist: list[ActivityItem]):
         klass, group, sid, tid = data.course_data
         lessons = data.lessons
         t_lessons = ','.join(str(l) for l in lessons)
-        pdata = pay_data(data.paytag, sum(lessons))
+        pdata = pay_data(data.paytag, (nlessons := sum(lessons)))
         if data.blocktag:
             bs = data.blocktag.subject
             bt = data.blocktag.tag
@@ -217,6 +218,7 @@ def teacher_list(tlist: list[ActivityItem]):
             group,
             data.room,
             t_lessons,
+            nlessons,
             data.workload,
             *pdata
         )
@@ -429,7 +431,118 @@ def make_class_table_xlsx(activity_lists):
     return db
 
 
-#TODO: add a version with room instead of pay
+def make_teacher_table_room(activity_lists):
+    """Construct a pdf with a table for each teacher, each such table
+    starting on a new page.
+    The sorting within a teacher table is first class, then block,
+    then subject.
+    """
+    def add_simple_items():
+        for item in noblocklist:
+            # The "team" tag is shown only when it is referenced later
+            pdf.add_line(item)
+        noblocklist.clear()
+
+    headers = []
+    colwidths = []
+    for h, w in (
+        ("H_team_tag",          15),
+        ("H_group",             20),
+        ("H_subject",           60),
+        ("H_units",             35),
+        ("H_room",              40),
+    ):
+        headers.append(T[h])
+        colwidths.append(w)
+
+    pdf = TablePages(
+        title=T["teacher_activities"],
+        author=CONFIG["SCHOOL_NAME"],
+        headers=headers,
+        colwidths=colwidths,
+        align=((1, "l"), (2, "p")),
+    )
+
+    noblocklist = []
+    teachers = get_teachers()
+    for t in teachers:
+        try:
+            datalist = activity_lists[t]
+        except KeyError:
+            continue    # skip teachers without entries
+        tname = teachers.name(t)
+        pdf.add_page(tname)
+        items = teacher_list(datalist)
+
+        workgroups = {} # for detecting parallel groups
+        pay_total = 0.0
+        for item in items:
+            w = item.workgroup
+            if w in workgroups:
+                workgroups[w] = 1
+            else:
+                workgroups[w] = 0
+                pay_total += item.pay
+        # pdf.add_paragraph(f"Deputat, insgesamt: {PAY_FORMAT(pay_total)}")
+        # pdf.add_vspace(5)
+
+        klass = None
+        for item in items:
+            # The "team" tag is shown only when it is referenced later
+            if workgroups[item.workgroup] > 0:
+                ## first time, show workgroup
+                w = f"[{item.workgroup}]"
+                workgroups[item.workgroup] = -1
+                ref = ""
+                room = item.room
+            elif workgroups[item.workgroup] < 0:
+                ## second time, show reference to workgroup
+                ref = f"→ [{item.workgroup}]"
+                w = ""
+                room = ""
+            else:
+                ref = ""
+                w = ""
+                room = item.room
+            
+            if item.klass != klass:
+                add_simple_items()
+                # Add space before new class
+                pdf.add_line()
+                klass = item.klass
+
+            # Combine class and group
+            cg = print_class_group(item.klass, item.group)
+            if item.block_subject:
+                ## Add block item
+                if ref:
+                    t_lessons = ref
+                else:
+                    t_lessons = item.lessons
+                    try:
+                        n = int(item.paynum)
+                        if (n > 0) and (n != item.nlessons):
+                            t_lessons += f" [{n}]"
+                    except ValueError:
+                        pass
+                pdf.add_line((
+                    w,
+                    cg,
+                    f"{item.block_subject}::{item.subject}",
+                    t_lessons,
+                    room,
+                ))
+            else:
+                noblocklist.append(
+                    (w, cg, item.subject, ref or item.lessons, room)
+                )
+        if noblocklist:
+            add_simple_items()
+        # Add space before final underline
+        pdf.add_line()
+    return pdf.build_pdf()
+
+
 def make_teacher_table_pay(activity_lists):
     """Construct a pdf with a table for each teacher, each such table
     starting on a new page.
@@ -709,6 +822,15 @@ if __name__ == "__main__":
             fh.write(pdfbytes)
         print("  --->", filepath)
 
+    pdfbytes = make_teacher_table_room(t_lists)
+    filepath = saveDialog("pdf-Datei (*.pdf)", T["teacher_activities"])
+    if filepath and os.path.isabs(filepath):
+        if not filepath.endswith(".pdf"):
+            filepath += ".pdf"
+        with open(filepath, "wb") as fh:
+            fh.write(pdfbytes)
+        print("  --->", filepath)
+
     pdfbytes = make_class_table_pdf(cl_lists, lg_2_c)
     filepath = saveDialog("pdf-Datei (*.pdf)", T["class_lessons"])
     if filepath and os.path.isabs(filepath):
@@ -718,7 +840,7 @@ if __name__ == "__main__":
             fh.write(pdfbytes)
         print("  --->", filepath)
 
-    quit(0)
+#    quit(0)
 
     tdb = make_teacher_table_xlsx(t_lists)
 

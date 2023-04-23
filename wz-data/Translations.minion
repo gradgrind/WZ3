@@ -46,8 +46,6 @@ core.classes: {
 }
 
 core.list_activities: {
-#TODO ... not yet fully adapted
-    
     H_class:            Klasse
     H_group:            Gruppe
     H_block_subject:    Blockfach
@@ -64,33 +62,9 @@ core.list_activities: {
     H_lessons:          Stunden
     
     teacher_workload_pay: "Deputate"
+    teacher_activities: "Lehrer-Stunden"
     class_lessons:      "Klassen-Stunden"
     total_lessons:      "Gesamtstunden:"
-    
-    
-#    H_lessons_blocks: "St./[Epochen]"
-#    H_workload: Deputat
-#    H_lessons:  Stunden
-#    H_total:    insgesamt
-#    classes-subjects: "Klassen-Fächer"
-#    teachers-subjects: "Lehrer-Fächer"
-#    continuous: durchgehend
-
-    TEACHER_SUPPRESSED: "Lehrkraft ausgeschlossen: {tname}"
-    TEACHER_NO_ACTIVITIES: "Lehrkraft ohne „Aktivitäten“: {tname}"
-    CONTINUOUS_BLOCK_TAG: "Durchgehende Kurse dürfen keine Deputatskennung haben: {course} mit Kennzeichen {tag}"
-    PARTNER_PAY_MISMATCH: "„Partner-Kurse“ müssen die gleichen Deputatsangaben haben:\n  {course1}\n  {course2}\n  Kennzeichen {tag}"
-    PARTNER_SID_MISMATCH: "„Partner-Kurse“ müssen das gleiche Fach haben:\n  {course1}\n  {course2}\n  Kennzeichen {tag}"
-    PARTNER_ROOM_MISMATCH: "„Partner-Kurse“ müssen den gleichen Raum haben:\n  {course1}\n  {course2}\n  Kennzeichen {tag}"
-    BAD_PLAIN_BLOCK:    "{course}: für Kennzeichen {tag} muss es genau einen Kurs geben"
-    CONTINUOUS_PLUS_OTHERS: "{course}: eine durchgehende Aktivität (Kennzeichen {tag}) kann nicht parallel zu anderen Aktivitäten stattfinden"
-    BLOCK_TOO_FULL: "{teacher}: Block (Kennzeichen {tag}) hat zu viele Unterrichtseinheiten"
-    BLOCK_NO_LESSONS: "Block (Kennzeichen {tag}) hat keine Unterrichtseinheiten"
-    CLASS_NO_ACTIVITIES: "Klasse ohne „Aktivitäten“: {klass}"
-    TAG_NO_ACTIVITIES: "Klasse {klass}: Kennzeichen ({tag}) hat keine Aktivitäten"
-    Repeated_page_title: "Seitentitel wurde doppelt verwendet: {ref}"
-    TAG_NO_LESSONS: "{course}, Kennzeichen {tag}: Keine Aktivitäten"
-    
 }
 
 core.db_access: {

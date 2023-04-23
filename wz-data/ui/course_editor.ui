@@ -175,6 +175,13 @@
          </property>
         </widget>
        </item>
+       <item>
+        <widget class="QPushButton" name="make_tables">
+         <property name="text">
+          <string>Tabellen erstellen</string>
+         </property>
+        </widget>
+       </item>
       </layout>
      </item>
      <item>

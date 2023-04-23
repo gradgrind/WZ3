@@ -1,7 +1,7 @@
 """
 ui/modules/course_editor.py
 
-Last updated:  2023-04-15
+Last updated:  2023-04-23
 
 Edit course and blocks+lessons data.
 
@@ -895,6 +895,11 @@ class CourseEditorPage(Page):
                 )
         self.display_lessons(-1)
         self.total_calc()
+
+
+    @Slot()
+    def on_make_tables_clicked(self):
+        SHOW_INFO("TODO: Dialog to output tables")
 
 
 # --#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#

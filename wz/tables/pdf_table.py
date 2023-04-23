@@ -1,7 +1,7 @@
 """
 tables/pdf_table.py
 
-Last updated:  2023-04-22
+Last updated:  2023-04-23
 
 Generate tabular reports as PDF files with multiple pages.
 
@@ -81,27 +81,33 @@ class MyDocTemplate(SimpleDocTemplate):
 # Table coordinates are 0-based cells: (column, row).
 # Positive coordinates are from (left, top),
 # negative coordinates are from (right, bottom).
-tablestyle0 = [
-    # Simple table with grey line above bottom row, 12pt text
-    ("FONT", (0, 0), (-1, -1), "Helvetica"),
-    ("FONTSIZE", (0, 0), (-1, -1), 12),
-    ("LINEABOVE", (0, -1), (-1, -1), 1, colors.lightgrey),
-]
 
-TABLESTYLE = [
-    # A somewhat fancier table with black lines below the first and
-    # last lines, bold titles, 11pt text.
-    ('ALIGN', (-1, 1), (-1, -1), 'RIGHT'),
-    ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-    ("LINEBELOW", (0, 0), (-1, 0), 1, colors.black),
-    ("LINEBELOW", (0, -1), (-1, -1), 1, colors.black),
-    ("FONT", (0, 0), (-1, 0), "Helvetica-Bold"),
-    #         ('LINEABOVE', (0,-1), (-1,-1), 1, colors.black),
-    ("FONT", (0, 1), (-1, -1), "Helvetica"),
-    #         ('BACKGROUND', (1, 1), (-2, -2), colors.white),
-    ("TEXTCOLOR", (0, 0), (1, -1), colors.black),
-    ("FONTSIZE", (0, 0), (-1, -1), 11),
-]
+def ListTable(
+    data,
+    colwidths=None,     # to specify column widths: list of sizes in mm
+    ncols=4,            # number of columns – only if no column widths given
+    skip0=False,        # if true, column 0 will only be used in first line
+    fontname="Helvetica",
+    fontsize=11,
+):
+    tstyle = [
+        # Simple table with grey line below bottom row
+        ("FONT", (0, 0), (-1, -1), fontname),
+        ("FONTSIZE", (0, 0), (-1, -1), fontsize),
+        ("LINEBELOW", (0, -1), (-1, -1), 1, colors.lightgrey),
+    ]
+    if colwidths:
+        colwidths = [w * mm for w in colwidths]
+        ncols = len(colwidths)
+    lines = [line := []]
+    for item in data:
+        if len(line) == ncols:               
+            lines.append(line := [])
+            if skip0:
+                line.append("")
+        line.append(item)
+    return Table(lines, colwidths, style = tstyle)
+
 
 #?????
 # Seems to work, but positioning is wrong (needs shifting right)
@@ -109,140 +115,6 @@ class RotatedParagraph(Paragraph):
     def draw(self):
         self.canv.rotate(90)
         super().draw()
-
-
-class PdfCreator:
-    def add_page_number(self, canvas, doc):
-        canvas.saveState()
-        font_name = "Helvetica"
-        font_size = 11
-        canvas.setFont(font_name, font_size)
-        page_number_text = str(doc.page)
-        w = stringWidth(page_number_text, font_name, font_size)
-        x = (self.pagesize[0] - w) / 2
-        canvas.drawCentredString(x, 10 * mm, page_number_text)
-        canvas.restoreState()
-
-    def build_pdf(
-        self,
-        pagelist,
-        title,
-        author,
-        headers,
-        colwidths=None,     # to specify column widths: list of sizes in mm
-        do_landscape=False,
-    ):
-        all_refs = set()
-
-        class PageHeader(Paragraph):
-            # class PageHeader(Preformatted):
-            def __init__(self, text, ref):
-                if ref in all_refs:
-                    REPORT("ERROR", T["Repeated_page_title"].format(ref=ref))
-                    self.ref = None
-                else:
-                    self.ref = ref
-                    all_refs.add(ref)
-                super().__init__(text, heading_style)
-
-            def toc(self, canvas):
-                if self.ref:
-                    canvas.bookmarkPage(self.ref)
-                    canvas.addOutlineEntry(self.ref, self.ref, 0, 0)
-
-        pdf_buffer = BytesIO()
-        self.pagesize = PAGESIZE_L if do_landscape else PAGESIZE
-        my_doc = MyDocTemplate(
-            pdf_buffer,
-            title=title,
-            author=author,
-            pagesize=self.pagesize,
-            topMargin=BASE_MARGIN,
-            leftMargin=BASE_MARGIN,
-            rightMargin=BASE_MARGIN,
-            bottomMargin=BASE_MARGIN,
-        )
-        sample_style_sheet = getSampleStyleSheet()
-
-        body_style = sample_style_sheet["BodyText"]
-        # body_style = sample_style_sheet["Code"]
-        body_style.fontSize = 11
-        # body_style.leading = 14
-        # body_style.leftIndent = 0
-
-        # body_style_2 = copy.deepcopy(body_style)
-        # body_style.spaceBefore = 10
-        # body_style_2.alignment = TA_RIGHT
-
-        # style for PageHeader
-        heading_style = sample_style_sheet["Heading1"]
-        # print("????????????", heading_style.fontName)
-        # heading_style = copy.deepcopy(body_style)
-        heading_style.fontName = "Helvetica-Bold"
-        heading_style.fontSize = 14
-        heading_style.spaceAfter = 24
-
-        # sect_style = sample_style_sheet["Heading2"]
-        # sect_style.fontSize = 13
-        # sect_style.spaceBefore = 20
-        # print("\n STYLES:", sample_style_sheet.list())
-
-        flowables = []
-        for pagehead, plist in pagelist:
-            print("§§§", repr(pagehead), plist)
-            # Need a copy of the style because it might be extended
-            tstyle = TABLESTYLE.copy()
-            # h = Paragraph(pagehead, heading_style)
-            # The second argument is the outline tag:
-            h = PageHeader(pagehead, pagehead)  # .split("(", 1)[0].rstrip())
-            flowables.append(h)
-#            lines = [[RotatedParagraph(h, heading_style) for h in headers]]
-            lines = [headers]
-            nh = len(headers)
-            for secthead, slist in plist:
-                # With the special "section header" "#" add a table styled
-                # by <tablestyle0>
-                if secthead == "#":
-                    table = Table(slist)
-                    table_style = TableStyle(tablestyle0)
-                    table.setStyle(table_style)
-                    flowables.append(table)
-                    continue
-                lines.append("")
-                for sline in slist:
-                    r = len(lines)
-                    if sline:
-# This is rather specialized ... !
-                        if sline[0].startswith("[["):
-                            tstyle.append(("SPAN", (0, r), (2, r)))
-                        elif sline[0] == "-----":
-                            tstyle.append(
-                                ("LINEABOVE", (0, r), (-1, r), 1, colors.black),
-                            )
-                            sline = sline[1:]
-                        lines.append(
-                            [Paragraph(l, body_style) for l in sline[:nh]]
-                        )
-                    else:
-                        lines.append("")
-
-            kargs = {"repeatRows": 1}
-            if colwidths:
-                kargs["colWidths"] = [w * mm for w in colwidths]
-            table = Table(lines, **kargs)
-            table_style = TableStyle(tstyle)
-            table.setStyle(table_style)
-            flowables.append(table)
-
-            flowables.append(PageBreak())
-        my_doc.build(
-            flowables,
-            onFirstPage=self.add_page_number,
-            onLaterPages=self.add_page_number,
-        )
-        pdf_value = pdf_buffer.getvalue()
-        pdf_buffer.close()
-        return pdf_value
 
 
 class TablePages:
@@ -308,6 +180,10 @@ class TablePages:
             #         ('BACKGROUND', (1, 1), (-2, -2), colors.white),
             ("TEXTCOLOR", (0, 0), (1, -1), colors.black),
             ("FONTSIZE", (0, 0), (-1, -1), fontsize),
+            # Alternating row colours (ignoring first and last lines):
+            ("ROWBACKGROUNDS", (0, 2), (-1, -2),
+                (colors.white, (0.94, 0.94, 1.0))
+            ),
         ]
         for i, a in self.align.items():
             tstyle.append(('ALIGN', (i, 1), (i, -1), a))
@@ -334,12 +210,20 @@ class TablePages:
         self.pages.append({
             "header": header,
             "tablestyle": self.TABLESTYLE,
+#            lines = [
+#                [   RotatedParagraph(h, self.heading_style)
+#                    for h in self.headers
+#                ]
+#            ]
             "table": [self.headers],
             "PRE": [],
             "POST": [],
         })
 
-    def add_line(self, values):
+    def add_line(self, values=None):
+        if values is None:
+            self.pages[-1]["table"].append([])
+            return
         assert len(values) == len(self.headers)
         # Wrap field values in <Paragraph> to allow line breaking
         self.pages[-1]["table"].append(
@@ -349,11 +233,28 @@ class TablePages:
             for i, l in enumerate(values)]
         )
 
-    def add_paragraph(self, text):
-        self.pages[-1]["PRE"].append(Paragraph(text, self.body_style))
+    def add_paragraph(self, text, indent=None, pre=True):
+        if indent is None:
+            self.pages[-1]["PRE" if pre else "POST"].append(
+                Paragraph(text, self.body_style)
+            )
+        else:
+            s = self.body_style.clone(
+                "IndentedParagraph", leftIndent=indent*mm
+            )
+            self.pages[-1]["PRE" if pre else "POST"].append(
+                Paragraph(text, s)
+            )
 
-    def add_vspace(self, height):
-        self.pages[-1]["PRE"].append(Spacer(0, height * mm))
+    def add_list_table(self, data, pre=True, **kargs):
+        self.pages[-1]["PRE" if pre else "POST"].append(
+            ListTable(data, **kargs)
+        )
+
+    def add_vspace(self, height, pre=True):
+        self.pages[-1]["PRE" if pre else "POST"].append(
+            Spacer(0, height * mm)
+        )
 
     def build_pdf(self):
         """Build the pdf, returning the file as a byte array.
@@ -409,57 +310,43 @@ if __name__ == "__main__":
         "TestPdfCreator",
         "Gradgrind",
         ["A", "B", "C", "D"],
-        colwidths = [30, 30, 50, 50]
+        colwidths = [30, 30, 50, 50],
+        align = ((3, "p"),),
     )
 
     pdf.add_page("Page 1")
+    pdf.add_line()
     pdf.add_line((
         "First",
         "Second",
         "Third",
         "Last, but very long and most certainly not least",
     ))
+    pdf.add_line(("2.1", "2.2", "2.3", "2.4"))
+    pdf.add_line(("3.1", "3.2", "3.3", "3.4"))
+    pdf.add_line()
+
+    pdf.add_paragraph("An introductory line")
+    pdf.add_paragraph("... which can be indented, too!", 10)
+    pdf.add_vspace(5)   # mm
+
+    pdf.add_vspace(5, pre=False)   # mm
+    pdf.add_list_table(("Total hours for groups:", "A: 10", "B: 9",
+        "C.G: 8", "D: 11"),
+        skip0=True,
+        colwidths=(60, 30, 30, 30),
+        pre=False,
+    )
+
+    pdf.add_list_table(("Total hours for groups:", "A: 10", "B: 9",
+        "C.G: 8", "D: 11"),
+        skip0=True,
+        ncols=8,
+    )
+    pdf.add_vspace(5)   # mm
+
     pdfbytes = pdf.build_pdf()
     filepath = DATAPATH("testing/tmp/pdftable0.pdf")
-    odir = os.path.dirname(filepath)
-    os.makedirs(odir, exist_ok = True)
-    with open(filepath, "wb") as fh:
-        fh.write(pdfbytes)
-    print("  --->", filepath)
-
-#    quit(0)
-
-    pagelist = [
-        ("Page 1",
-            [
-                ('#', 
-                    [   
-                        ("1", "2", "3"),
-                        ("2.1", "2.2", "2.3"),
-                        ("Longer item", "Very long item indeed", "3.3"),
-                        "",
-                    ]
-                ),
-                
-                ('XXX',
-                    [
-                        ("First", "Second", "Third", "Last, but very long and most certainly not least"),
-                        ("1", "2", "3", "4"),
-                        "",
-                    ]
-                ),
-            ]
-        ),
-    ]
-    pdf = PdfCreator()
-    pdfbytes = pdf.build_pdf(
-        pagelist,
-        "TestPdfCreator",
-        "Gradgrind",
-        ["A", "B", "C", "D"],
-        colwidths = [30, 30, 50, 50]
-    )
-    filepath = DATAPATH("testing/tmp/pdftable1.pdf")
     odir = os.path.dirname(filepath)
     os.makedirs(odir, exist_ok = True)
     with open(filepath, "wb") as fh:

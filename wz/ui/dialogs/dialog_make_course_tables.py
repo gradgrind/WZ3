@@ -46,13 +46,16 @@ from ui.ui_base import (
 from core.list_activities import (
     read_db,
     make_teacher_table_pay,
-
+    make_teacher_table_room,
+    make_class_table_pdf,
+    make_teacher_table_xlsx,
+    make_class_table_xlsx,
+    write_xlsx,
 )
 
 ### -----
 
 
-#TODO
 class ExportTable(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent=parent)
@@ -70,8 +73,8 @@ class ExportTable(QDialog):
 
     @Slot()
     def on_pb_pay_clicked(self):
-        """Export a pdf table detailing the workload and giving
-        pay-relevant information for all teachers.
+        """Export a pdf file with a table for each teacher detailing
+        the workload and giving some pay-related information.
         """
         pdfbytes = make_teacher_table_pay(self.t_lists)
         filepath = SAVE_FILE("pdf-Datei (*.pdf)", T["teacher_workload_pay"])
@@ -84,66 +87,61 @@ class ExportTable(QDialog):
 
     @Slot()
     def on_pb_teachers_clicked(self):
-        pass
+        """Export a pdf file with a table for each teacher detailing
+        the lessons, etc.
+        """
+        pdfbytes = make_teacher_table_room(self.t_lists)
+        filepath = SAVE_FILE("pdf-Datei (*.pdf)", T["teacher_activities"])
+        if filepath and os.path.isabs(filepath):
+            if not filepath.endswith(".pdf"):
+                filepath += ".pdf"
+            with open(filepath, "wb") as fh:
+                fh.write(pdfbytes)
+            self.output(f"---> {filepath}")
 
     @Slot()
     def on_pb_classes_clicked(self):
-        pass
+        """Export a pdf file with a table for each class detailing
+        the lessons, etc.
+        """
+        pdfbytes = make_class_table_pdf(self.cl_lists, self.lg_2_c)
+        filepath = SAVE_FILE("pdf-Datei (*.pdf)", T["class_lessons"])
+        if filepath and os.path.isabs(filepath):
+            if not filepath.endswith(".pdf"):
+                filepath += ".pdf"
+            with open(filepath, "wb") as fh:
+                fh.write(pdfbytes)
+            self.output(f"---> {filepath}")
 
     @Slot()
-    def on_pb_teacher_xlsx_clicked(self):
-        pass
-
+    def on_pb_teachers_xlsx_clicked(self):
+        """Export an xlsx (Excel) file with a table for each teacher
+        detailing the workload and giving some pay-related information.
+        The data is rather more "raw" than in the corresponding pdf files.
+        """
+        tdb = make_teacher_table_xlsx(self.t_lists)
+        filepath = SAVE_FILE(
+            "Excel-Datei (*.xlsx)", T["teacher_workload_pay"]
+        )
+        if filepath and os.path.isabs(filepath):
+            if not filepath.endswith(".xlsx"):
+                filepath += ".xlsx"
+            write_xlsx(tdb, filepath)
+            self.output(f"---> {filepath}")
+    
     @Slot()
     def on_pb_classes_xlsx_clicked(self):
-        pass
-
-
-def todo():
-
-    pdfbytes = make_teacher_table_pay(t_lists)
-    filepath = saveDialog("pdf-Datei (*.pdf)", T["teacher_workload_pay"])
-    if filepath and os.path.isabs(filepath):
-        if not filepath.endswith(".pdf"):
-            filepath += ".pdf"
-        with open(filepath, "wb") as fh:
-            fh.write(pdfbytes)
-        print("  --->", filepath)
-
-    pdfbytes = make_teacher_table_room(t_lists)
-    filepath = saveDialog("pdf-Datei (*.pdf)", T["teacher_activities"])
-    if filepath and os.path.isabs(filepath):
-        if not filepath.endswith(".pdf"):
-            filepath += ".pdf"
-        with open(filepath, "wb") as fh:
-            fh.write(pdfbytes)
-        print("  --->", filepath)
-
-    pdfbytes = make_class_table_pdf(cl_lists, lg_2_c)
-    filepath = saveDialog("pdf-Datei (*.pdf)", T["class_lessons"])
-    if filepath and os.path.isabs(filepath):
-        if not filepath.endswith(".pdf"):
-            filepath += ".pdf"
-        with open(filepath, "wb") as fh:
-            fh.write(pdfbytes)
-        print("  --->", filepath)
-
-#    quit(0)
-
-    tdb = make_teacher_table_xlsx(t_lists)
-
-    filepath = saveDialog("Excel-Datei (*.xlsx)", "Deputate")
-    if filepath and os.path.isabs(filepath):
-        if not filepath.endswith(".xlsx"):
-            filepath += ".xlsx"
-        xl.writexl(db=tdb, fn=filepath)
-        print("  --->", filepath)
-
-    cdb = make_class_table_xlsx(cl_lists)
-
-    filepath = saveDialog("Excel-Datei (*.xlsx)", "Klassenstunden")
-    if filepath and os.path.isabs(filepath):
-        if not filepath.endswith(".xlsx"):
-            filepath += ".xlsx"
-        xl.writexl(db=cdb, fn=filepath)
-        print("  --->", filepath)
+        """Export an xlsx (Excel) file with a table for each class
+        detailing the lessons, etc.
+        The data is rather more "raw" than in the corresponding pdf file.
+        """
+        cdb = make_class_table_xlsx(self.cl_lists)
+        filepath = SAVE_FILE(
+            "Excel-Datei (*.xlsx)", T["class_lessons"]
+        )
+        if filepath and os.path.isabs(filepath):
+            if not filepath.endswith(".xlsx"):
+                filepath += ".xlsx"
+            write_xlsx(cdb, filepath)
+            self.output(f"---> {filepath}")
+            

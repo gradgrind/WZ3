@@ -276,6 +276,12 @@ def class_list(clist: list[ActivityItem]):
     return courses
 
 
+def write_xlsx(xl_db, filepath):
+    """Write a pylightxl "database" to the given path.
+    """
+    xl.writexl(db=xl_db, fn=filepath)
+
+
 def make_teacher_table_xlsx(activity_lists):
     headers = [
         "H_class",
@@ -815,7 +821,7 @@ if __name__ == "__main__":
     cl_lists, t_lists, lg_2_c = read_db()
 
     pdfbytes = make_teacher_table_pay(t_lists)
-    filepath = saveDialog("pdf-Datei (*.pdf)", T["teacher_workload_pay"])
+    filepath = saveDialog("pdf-Datei (*.pdf)", "Deputate")
     if filepath and os.path.isabs(filepath):
         if not filepath.endswith(".pdf"):
             filepath += ".pdf"
@@ -824,7 +830,7 @@ if __name__ == "__main__":
         print("  --->", filepath)
 
     pdfbytes = make_teacher_table_room(t_lists)
-    filepath = saveDialog("pdf-Datei (*.pdf)", T["teacher_activities"])
+    filepath = saveDialog("pdf-Datei (*.pdf)", "Lehrer-Stunden")
     if filepath and os.path.isabs(filepath):
         if not filepath.endswith(".pdf"):
             filepath += ".pdf"
@@ -833,7 +839,7 @@ if __name__ == "__main__":
         print("  --->", filepath)
 
     pdfbytes = make_class_table_pdf(cl_lists, lg_2_c)
-    filepath = saveDialog("pdf-Datei (*.pdf)", T["class_lessons"])
+    filepath = saveDialog("pdf-Datei (*.pdf)", "Klassen-Stunden")
     if filepath and os.path.isabs(filepath):
         if not filepath.endswith(".pdf"):
             filepath += ".pdf"
@@ -841,10 +847,7 @@ if __name__ == "__main__":
             fh.write(pdfbytes)
         print("  --->", filepath)
 
-#    quit(0)
-
     tdb = make_teacher_table_xlsx(t_lists)
-
     filepath = saveDialog("Excel-Datei (*.xlsx)", "Deputate")
     if filepath and os.path.isabs(filepath):
         if not filepath.endswith(".xlsx"):
@@ -853,8 +856,7 @@ if __name__ == "__main__":
         print("  --->", filepath)
 
     cdb = make_class_table_xlsx(cl_lists)
-
-    filepath = saveDialog("Excel-Datei (*.xlsx)", "Klassenstunden")
+    filepath = saveDialog("Excel-Datei (*.xlsx)", "Klassen-Stunden")
     if filepath and os.path.isabs(filepath):
         if not filepath.endswith(".xlsx"):
             filepath += ".xlsx"

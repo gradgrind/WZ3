@@ -60,7 +60,7 @@ core.list_activities: {
     H_team_tag:         //
     H_teacher:          Lehrkraft
     H_lessons:          Stunden
-    
+
     teacher_workload_pay: "Deputate"
     teacher_activities: "Lehrer-Stunden"
     class_lessons:      "Klassen-Stunden"

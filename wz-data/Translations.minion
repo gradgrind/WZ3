@@ -237,6 +237,13 @@ ui.dialogs.dialog_course_fields: {
 #ui.dialogs.dialog_day_period: {
 #}
 
+ui.dialogs.dialog_make_course_tables: {
+    teacher_workload_pay: "Deputate"
+    teacher_activities: "Lehrer-Stunden"
+    class_lessons:      "Klassen-Stunden"
+    total_lessons:      "Gesamtstunden:"
+}
+
 #ui.dialogs.dialog_number_constraint: {
 #}
 

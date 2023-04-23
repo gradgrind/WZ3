@@ -6,6 +6,7 @@ Last updated:  2023-04-23
 Present information on activities for teachers and classes/groups.
 The information is formatted in pdf documents using the reportlab
 library.
+Also (unformatted) xlsx spreadsheets can be exported.
 
 =+LICENCE=============================
 Copyright 2023 Michael Towers

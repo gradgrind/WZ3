@@ -97,6 +97,7 @@ from ui.dialogs.dialog_workload import WorkloadDialog
 from ui.dialogs.dialog_block_name import BlockNameDialog
 from ui.dialogs.dialog_parallel_lessons import ParallelsDialog
 from ui.dialogs.dialog_text_line import TextLineDialog
+from ui.dialogs.dialog_make_course_tables import ExportTable
 
 COURSE_TABLE_FIELDS = ( # the fields shown in the course table
 # (db-field name, column-type, horizontal text alignment)
@@ -899,7 +900,7 @@ class CourseEditorPage(Page):
 
     @Slot()
     def on_make_tables_clicked(self):
-        SHOW_INFO("TODO: Dialog to output tables")
+        ExportTable(parent=self).activate()
 
 
 # --#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#

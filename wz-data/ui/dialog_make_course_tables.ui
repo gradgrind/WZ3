@@ -6,59 +6,87 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>278</width>
-    <height>207</height>
+    <width>321</width>
+    <height>257</height>
    </rect>
   </property>
   <property name="windowTitle">
    <string>Dialog</string>
   </property>
-  <layout class="QVBoxLayout" name="verticalLayout">
-   <item>
-    <widget class="QPushButton" name="pb_pay">
-     <property name="text">
-      <string>Deputate – pdf</string>
-     </property>
-    </widget>
-   </item>
-   <item>
-    <widget class="QPushButton" name="pb_teachers">
-     <property name="text">
-      <string>Lehrer-Klassen – pdf</string>
-     </property>
-    </widget>
-   </item>
-   <item>
-    <widget class="QPushButton" name="pb_classes">
-     <property name="text">
-      <string>Klassen-Stunden – pdf</string>
-     </property>
-    </widget>
-   </item>
-   <item>
-    <widget class="Line" name="line_2">
-     <property name="orientation">
-      <enum>Qt::Horizontal</enum>
-     </property>
-    </widget>
-   </item>
+  <layout class="QVBoxLayout" name="verticalLayout_3">
    <item>
     <layout class="QHBoxLayout" name="horizontalLayout">
      <item>
-      <widget class="QPushButton" name="pb_teachers_xlsx">
-       <property name="text">
-        <string>Lehrer – xlsx</string>
+      <layout class="QVBoxLayout" name="verticalLayout">
+       <item>
+        <widget class="QPushButton" name="pb_pay">
+         <property name="text">
+          <string>Deputate – pdf</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QPushButton" name="pb_teachers">
+         <property name="text">
+          <string>Lehrer-Klassen – pdf</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QPushButton" name="pb_classes">
+         <property name="text">
+          <string>Klassen-Stunden – pdf</string>
+         </property>
+        </widget>
+       </item>
+      </layout>
+     </item>
+     <item>
+      <widget class="Line" name="line_2">
+       <property name="orientation">
+        <enum>Qt::Vertical</enum>
        </property>
       </widget>
      </item>
      <item>
-      <widget class="QPushButton" name="pb_classes_xlsx">
-       <property name="text">
-        <string>Klassen –xlsx</string>
-       </property>
-      </widget>
+      <layout class="QVBoxLayout" name="verticalLayout_2">
+       <item>
+        <widget class="QPushButton" name="pb_teachers_xlsx">
+         <property name="text">
+          <string>Lehrer – xlsx</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QPushButton" name="pb_classes_xlsx">
+         <property name="text">
+          <string>Klassen –xlsx</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <spacer name="verticalSpacer">
+         <property name="orientation">
+          <enum>Qt::Vertical</enum>
+         </property>
+         <property name="sizeHint" stdset="0">
+          <size>
+           <width>20</width>
+           <height>40</height>
+          </size>
+         </property>
+        </spacer>
+       </item>
+      </layout>
      </item>
     </layout>
+   </item>
+   <item>
+    <widget class="QPlainTextEdit" name="output_box">
+     <property name="readOnly">
+      <bool>true</bool>
+     </property>
+    </widget>
    </item>
    <item>
     <widget class="Line" name="line">

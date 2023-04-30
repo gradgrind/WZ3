@@ -344,7 +344,7 @@ ui.modules.grades_manager: {
     CELL_NOT_EDITABLE: "Feld „{field}“ darf nicht geändert werden"
 }
 
-ui.modules.pupils_manager: {
+ui.modules.pupil_editor: {
 #TODO ... not yet implemented/adapted
     # Labels
     MODULE_NAME:    Schüler

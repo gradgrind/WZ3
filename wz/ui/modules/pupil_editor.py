@@ -1,7 +1,7 @@
 """
 ui/modules/pupil_editor.py
 
-Last updated:  2023-04-30
+Last updated:  2023-05-01
 
 Edit pupil data.
 
@@ -75,7 +75,7 @@ from ui.dialogs.dialog_number_constraint import NumberConstraintDialog
 from local.name_support import asciify, tvSplit
 from core.basic_data import get_classes
 
-PUPIL_FIELDS = (
+PUPIL_FIELDS = ( # fields displayed in class table
     "FIRSTNAME",
     "LASTNAME",
     "LEVEL",
@@ -128,7 +128,6 @@ class PupilEditorPage(Page):
         self.init_data()
 
     def  init_data(self):
-#TODO: handle class!
         self.class_list = get_classes().get_class_list()
         self.select_class.clear()
         self.select_class.addItems([c[1] for c in self.class_list])
@@ -150,7 +149,7 @@ class PupilEditorPage(Page):
             sort_field="SORT_NAME",
             CLASS=self.current_class,
         )
-        # Populate the teachers table
+        # Populate the pupils table
         self.pupil_table.setRowCount(len(records))
         self.pupil_list = []
         self.pid2row = {}
@@ -169,8 +168,8 @@ class PupilEditorPage(Page):
                 c += 1
         self.pupil_dict = None
 
-    def set_tid(self, tid):
-        self.set_row(self.tid2row[tid])
+    def set_pid(self, pid):
+        self.set_row(self.pid2row[pid])
 
     def set_row(self, row):
         nrows = self.pupil_table.rowCount()
@@ -180,43 +179,17 @@ class PupilEditorPage(Page):
                 row = nrows - 1
             self.pupil_table.setCurrentCell(row, 0)
 
-    def on_teacher_table_itemSelectionChanged(self):
-        row = self.teacher_table.currentRow()
+    def on_pupil_table_itemSelectionChanged(self):
+        row = self.pupil_table.currentRow()
         if row >= 0:
-            self.teacher_dict = self.teacher_list[row]
-            self.set_teacher()
-        self.pb_remove.setEnabled(row > 0)
-        self.frame_r.setEnabled(row > 0)
+            self.pupil_dict = self.pupil_list[row]
+            self.set_pupil()
+            self.pb_remove.setEnabled(row > 0)
+            self.frame_r.setEnabled(row > 0)
 
-    def set_teacher(self):
-        self.teacher_id = self.teacher_dict["TID"]
-        for k, v in self.teacher_dict.items():
-            getattr(self, k).setText(v)
-        try:
-            record = db_read_unique(
-                "TT_TEACHERS",
-                TT_FIELDS,
-                TID=self.teacher_id
-            )
-            ttdict = {f: record[i] for i, f in enumerate(TT_FIELDS)}
-        except NoRecord:
-            ttdict = {f: "" for f in TT_FIELDS}
-            db_new_row("TT_TEACHERS", TID=self.teacher_id)
-        self.tt_available = ttdict.pop("AVAILABLE")
-        self.week_table.setText(self.tt_available)
-        lb = ttdict.pop("LUNCHBREAK")
-        lbi = self.LUNCHBREAK.findText(lb)
-        if lbi < 0:
-            if lb:
-                db_update_field(
-                    "TT_TEACHERS",
-                    "LUNCHBREAK",
-                    '',
-                    TID=self.teacher_id
-                )
-        self.current_lunchbreak = lb
-        self.LUNCHBREAK.setCurrentIndex(lbi)
-        for k, v in ttdict.items():
+    def set_pupil(self):
+        self.pupil_id = self.pupil_dict["PID"]
+        for k, v in self.pupil_dict.items():
             getattr(self, k).setText(v)
 
     @Slot()
@@ -224,6 +197,7 @@ class PupilEditorPage(Page):
         """Add a new teacher.
         The fields will initially have dummy values.
         """
+        raise TODO
         db_new_row(
             "TEACHERS",
             **{f: "?" for f in TEACHER_FIELDS}
@@ -234,6 +208,7 @@ class PupilEditorPage(Page):
     @Slot()
     def on_pb_remove_clicked(self):
         """Remove the current teacher."""
+        raise TODO
         row = self.teacher_table.currentRow()
         if row < 0:
             raise Bug("No teacher selected")

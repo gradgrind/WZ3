@@ -1,5 +1,5 @@
 """
-core/classes.py - last updated 2023-04-14
+core/classes.py - last updated 2023-05-01
 
 Manage class data.
 
@@ -43,12 +43,18 @@ from core.db_access import open_database, db_read_fields
 class Subgroup(frozenset):
     """This <frozenset> wrapper is used for groups and subgroups within
     a class.
+    The <__str__> method does not follow the intentions of <ClassGroups>, it
+    is primarily for testing purposes within this module itself. For
+    "correctness" use the <set2group> method of <ClassGroups>.
     """
     def __str__(self):
         return '.'.join(sorted(self))
 
 class Groupset(frozenset):
-    """A <frozenset> wrapper  modifying the <__str__> method."""
+    """A <frozenset> wrapper  modifying the <__str__> method.
+    The <__str__> method does not follow the intentions of <ClassGroups>, it
+    is primarily for testing purposes within this module itself.
+    """
     def __str__(self):
         return f"<<{' + '.join(sorted((str(m) for m in self)))}>>"
 

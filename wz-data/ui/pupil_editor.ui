@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>835</width>
-    <height>561</height>
+    <height>491</height>
    </rect>
   </property>
   <property name="sizePolicy">
@@ -199,13 +199,19 @@
      <property name="enabled">
       <bool>true</bool>
      </property>
+     <property name="sizePolicy">
+      <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
+       <horstretch>0</horstretch>
+       <verstretch>0</verstretch>
+      </sizepolicy>
+     </property>
      <property name="maximumSize">
       <size>
        <width>320</width>
        <height>16777215</height>
       </size>
      </property>
-     <layout class="QVBoxLayout" name="verticalLayout">
+     <layout class="QVBoxLayout" name="verticalLayout_3">
       <item>
        <layout class="QFormLayout" name="formLayout">
         <item row="0" column="0">
@@ -237,181 +243,98 @@
          </widget>
         </item>
         <item row="2" column="0">
-         <widget class="QLabel" name="label_3">
-          <property name="text">
-           <string>Schülerkennung</string>
-          </property>
-         </widget>
-        </item>
-        <item row="2" column="1">
-         <widget class="QLineEdit" name="PID">
-          <property name="readOnly">
-           <bool>true</bool>
-          </property>
-         </widget>
-        </item>
-        <item row="3" column="0">
-         <widget class="QLabel" name="label_2">
-          <property name="text">
-           <string>Klasse</string>
-          </property>
-         </widget>
-        </item>
-        <item row="3" column="1">
-         <widget class="QComboBox" name="CLASS"/>
-        </item>
-        <item row="4" column="0">
          <widget class="QLabel" name="label_6">
           <property name="text">
            <string>Vornamen</string>
           </property>
          </widget>
         </item>
-        <item row="4" column="1">
+        <item row="2" column="1">
          <widget class="QLineEdit" name="FIRSTNAMES">
           <property name="readOnly">
            <bool>true</bool>
           </property>
          </widget>
         </item>
-        <item row="5" column="0">
+        <item row="3" column="0">
          <widget class="QLabel" name="label_8">
           <property name="text">
            <string>Sortiername</string>
           </property>
          </widget>
         </item>
-        <item row="5" column="1">
+        <item row="3" column="1">
          <widget class="QLineEdit" name="SORT_NAME">
           <property name="readOnly">
            <bool>true</bool>
           </property>
          </widget>
         </item>
+        <item row="4" column="0">
+         <widget class="QLabel" name="label_3">
+          <property name="text">
+           <string>ID</string>
+          </property>
+         </widget>
+        </item>
+        <item row="4" column="1">
+         <widget class="QLineEdit" name="PID">
+          <property name="readOnly">
+           <bool>true</bool>
+          </property>
+         </widget>
+        </item>
+        <item row="5" column="0">
+         <widget class="QLabel" name="label_2">
+          <property name="text">
+           <string>Klasse</string>
+          </property>
+         </widget>
+        </item>
+        <item row="5" column="1">
+         <widget class="QLineEdit" name="CLASS">
+          <property name="readOnly">
+           <bool>true</bool>
+          </property>
+         </widget>
+        </item>
         <item row="6" column="0">
-         <widget class="QLabel" name="label_7">
-          <property name="text">
-           <string>Geburtsdatum</string>
-          </property>
-         </widget>
-        </item>
-        <item row="6" column="1">
-         <widget class="QDateEdit" name="DATE_BIRTH">
-          <property name="calendarPopup">
-           <bool>true</bool>
-          </property>
-         </widget>
-        </item>
-        <item row="7" column="0">
-         <widget class="QLabel" name="label_9">
-          <property name="text">
-           <string>Geburtsort</string>
-          </property>
-         </widget>
-        </item>
-        <item row="7" column="1">
-         <widget class="QLineEdit" name="BIRTHPLACE">
-          <property name="readOnly">
-           <bool>true</bool>
-          </property>
-         </widget>
-        </item>
-        <item row="8" column="0">
-         <widget class="QLabel" name="label_10">
-          <property name="text">
-           <string>Geschlecht</string>
-          </property>
-         </widget>
-        </item>
-        <item row="8" column="1">
-         <widget class="QComboBox" name="SEX">
-          <item>
-           <property name="text">
-            <string>m</string>
-           </property>
-          </item>
-          <item>
-           <property name="text">
-            <string>w</string>
-           </property>
-          </item>
-         </widget>
-        </item>
-        <item row="9" column="0">
-         <widget class="QLabel" name="label_11">
-          <property name="text">
-           <string>Eintrittsdatum</string>
-          </property>
-         </widget>
-        </item>
-        <item row="9" column="1">
-         <widget class="QDateEdit" name="DATE_ENTRY">
-          <property name="calendarPopup">
-           <bool>true</bool>
-          </property>
-         </widget>
-        </item>
-        <item row="10" column="0">
-         <widget class="QLabel" name="label_12">
-          <property name="text">
-           <string>Austrittsdatum</string>
-          </property>
-         </widget>
-        </item>
-        <item row="10" column="1">
-         <widget class="QLineEdit" name="DATE_EXIT">
-          <property name="readOnly">
-           <bool>true</bool>
-          </property>
-         </widget>
-        </item>
-        <item row="11" column="0">
          <widget class="QLabel" name="label_13">
           <property name="text">
            <string>Gruppen</string>
           </property>
          </widget>
         </item>
-        <item row="11" column="1">
+        <item row="6" column="1">
          <widget class="QLineEdit" name="GROUPS">
           <property name="readOnly">
            <bool>true</bool>
           </property>
          </widget>
         </item>
-        <item row="12" column="0">
+        <item row="7" column="0">
          <widget class="QLabel" name="label_14">
           <property name="text">
            <string>Bewertungsmaßstab</string>
           </property>
          </widget>
         </item>
-        <item row="12" column="1">
-         <widget class="QComboBox" name="LEVEL"/>
-        </item>
-        <item row="13" column="0">
-         <widget class="QLabel" name="label_15">
-          <property name="text">
-           <string>Wohnort</string>
-          </property>
-         </widget>
-        </item>
-        <item row="13" column="1">
-         <widget class="QLineEdit" name="HOME">
+        <item row="7" column="1">
+         <widget class="QLineEdit" name="LEVEL">
           <property name="readOnly">
            <bool>true</bool>
           </property>
          </widget>
         </item>
-        <item row="14" column="0">
-         <widget class="QLabel" name="label_16">
+        <item row="8" column="0">
+         <widget class="QLabel" name="label_12">
           <property name="text">
-           <string>Qualifikationsphase</string>
+           <string>Austrittsdatum</string>
           </property>
          </widget>
         </item>
-        <item row="14" column="1">
-         <widget class="QLineEdit" name="DATE_QPHASE">
+        <item row="8" column="1">
+         <widget class="QLineEdit" name="DATE_EXIT">
           <property name="readOnly">
            <bool>true</bool>
           </property>
@@ -420,17 +343,120 @@
        </layout>
       </item>
       <item>
-       <spacer name="verticalSpacer">
+       <widget class="Line" name="line_2">
         <property name="orientation">
-         <enum>Qt::Vertical</enum>
+         <enum>Qt::Horizontal</enum>
         </property>
-        <property name="sizeHint" stdset="0">
-         <size>
-          <width>20</width>
-          <height>20</height>
-         </size>
+       </widget>
+      </item>
+      <item>
+       <widget class="QLabel" name="label_17">
+        <property name="text">
+         <string>zusätzliche Felder für Zeugnisse, usw.</string>
         </property>
-       </spacer>
+       </widget>
+      </item>
+      <item>
+       <widget class="QScrollArea" name="scrollArea">
+        <property name="widgetResizable">
+         <bool>true</bool>
+        </property>
+        <widget class="QWidget" name="scrollAreaWidgetContents">
+         <property name="geometry">
+          <rect>
+           <x>0</x>
+           <y>0</y>
+           <width>279</width>
+           <height>174</height>
+          </rect>
+         </property>
+         <layout class="QVBoxLayout" name="verticalLayout">
+          <property name="leftMargin">
+           <number>3</number>
+          </property>
+          <property name="topMargin">
+           <number>3</number>
+          </property>
+          <property name="rightMargin">
+           <number>3</number>
+          </property>
+          <item>
+           <layout class="QFormLayout" name="formLayout_2">
+            <item row="0" column="0">
+             <widget class="QLabel" name="label_7">
+              <property name="text">
+               <string>Geburtsdatum</string>
+              </property>
+             </widget>
+            </item>
+            <item row="0" column="1">
+             <widget class="QLineEdit" name="DATE_BIRTH">
+              <property name="readOnly">
+               <bool>true</bool>
+              </property>
+             </widget>
+            </item>
+            <item row="1" column="0">
+             <widget class="QLabel" name="label_9">
+              <property name="text">
+               <string>Geburtsort</string>
+              </property>
+             </widget>
+            </item>
+            <item row="1" column="1">
+             <widget class="QLineEdit" name="BIRTHPLACE">
+              <property name="readOnly">
+               <bool>true</bool>
+              </property>
+             </widget>
+            </item>
+            <item row="2" column="0">
+             <widget class="QLabel" name="label_11">
+              <property name="text">
+               <string>Eintrittsdatum</string>
+              </property>
+             </widget>
+            </item>
+            <item row="2" column="1">
+             <widget class="QLineEdit" name="DATE_ENTRY">
+              <property name="readOnly">
+               <bool>true</bool>
+              </property>
+             </widget>
+            </item>
+            <item row="3" column="0">
+             <widget class="QLabel" name="label_10">
+              <property name="text">
+               <string>Geschlecht</string>
+              </property>
+             </widget>
+            </item>
+            <item row="3" column="1">
+             <widget class="QLineEdit" name="SEX">
+              <property name="readOnly">
+               <bool>true</bool>
+              </property>
+             </widget>
+            </item>
+            <item row="4" column="0">
+             <widget class="QLabel" name="label_15">
+              <property name="text">
+               <string>Wohnort</string>
+              </property>
+             </widget>
+            </item>
+            <item row="4" column="1">
+             <widget class="QLineEdit" name="HOME">
+              <property name="readOnly">
+               <bool>true</bool>
+              </property>
+             </widget>
+            </item>
+           </layout>
+          </item>
+         </layout>
+        </widget>
+       </widget>
       </item>
       <item>
        <widget class="Line" name="line">

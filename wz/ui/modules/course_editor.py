@@ -1,7 +1,7 @@
 """
 ui/modules/course_editor.py
 
-Last updated:  2023-04-23
+Last updated:  2023-05-01
 
 Edit course and blocks+lessons data.
 
@@ -630,6 +630,7 @@ class CourseEditorPage(Page):
                     result,
                     lesson_group=lg["lesson_group"]
                 )
+                lg["NOTES"] = result
                 obj.setText(result)
         ### LENGTH (LESSONS) --- own handler: on_lesson_length_ ...
         ### TIME (LESSONS)

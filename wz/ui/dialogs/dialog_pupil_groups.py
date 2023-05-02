@@ -1,7 +1,7 @@
 """
-ui/dialogs/dialog_class_groups.py
+ui/dialogs/dialog_pupil_groups.py
 
-Last updated:  2023-05-01
+Last updated:  2023-05-02
 
 Supporting "dialog" for the class-data editor – specify the ways a class
 can be divided into groups.
@@ -35,16 +35,17 @@ if __name__ == "__main__":
     from core.base import start
     start.setup(os.path.join(basedir, 'TESTDATA'))
 
-T = TRANSLATIONS("ui.dialogs.dialog_class_groups")
+T = TRANSLATIONS("ui.dialogs.dialog_pupil_groups")
 
 ### +++++
 
 from typing import Optional
+from itertools import product
+
 from ui.ui_base import (
     ### QtWidgets:
     QDialog,
     QDialogButtonBox,
-    QTableWidgetItem,
     QListWidgetItem,
     ### QtGui:
     ### QtCore:
@@ -76,7 +77,6 @@ class PupilGroupsDialog(QDialog):
         if elist:
             REPORT(
                 "WARNING",
-#TODO: T ...
                 T["EMPTY_GROUPS_ERROR"].format(e="\n - ".join(elist))
             )
 
@@ -90,34 +90,94 @@ class PupilGroupsDialog(QDialog):
         self.exec()
         return self.result
 
-#TODO
+    def print_groups(self):
+        return " ".join(g for g in self.divchoice if g)
+
     def set_groups(self):
+        self.block_handler = True
         self.grouplist.clear()
-
-        divchoice = [""] * len(self.class_groups.divisions)
-        first = True
-        for div in self.class_groups.divisions:
-            if first:
-                first = False
-            else:
+        self.divmap = {}    # group -> division index
+        self.groupmap = {}  # group -> list item
+        self.divchoice = [""] * len(self.class_groups.divisions)
+        for d, div in enumerate(self.class_groups.divisions):
+            if d != 0:
+                # Add division spacer
                 self.grouplist.addItem(QListWidgetItem())
-            for i, g in enumerate(sorted(div)):
+            for g in sorted(div):
+                self.divmap[g] = d
                 item = QListWidgetItem(g)
-                if (active := g in self.pgroups):
-                    if divchoice[i]:
-#TODO: T ...
-                        REPORT("ERROR", T["MULTIPLE_GROUPS_IN_DIV"])
+                self.groupmap[g] = item
+                checkstate = Qt.CheckState.Unchecked
+                if g in self.pgroups:
+                    if self.divchoice[d]:
+                        REPORT(
+                            "ERROR",
+                            T["MULTIPLE_GROUPS_IN_DIV"].format(
+                                g1=self.divchoice[d], g2=g
+                            )
+                        )
                     else:
-#TODO: check combination
-                        divchoice[i] = g
-                item.setCheckState(
-                    Qt.CheckState.Checked if active
-                    else Qt.CheckState.Unchecked
-                )
+                        # Check combination
+                        self.divchoice[d] = g
+                        if self.check_groups():
+                            checkstate = Qt.CheckState.Checked
+                        else:
+                            REPORT(
+                                "ERROR",
+                                T["INVALID_GROUP_COMBINATION"].format(
+                                    g = self.print_groups()
+                                )
+                            )
+                            self.divchoice[d] = ""
+                item.setCheckState(checkstate)
                 self.grouplist.addItem(item)
-        self.value = " ".join(g for g in divchoice if g)
-        print("§§§", self.value, self.value != self.value0)
+        self.set_accept_enable()
+        self.block_handler = False
 
+    def check_groups(self):
+        atomics = self.class_groups.filtered_atomic_groups
+        trial = []
+        for i, div in enumerate(self.class_groups.divisions):
+            if ( g := self.divchoice[i]):
+                trial.append([g])
+            else:
+                trial.append(div)
+        for cp in product(*trial):
+            if frozenset(cp) in atomics:
+                return True
+        return False
+
+    @Slot(QListWidgetItem)
+    def on_grouplist_itemChanged(self, lwi):
+        if self.block_handler:
+            return
+        g = lwi.text()
+        d = self.divmap[g]
+        if lwi.checkState() == Qt.CheckState.Checked:
+            self.block_handler = True
+            g0 = self.divchoice[d]
+            self.divchoice[d] = g
+            if self.check_groups():
+                if g0:
+                    # Group in division already set, deselect it
+                    self.groupmap[g0].setCheckState(Qt.CheckState.Unchecked)
+            else:
+                REPORT(
+                    "WARNING",
+                    T["INVALID_GROUP_COMBINATION"].format(
+                        g = self.print_groups()
+                    )
+                )
+                lwi.setCheckState(Qt.CheckState.Unchecked)
+                self.divchoice[d] = g0
+            self.block_handler = False
+        else:
+            self.divchoice[d] = ""
+        self.set_accept_enable()
+
+    def set_accept_enable(self):
+        self.value = self.print_groups()
+        self.pb_accept.setEnabled(self.value != self.value0)
 
     def accept(self):
         self.result = self.value
@@ -131,8 +191,9 @@ if __name__ == "__main__":
     open_database()
     print(
         "----->",
+        PupilGroupsDialog.popup("11G", "B")
+    )
+    print(
+        "----->",
         PupilGroupsDialog.popup("11G", "R A")
     )
-#    print("----->", ClassGroupsDialog.popup("A+B;G+R;B+A"))
-#    print("----->", ClassGroupsDialog.popup("A+B;G+r:I+II+III"))
-#    print("----->", ClassGroupsDialog.popup(""))

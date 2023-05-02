@@ -250,6 +250,12 @@ ui.dialogs.dialog_make_course_tables: {
 #ui.dialogs.dialog_parallel_lessons: {
 #}
 
+ui.dialogs.dialog_pupil_groups: {
+    EMPTY_GROUPS_ERROR: "Bei Verarbeitung der Untergruppen:\n\n - {e}"
+    INVALID_GROUP_COMBINATION: "Unzulässige Gruppenkombination: {g}"
+    MULTIPLE_GROUPS_IN_DIV: "Ungültige gespeicherte Gruppen: {g1} + {g2}"
+}
+
 ui.dialogs.dialog_room_choice: {
     INVALID_ROOM_IDS: "Ungültige Raumkürzel"
     NO_CLASSROOM_DEFINED: "Kein Klassenraum definiert"

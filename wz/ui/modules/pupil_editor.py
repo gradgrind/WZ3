@@ -24,9 +24,6 @@ Copyright 2023 Michael Towers
 =-LICENCE========================================
 """
 
-#TODO: just copied from teacher editor ...
-########################################################################
-
 if __name__ == "__main__":
     import sys, os
 
@@ -44,7 +41,6 @@ T = TRANSLATIONS("ui.modules.pupil_editor")
 
 ### +++++
 
-#from typing import NamedTuple
 from core.basic_data import clear_cache
 from core.db_access import (
     open_database,
@@ -75,12 +71,29 @@ from ui.dialogs.dialog_number_constraint import NumberConstraintDialog
 from local.name_support import asciify, tvSplit
 from core.basic_data import get_classes
 
-PUPIL_FIELDS = ( # fields displayed in class table
+TABLE_FIELDS = ( # fields displayed in class table
     "FIRSTNAME",
     "LASTNAME",
     "LEVEL",
     "GROUPS",
 )
+
+#TODO:
+PUPIL_FIELD_INFOS: {
+# Diese werden im Programm verwendet:
+#TODO: Perhaps a warning/info? (the entry will disappear if the class is changed!)
+    "CLASS":        ("CLASS_CHOICE", "", True),
+#TODO: T  ...
+    "PID":          ("LINE", "", True),
+    "SORT_NAME":    ("SORT_NAME?", "", True), #???
+    "LASTNAME":     ("LINE", "", True),
+    "FIRSTNAMES":   ("LINE", "", True),
+    "FIRSTNAME":    ("LINE", "", True),
+    "GROUPS":       ("GROUPS", "", False),
+    "DATE_EXIT":    ("DATE_OR_EMPTY", "", False),
+#TODO: The values must be in config!
+    "LEVEL":        ("CHOICE", ["", "Gym", "RS", "HS"], False),
+}
 
 ### -----
 
@@ -91,18 +104,18 @@ class PupilEditorPage(Page):
         self.pupil_table.horizontalHeader().setSectionResizeMode(
             QHeaderView.ResizeMode.ResizeToContents
         )
-        # Set up activation for the editors for the read-only lesson/block
-        # fields:
-        for w in (
-            self.PID, #self.CLASS,
-            self.FIRSTNAME, self.FIRSTNAMES,
-            self.LASTNAME, self.SORT_NAME,
-            self.GROUPS, #self.LEVEL,
-            #self.SEX, self.DATE_BIRTH, self.DATE_ENTRY,
-            self.BIRTHPLACE, self.HOME,
-            self.DATE_EXIT, self.DATE_QPHASE,
-        ):
-            w.installEventFilter(self)
+        self.extra_field2editor = {}
+        for field, name, editor, choice, required in CONFIG["PUPILS_FIELDS"]:
+            try:
+                ed = getattr(self, field)
+            except AttributeError:
+                # Need to add field to <self.extra_fields>
+                ed = QLineEdit()
+                self.extra_fields.addRow(name, ed)
+                ed.setReadOnly(True)
+                ed.setObjectName(field)
+                self.extra_field2editor[field] = ed
+            ed.installEventFilter(self)
 
     def eventFilter(self, obj: QWidget, event: QEvent) -> bool:
         """Event filter for the text-line fields.
@@ -158,7 +171,7 @@ class PupilEditorPage(Page):
             self.pid2row[rdict["PID"]] = r
             self.pupil_list.append(rdict)
             c = 0
-            for field in PUPIL_FIELDS:
+            for field in TABLE_FIELDS:
                 cell_value = rdict[field]
                 item = self.pupil_table.item(r, c)
                 if not item:
@@ -190,7 +203,10 @@ class PupilEditorPage(Page):
     def set_pupil(self):
         self.pupil_id = self.pupil_dict["PID"]
         for k, v in self.pupil_dict.items():
-            getattr(self, k).setText(v)
+            try:
+                getattr(self, k).setText(v)
+            except AttributeError:
+                self.extra_field2editor[k].setText(v)
 
     @Slot()
     def on_pb_new_clicked(self):
@@ -227,9 +243,13 @@ class PupilEditorPage(Page):
             self.set_row(row)
 
     def field_editor(self, obj: QLineEdit):
-        row = self.teacher_table.currentRow()
+        row = self.pupil_table.currentRow()
         object_name = obj.objectName()
-        ### TEACHER fields
+        ### PUPIL fields
+#TODO
+
+
+
         if object_name in (
             "TID", "FIRSTNAMES", "LASTNAME", "SIGNED", "SORTNAME"
         ):

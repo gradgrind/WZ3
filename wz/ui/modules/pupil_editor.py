@@ -1,7 +1,7 @@
 """
 ui/modules/pupil_editor.py
 
-Last updated:  2023-05-01
+Last updated:  2023-05-06
 
 Edit pupil data.
 
@@ -41,7 +41,6 @@ T = TRANSLATIONS("ui.modules.pupil_editor")
 
 ### +++++
 
-from core.basic_data import clear_cache
 from core.db_access import (
     open_database,
     db_read_unique,
@@ -65,11 +64,14 @@ from ui.ui_base import (
     ### uic
     uic,
 )
-from ui.dialogs.dialog_text_line import TextLineDialog
+from ui.dialogs.dialog_text_line_message import TextLineDialog
 from ui.dialogs.dialog_text_line_offer import TextLineOfferDialog
+from ui.dialogs.dialog_choose_class import ClassSelectDialog
+from ui.dialogs.dialog_pupil_groups import PupilGroupsDialog
 from ui.dialogs.dialog_number_constraint import NumberConstraintDialog
 from local.name_support import asciify, tvSplit
-from core.basic_data import get_classes
+from local.pupil_support import pupil_name, check_pid_valid
+from core.basic_data import get_classes, clear_cache
 
 TABLE_FIELDS = ( # fields displayed in class table
     "FIRSTNAME",
@@ -149,7 +151,6 @@ class PupilEditorPage(Page):
 
     @Slot(int)
     def on_select_class_currentIndexChanged(self, i):
-        print("§CLASS INDEX", i)
         self.load_pupil_table()
         self.set_row(0)
 
@@ -185,24 +186,37 @@ class PupilEditorPage(Page):
         self.set_row(self.pid2row[pid])
 
     def set_row(self, row):
+        self.suppress_pupil_change = True
         nrows = self.pupil_table.rowCount()
-        self.pupil_table.setCurrentCell(-1, 0)
         if nrows > 0:
             if row >= nrows:
                 row = nrows - 1
             self.pupil_table.setCurrentCell(row, 0)
+        self.suppress_pupil_change = False
+        self.set_pupil()
 
+    @Slot()
     def on_pupil_table_itemSelectionChanged(self):
-        row = self.pupil_table.currentRow()
-        if row >= 0:
-            self.pupil_dict = self.pupil_list[row]
-            self.set_pupil()
-            self.pb_remove.setEnabled(row > 0)
-            self.frame_r.setEnabled(row > 0)
+        if self.suppress_pupil_change:
+            return
+        self.set_pupil()
 
     def set_pupil(self):
-        self.pupil_id = self.pupil_dict["PID"]
-        for k, v in self.pupil_dict.items():
+        row = self.pupil_table.currentRow()
+        if row >= 0:
+            self.pupil_dict = (pdata := self.pupil_list[row])
+            self.pupil_id = pdata["PID"]
+            self.pb_remove.setEnabled(True)
+            self.frame_r.setEnabled(True)
+        else:
+            self.pupil_dict = None
+            pdata = {}
+            self.pupil_id = None
+            self.pb_remove.setEnabled(False)
+            self.frame_r.setEnabled(False)
+        for pfline in CONFIG["PUPILS_FIELDS"]:
+            k = pfline[0]
+            v = pdata.get(k, "")
             try:
                 getattr(self, k).setText(v)
             except AttributeError:
@@ -210,12 +224,12 @@ class PupilEditorPage(Page):
 
     @Slot()
     def on_pb_new_clicked(self):
-        """Add a new teacher.
+        """Add a new pupil.
         The fields will initially have dummy values.
         """
         raise TODO
         db_new_row(
-            "TEACHERS",
+            "PUPILS",
             **{f: "?" for f in TEACHER_FIELDS}
         )
         self.load_teacher_table()
@@ -223,7 +237,9 @@ class PupilEditorPage(Page):
 
     @Slot()
     def on_pb_remove_clicked(self):
-        """Remove the current teacher."""
+        """Remove the current pupil."""
+# Warn that this is not normally the correct approach ... rather set
+# an exit date.
         raise TODO
         row = self.teacher_table.currentRow()
         if row < 0:
@@ -245,10 +261,61 @@ class PupilEditorPage(Page):
     def field_editor(self, obj: QLineEdit):
         row = self.pupil_table.currentRow()
         object_name = obj.objectName()
+        val = self.pupil_dict[object_name]
         ### PUPIL fields
 #TODO
+        if object_name == "CLASS":
+            result = ClassSelectDialog.popup(val)
+            if result is not None:
+                SHOW_INFO(T["CHANGED_CLASS"].format(
+                    pname=pupil_name(self.pupil_dict),
+                    klass=result
+                ))
+# ...                
+
+        elif object_name == "SORT_NAME":
+            f, t, l = tvSplit(
+                self.pupil_dict["FIRSTNAME"],
+                self.pupil_dict["LASTNAME"]
+            )
+            result = TextLineOfferDialog.popup(
+                self.pupil_dict["SORT_NAME"],
+                asciify(f"{l}_{t}_{f}" if t else f"{l}_{f}"),
+                parent=self
+            )
+# ...                
+
+        elif object_name == "GROUPS":
+            result = PupilGroupsDialog.popup(val)
+# ...                
+
+        elif object_name == "PID":
+            result = TextLineDialog.popup(
+                val,
+                message=T["CHANGE_PUPIL_ID_WARNING"],
+                title=T["PUPIL_ID"]
+            )
+            if result is not None:
+                if (e := check_pid_valid(result)):
+                    SHOW_ERROR(e)
+                    result = None
+                elif not SHOW_CONFIRM(T["PID_CONFIRM"]):
+                    result = None
+# ...                
+
+#    "LASTNAME":     ("LINE", "", True),
+#    "FIRSTNAMES":   ("LINE", "", True),
+#    "FIRSTNAME":    ("LINE", "", True),
+#    "DATE_EXIT":    ("DATE_OR_EMPTY", "", False),
+##TODO: The values must be in config!
+#    "LEVEL":        ("CHOICE", ["", "Gym", "RS", "HS"], False),
 
 
+#TODO
+        print("§§§ RESULT:", result)
+        return
+
+### Was:
 
         if object_name in (
             "TID", "FIRSTNAMES", "LASTNAME", "SIGNED", "SORTNAME"

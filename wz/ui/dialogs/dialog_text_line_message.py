@@ -77,7 +77,7 @@ class TextLineDialog(QDialog):
         self.result = None
         self.value0 = start_value
         if message[-1] == "!":
-            message = f'<p style="color:#ff0000;">{message}</p>'
+            message = f'<p style="color:#d50000;">{message}</p>'
         self.label.setText(message)
         self.textline.setText(start_value)
         self.pb_accept.setEnabled(False)

@@ -119,11 +119,6 @@ def pupils_in_group(class_group, date=None):
     return plist
 
 
-def pupil_name(pupil_data):
-    """Return the short-name of the pupil."""
-    return f"{pupil_data['FIRSTNAME']} {pupil_data['LASTNAME']}"
-
-
 def final_year_pupils():
     """Return lists of pupils in their final year:
     {class: [(pid, name), ... ], ...}

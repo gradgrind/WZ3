@@ -77,6 +77,9 @@ core.db_access: {
 }
 
 core.pupils: {
+    PID_EXISTS:     "Schüler-Kennzeichen existiert schon: '{pid}'"
+    INVALID_PID:    "'{pid}' ist kein gültiges Schüler-Kennzeichen"
+
 #TODO ... not yet implemented/adapted
     # Labels
     OPEN_TABLETYPE: "Tabellendatei"
@@ -351,6 +354,11 @@ ui.modules.grades_manager: {
 }
 
 ui.modules.pupil_editor: {
+    CHANGED_CLASS:  "Klassenwechsel: {pname} ist jetzt in Klasse {klass}"
+    CHANGE_PUPIL_ID_WARNING: "Das Schüler-Kennzeichen sollte nur in Ausnahmefällen geändert werden. Alte Daten des Schülers können verloren gehen!"
+    PUPIL_ID: "Schüler-Kennzeichen"
+    PID_CONFIRM: "Soll das Schüler-Kennzeichen wirklich geändert werden? Diese Änderung kann zu Datenverlusten führen."
+    
 #TODO ... not yet implemented/adapted
     # Labels
     MODULE_NAME:    Schüler

@@ -281,6 +281,12 @@ class ClassGroups:
         self.group2atoms = {v: k for k, v in gdict.items()}
         return elist
 
+    def atoms2grouplist(self):
+        """Return a mapping {(atom, ... ): (group, ... )} where the keys
+        are all possible (sorted) combinations of the minimal subgroups.
+        The corresponding value is a minimal list of groups representing
+        the key.
+        """
 
 class ClassData(NamedTuple):
     klass: str
@@ -298,6 +304,8 @@ if __name__ == "__main__":
         "",
         "A+B;G+R;B+A-A.R",
         "A+B;G+r:I+II+III",
+        "E+e;K+k;M+m;S+s-E.K.M.S-E.K.m.s-E.M.k.s-E.S.k.m-E.k.m.s" \
+            "-K.M.S.e-K.e.m.s-M.e.k.s-S.e.k.m-e.k.m.s",
     ):
         cg = ClassGroups(cglist)
         print(f"\n{cglist} ->", cg.filtered_atomic_groups)

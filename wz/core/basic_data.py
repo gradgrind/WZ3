@@ -290,16 +290,18 @@ def blocknotes_info(text:str) -> dict[str,str]:
 '''
 
 
+'''
+deprecated ...
+
 def get_group_info(klass):
     tag = f"group_info_{klass}"
     try:
         return SHARED_DATA[tag]
     except KeyError:
         pass
-    gi = get_classes().group_info(klass)
+    gi = get_classes()[klass].divisions
     SHARED_DATA[tag] = gi
     return gi
-
 
 def check_group(klass, group=None):
     try:
@@ -311,7 +313,7 @@ def check_group(klass, group=None):
         if group not in groups:
             return False
     return True
-
+'''
 
 # def check_lesson_length(length: str) -> int:
 #    """Return the length of a valid lesson duration as an <int>.

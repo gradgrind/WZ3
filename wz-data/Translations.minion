@@ -493,7 +493,7 @@ timetable.fet_data: {
     ROOM_BLOCK_CONFLICT: "Räume nicht unabhängig für Kurs(e) mit Kennzeichen {tag}, Klasse(n) {classes}: {rooms}"
     INVALID_TEACHER_CONDITION_VALUE: "Lehrer {tid}, ungültiger Wert für Bedingung {constraint}: '{val}'"
     INVALID_CLASS_CONDITION_VALUE: "Klasse {klass}, ungültiger Wert für Bedingung {constraint}: '{val}'"
-    INVALID_GROUP_LIST: "Kurs mit Kennzeichen {tag}, Gruppenkombination nicht möglich: {groups}"
+    INVALID_GROUP_LIST: "LESSON_GROUP {lg}, Gruppenkombination nicht möglich: {groups}"
     INVALID_CLASS_CONSTRAINT: "Klasse {klass}: ungültige Wert für Bedingung {constraint}"
     PARALLEL_SINGLE: "Parallel-Kennung {tag} hat nur eine Unterrichtsstunde"
    

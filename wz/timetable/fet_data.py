@@ -73,6 +73,7 @@ from core.db_access import (
     db_backup,
     db_update_fields,
     db_read_unique,
+    db_read_fields,
     NoRecord,
 )
 from core.classes import ClassGroups
@@ -299,7 +300,6 @@ class TimetableCourses(Courses):
         "timetable_classes",
         "parallel_tags",
         "locked_aids",
-#?
         "fet_classes",
         "group2atoms",
         "activities",
@@ -371,170 +371,198 @@ class TimetableCourses(Courses):
         '''
 
         # <cl_lists> is a mapping { class -> [activity, ... ] }
+        lg_set = set()
+        roomlists = {}  # sets of unique room lists
         for klass in sorted(cl_lists):
-            ailist = cl_lists[klass]
+            for ai in cl_lists[klass]:
+                if not ai.lessons:
+                    continue
+                if (lg := ai.lesson_group) in lg_set:
+#?
+                    # Add room choice
+                    if (r := ai.room):
+                        try:
+                            roomlists[lg].add(r)
+                        except KeyError:
+                            roomlists[lg] = {r}
+                    continue
+                print(" ++", ai.blocktag, ai.course_data)
+                lg_set.add(lg)
+#--
+                clist = lg_2_c[lg]
+                if len(clist) > 1:
+                    print("$$$", clist)
+
+                class_set = set()
+                group_sets = {} # {klass -> set of atomic groups}
+                teacher_set = set()
+                for klass, g, sid, tid in lg_2_c[lg]:
+                    class_set.add(klass)
+                    if g and klass != "--":
+                        # Only add a group "Students" entry if there is a
+                        # group and a (real) class
+                        if g == "*":
+                            g = ""
+                        gatoms = self.group2atoms[klass][g]
+                        try:
+                            group_sets[klass].update(gatoms)
+                        except KeyError:
+                            group_sets[klass] = set(gatoms)
+                    if tid != "--":
+                        teacher_set.add(tid)
 
 
+#        return
 
-        return
 
-#???
-        # tag2entries: {block-tag -> [BlockInfo, ... ]}
-        for tag, blocklist in self.tag2entries.items():
-            lessons = sublessons(tag)
-            if not lessons:
-                continue
-            class_set = set()
-            group_sets = {}  # {klass -> set of atomic groups}
-            teacher_set = set()
-            roomlists = []  # list of unique room lists
-            for blockinfo in blocklist:
-                course = blockinfo.course
-                klass = course.klass
-                class_set.add(klass)
-                g = course.group
-                if g and klass != "--":
-                    # Only add a group "Students" entry if there is a
-                    # group and a (real) class
-                    if g == "*":
-                        g = ""
-                    gatoms = self.group2atoms[klass][g]
+#???!!!
+                # Get "usable" groups
+                groups = []
+                for klass, aset in group_sets.items():
+
+                    a2g = atoms2group[klass]
+
+#                    a2glist = atoms2grouplist[klass]
                     try:
-                        group_sets[klass].update(gatoms)
-                    except KeyError:
-                        group_sets[klass] = set(gatoms)
-                if course.tid != "--":
-                    teacher_set.add(course.tid)
-                # Add rooms, retaining order
-                rl = blockinfo.rooms
-                if rl and rl not in roomlists:
-                    roomlists.append(rl)
-            # Get "usable" groups
-            groups = []
-            for klass, aset in group_sets.items():
-                a2glist = atoms2grouplist[klass]
-                try:
-                    key = tuple(sorted(aset))
-                    for g in a2glist[key]:
+                        key = tuple(sorted(aset))
+
+                        g = a2g[key]
                         groups.append(f"{klass}.{g}" if g else klass)
-                        # print("$$$", klass, g, key, a2glist)
-                except KeyError:
-                    REPORT(
-                        "ERROR",
-                        T["INVALID_GROUP_LIST"].format(
-                            tag=tag, groups=",".join(key)
-                        ),
-                    )
-            # Get the subject-id from the block-tag, if it has a
-            # subject, otherwise from the course (of which there
-            # should be only one!)
-            sid = blockinfo.block.sid or course.sid
-            ## Handle rooms
-            # Simplify room lists, check for room conflicts.
-            # Collect room allocations which must remain open (containing
-            # '+') and multiple room allocations for possible later
-            # manual handling.
-            singles = []
-            roomlists0 = []
-            classes_str = ",".join(sorted(class_set))
-            # Collect open allocations (with '+') and multiple room
-            # activities. Eliminate open room choices from further
-            # consideration here.
-            if len(roomlists) > 1:
-                self.fancy_rooms.append((classes_str, tag, roomlists))
-                for rl in roomlists:
-                    if rl[-1] != '+':
-                        if len(rl) == 1:
-                            singles.append(rl[0])
-                        else:
-                            roomlists0.append(rl)
-            elif len(roomlists) == 1:
-                rl = roomlists[0]
-                if rl[-1] == '+':
-                    self.fancy_rooms.append((classes_str, tag, roomlists))
-                elif len(rl) == 1:
-                    singles.append(rl[0])
-                else:
-                    roomlists0.append(rl)
-            # Remove redundant entries
-            roomlists1 = []
-            for rl in roomlists0:
-                _rl = rl.copy()
-                for sl in singles:
-                    try:
-                        _rl.remove(sl)
-                    except ValueError:
-                        pass
-                if _rl:
-                    roomlists1.append(_rl)
-                else:
-                    REPORT(
-                        "ERROR",
-                        T["ROOM_BLOCK_CONFLICT"].format(
-                            classes=classes_str,
-                            tag=tag,
-                            rooms=repr(roomlists),
-                        ),
-                    )
-            for sl in singles:
-                roomlists1.append([sl])
-            if len(roomlists1) == 1:
-                rooms = roomlists1[0]
-            elif len(roomlists1) > 1:
-                vroom = self.virtual_room(roomlists1)
-                rooms = [vroom]
-            else:
-                rooms = []
-            #            print("§§§", tag, class_set)
-            #            print("   +++", teacher_set, groups)
-            #            print("   ---", rooms)
-            #            if len(roomlists1) > 1:
-            #                print(roomlists1)
-            #                print(self.__virtual_rooms[rooms[0]])
 
-            # Add to "used" teachers and subjects
-            self.timetable_teachers.update(teacher_set)
-            self.timetable_subjects.add(sid)
-            ## Generate the activity or activities
-            if teacher_set:
-                if len(teacher_set) == 1:
-                    activity0 = {"Teacher": teacher_set.pop()}
+#                        for g in a2glist[key]:
+#                            groups.append(f"{klass}.{g}" if g else klass)
+#                            # print("$$$", klass, g, key, a2glist)
+                    except KeyError:
+                        REPORT(
+                            "ERROR",
+                            T["INVALID_GROUP_LIST"].format(
+                                lg=lg, groups=",".join(key)
+                            ),
+                        )
+
+                # Get the subject-id from the block-tag, if it has a
+                # subject, otherwise from the course (of which there
+                # should be only one!)
+                if (bt := ai.blocktag):
+                    sid = bt.sid
+
+                ## Handle rooms
+                # Simplify room lists, check for room conflicts.
+                # Collect room allocations which must remain open (containing
+                # '+') and multiple room allocations for possible later
+                # manual handling.
+                singles = []
+                roomlists0 = []
+                classes_str = ",".join(sorted(class_set))
+                # Collect open allocations (with '+') and multiple room
+                # activities. Eliminate open room choices from further
+                # consideration here.
+                if len(roomlists) > 1:
+                    self.fancy_rooms.append((classes_str, lg, roomlists))
+                    for rl in roomlists:
+                        if rl[-1] != '+':
+                            if len(rl) == 1:
+                                singles.append(rl[0])
+                            else:
+                                roomlists0.append(rl)
+                elif len(roomlists) == 1:
+                    rl = roomlists[0]
+                    if rl[-1] == '+':
+                        self.fancy_rooms.append((classes_str, lg, roomlists))
+                    elif len(rl) == 1:
+                        singles.append(rl[0])
+                    else:
+                        roomlists0.append(rl)
+                # Remove redundant entries
+                roomlists1 = []
+                for rl in roomlists0:
+                    _rl = rl.copy()
+                    for sl in singles:
+                        try:
+                            _rl.remove(sl)
+                        except ValueError:
+                            pass
+                    if _rl:
+                        roomlists1.append(_rl)
+                    else:
+                        REPORT(
+                            "ERROR",
+                            T["ROOM_BLOCK_CONFLICT"].format(
+                                classes=classes_str,
+                                tag=tag,
+                                rooms=repr(roomlists),
+                            ),
+                        )
+                for sl in singles:
+                    roomlists1.append([sl])
+                if len(roomlists1) == 1:
+                    rooms = roomlists1[0]
+                elif len(roomlists1) > 1:
+                    vroom = self.virtual_room(roomlists1)
+                    rooms = [vroom]
                 else:
-                    activity0 = {"Teacher": sorted(teacher_set)}
-            else:
-                activity0 = {}
-            if groups:
-                activity0["Students"] = (
-                    groups[0] if len(groups) == 1 else groups
+                    rooms = []
+                #            print("§§§", tag, class_set)
+                #            print("   +++", teacher_set, groups)
+                #            print("   ---", rooms)
+                #            if len(roomlists1) > 1:
+                #                print(roomlists1)
+                #                print(self.__virtual_rooms[rooms[0]])
+
+                # Add to "used" teachers and subjects
+                self.timetable_teachers.update(teacher_set)
+                self.timetable_subjects.add(sid)
+                ## Generate the activity or activities
+                if teacher_set:
+                    if len(teacher_set) == 1:
+                        activity0 = {"Teacher": teacher_set.pop()}
+                    else:
+                        activity0 = {"Teacher": sorted(teacher_set)}
+                else:
+                    activity0 = {}
+                if groups:
+                    activity0["Students"] = (
+                        groups[0] if len(groups) == 1 else groups
+                    )
+                activity0["Subject"] = sid
+                activity0["Active"] = "true"
+                # Divide lessons up according to duration
+
+                durations = {}
+                total_duration = 0
+                 # Need the LESSONS data: id, length, time
+                for lid, l, t in db_read_fields(
+                    "LESSONS",
+                    ("id", "LENGTH", "TIME"),
+                    lesson_group=lg
+                ):
+                    total_duration += l
+                    try:
+                        durations[l].append(lid)
+                    except KeyError:
+                        durations[l] = [lid]
+#TODO: what to do with the time, <t>?
+
+                activity0["Total_Duration"] = str(total_duration)
+                id0 = self.next_activity_id()
+                activity0["Activity_Group_Id"] = str(
+                    id0 if len(ai.lessons) > 1 else 0
                 )
-            activity0["Subject"] = sid
-            activity0["Active"] = "true"
-            # Divide lessons up according to duration
-            durations = {}
-            total_duration = 0
-            for sl in lessons:
-                l = sl.LENGTH
-                total_duration += l
-                try:
-                    durations[l].append(sl)
-                except KeyError:
-                    durations[l] = [sl]
-            activity0["Total_Duration"] = str(total_duration)
-            id0 = self.next_activity_id()
-            activity0["Activity_Group_Id"] = str(id0 if len(lessons) > 1 else 0)
-            for l in sorted(durations):
-                dstr = str(l)
-                for sl in durations[l]:
-                    id_str = str(id0)
-                    activity = activity0.copy()
-                    activity["Id"] = id_str
-                    activity["Duration"] = dstr
-                    activity["Comments"] = str(sl.id)
-                    self.add_placement(id_str, sl, rooms)
-                    self.activities.append(activity)
-                    # print("$$$$$", sid, groups, id_str)
-                    self.subject_group_activity(sid, groups, id_str)
-                    id0 += 1
+                for l in sorted(durations):
+                    dstr = str(l)
+                    for lid in durations[l]:
+                        id_str = str(id0)
+                        activity = activity0.copy()
+                        activity["Id"] = id_str
+                        activity["Duration"] = dstr
+                        activity["Comments"] = str(lid)
+
+#TODO: Need time here?
+                        self.add_placement(id_str, lid, rooms)
+                        self.activities.append(activity)
+                        # print("$$$$$", sid, groups, id_str)
+                        self.subject_group_activity(sid, groups, id_str)
+                        id0 += 1
 
         # Defining a set of lessons as an "Activity_Group" / subactivities
         # is a way of grouping activities which are split into a number
@@ -1698,7 +1726,6 @@ def getActivities(working_folder):
 
 if __name__ == "__main__":
     from core.db_access import open_database
-
     open_database()
 
     fet_days = get_days_fet()

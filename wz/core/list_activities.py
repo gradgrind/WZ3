@@ -1,7 +1,7 @@
 """
 core/list_activities.py
 
-Last updated:  2023-04-23
+Last updated:  2023-05-08
 
 Present information on activities for teachers and classes/groups.
 The information is formatted in pdf documents using the reportlab
@@ -35,7 +35,7 @@ if __name__ == "__main__":
     basedir = os.path.dirname(appdir)
     from core.base import start
     start.setup(os.path.join(basedir, "TESTDATA"))
-    
+
 T = TRANSLATIONS("core.list_activities")
 
 ### +++++
@@ -58,7 +58,7 @@ import lib.pylightxl as xl
 from tables.pdf_table import TablePages
 
 DECIMAL_SEP = CONFIG["DECIMAL_SEP"]
-        
+
 ### -----
 
 
@@ -114,7 +114,7 @@ def read_db():
     """
     cl_lists = {}
     t_lists = {}
-    
+
     c_2_cl_g_s_t = {}
     w_2_lg_p_r = {}
     lg_2_ll = {}
@@ -141,7 +141,7 @@ def read_db():
             lg_2_ll[lg].append(l)
         except KeyError:
             lg_2_ll[lg] = [l]
-        
+
     for lg, bsid, btag in db_read_fields(
         "LESSON_GROUPS",
         ("lesson_group", "BLOCK_SID", "BLOCK_TAG")
@@ -150,7 +150,7 @@ def read_db():
             BlockTag.build(bsid, btag) if bsid else None,
             lg_2_ll[lg]     # assumes each lg has lessons!
         )
-    
+
     for c, w in db_read_fields(
         "COURSE_WORKLOAD",
         ("course", "workload")
@@ -391,10 +391,10 @@ def make_class_table_xlsx(activity_lists):
                 data.subject,
                 data.group,
                 data.teacher_id,
-                data.block_subject, 
-                data.block_tag, 
-                data.workgroup, 
-                data.room, 
+                data.block_subject,
+                data.block_tag,
+                data.workgroup,
+                data.room,
                 data.lessons,
                 data.paystr,
             ]
@@ -511,7 +511,7 @@ def make_teacher_table_room(activity_lists):
                 ref = ""
                 w = ""
                 room = item.room
-            
+
             if item.klass != klass:
                 add_simple_items()
                 # Add space before new class
@@ -624,7 +624,7 @@ def make_teacher_table_pay(activity_lists):
                 paystr = item.paystr
                 pay = PAY_FORMAT(item.pay)
                 w = ""
-            
+
             if item.klass != klass:
                 add_simple_items()
                 # Add space before new class
@@ -680,6 +680,7 @@ def make_class_table_pdf(activity_lists, lg_2_c):
         datalist = activity_lists[klass]
         items = class_list(datalist)
         class_data = classes[klass]
+        w_set = set()   # to keep track of WORKLOAD indexes
         # Calculate the total number of lessons for the pupils.
         # The results should cover all (sub-)groups.
         # Each LESSON_GROUPS entry must be counted only once FOR
@@ -698,8 +699,8 @@ def make_class_table_pdf(activity_lists, lg_2_c):
                 fag2lessons[fag] = 0
                 lgsets[fag] = set()
         # Add page to table builder
-        pdf.add_page(f"{klass}: {class_data.name}")    
-        
+        pdf.add_page(f"{klass}: {class_data.name}")
+
         lessonblocks = {}
         simplelessons = []
         for data in items:
@@ -730,14 +731,20 @@ def make_class_table_pdf(activity_lists, lg_2_c):
 # If not, could span the columns ...
                     bline = [s, "", "", "", data.lessons]
                     lbtagmap[data.block_tag] = [bline, line]
-                    
+
             else:
+                # Manage "teams"
+                if data.workgroup in w_set:
+                    l = f"({data.lessons})"
+                else:
+                    w_set.add(data.workgroup)
+                    l = data.lessons
                 simplelessons.append((
                     data.subject,
                     data.group,
                     data.teacher_id,
                     "",
-                    data.lessons,
+                    l,
                 ))
 
             # Allocate the lessons to the minimal subgroups

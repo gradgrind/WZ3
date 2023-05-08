@@ -1,7 +1,7 @@
 """
 ui/modules/course_editor.py
 
-Last updated:  2023-05-01
+Last updated:  2023-05-08
 
 Edit course and blocks+lessons data.
 
@@ -207,7 +207,7 @@ class CourseEditorPage(Page):
     def on_buttonGroup_buttonClicked(self, pb):
         # CLASS, SUBJECT or TEACHER
         # Note: not called when <setChecked> is called on a member button
-        oname = pb.objectName() 
+        oname = pb.objectName()
         self.set_combo(oname.split("_", 1)[1])
 
     def set_combo(self, field):
@@ -723,7 +723,7 @@ class CourseEditorPage(Page):
                         activities.append(data)
             nlessons, total = teacher_workload(activities)
             self.total.setText(T["TEACHER_TOTAL"].format(
-                n=nlessons, total=str(total).replace('.', DECIMAL_SEP)
+                n=nlessons, total=f"{total:.2f}".replace('.', DECIMAL_SEP)
             ))
             self.total.setEnabled(True)
         else:

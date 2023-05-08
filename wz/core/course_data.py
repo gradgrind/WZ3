@@ -1,7 +1,7 @@
 """
 core/course_data.py
 
-Last updated:  2023-04-15
+Last updated:  2023-05-08
 
 Support functions dealing with courses, lessons, etc.
 
@@ -90,14 +90,14 @@ def course_activities(course_id:int
     This may be a bit restrictive, but is perhaps reasonable for most
     cases. Normally only single simple or pay-only elements would be
     expected.
-    
+
     There is also the possibility that multiple courses share a WORKLOAD
     entry, which means that room and pay-data values are shared by all
     the courses. The main idea behind this option is to facilitate
     combining groups (especially from different classes – within one
     class it is probably better to have a single group for this). It
     could also be used for joint teaching as long as the room is shared
-    and the pay-data identical. Otherwise a block might be better. 
+    and the pay-data identical. Otherwise a block might be better.
     """
     workload_elements = []
     simple_elements = []
@@ -157,6 +157,8 @@ def teacher_workload(activity_list: list[dict]) -> tuple[int, float]:
     """
     # Each WORKLOAD entry must be counted only once, so keep track:
     wset = set()
+    # Keep track of lesson-groups: don't count blocks twice for plan time
+    lgset = set()
     total = 0.0
     nlessons = 0
     for data in activity_list:
@@ -166,7 +168,9 @@ def teacher_workload(activity_list: list[dict]) -> tuple[int, float]:
         lessons = 0
         for l in (data.get("lessons") or []):
             lessons += l["LENGTH"]
-        nlessons += lessons
+        if (lg := data["lesson_group"]) not in lgset:
+            lgset.add(lg)
+            nlessons += lessons
         pay = Workload.build(data["PAY_TAG"]).payment(lessons)
         total += pay
     return (nlessons, total)

@@ -63,7 +63,7 @@ def filtered_courses(filter:str, value:str) -> list[dict]:
     """
     fields, records = db_read_full_table(
         "COURSES",
-        sort_field="SUBJECT",
+        sort_field="CLASS,SUBJECT,GRP,TEACHER",
         **{filter: value}
     )
     courses = []

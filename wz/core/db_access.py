@@ -1,7 +1,7 @@
 """
 core/db_access.py
 
-Last updated:  2023-03-23
+Last updated:  2023-05-09
 
 Helper functions for accessing the database.
 
@@ -284,6 +284,17 @@ def db_read_table(
 
 def db_read_full_table(table, *wheres, **keys):
     return db_read_table(table, None, *wheres, **keys)
+
+
+def db_read_mappings(table, *wheres, **keys) -> list[dict]:
+    """Read all fields from the given table, returning the data as a
+    list of mappings.
+    """
+    fields, records = db_read_table(table, None, *wheres, **keys)
+    return [
+        {fields[i]: val for i, val in enumerate(rec)}
+        for rec in records
+    ]
 
 
 def db_read_fields(table, fields, *wheres, **keys):

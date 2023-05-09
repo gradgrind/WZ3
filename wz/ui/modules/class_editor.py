@@ -1,7 +1,7 @@
 """
 ui/modules/class_editor.py
 
-Last updated:  2023-04-08
+Last updated:  2023-05-09
 
 Edit class data.
 
@@ -87,6 +87,9 @@ TT_FIELDS = (
     "MAX_GAPS_PER_WEEK",
     "LUNCHBREAK",
 )
+
+#TODO: further conditions ...
+# NOTAFTER, PAIRGAP
 
 ### -----
 

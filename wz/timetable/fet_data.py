@@ -1013,7 +1013,7 @@ class TimetableCourses(Courses):
 
     ############### FURTHER CONSTRAINTS ###############
 
-    def constraints_MINDAILY(self, default):
+    def constraints_MINDAILY(self, default, data):
         clist: list[dict] = []
         classes = get_classes()
         for klass, _ in classes.get_class_list():
@@ -1027,6 +1027,7 @@ class TimetableCourses(Courses):
             if n:
                 if n == "*":
                     n = default
+#????!!!
                 val = self.class_periods_constraint(n, klass, "MAXGAPSWEEKLY")
                 if val and val[1] != 0:
                     clist.append(
@@ -1052,7 +1053,7 @@ class TimetableCourses(Courses):
     #        }
     #    ]
 
-    def constraints_MAXGAPSWEEKLY(self, default):
+    def constraints_MAXGAPSWEEKLY(self, default, data):
         """Maximum gaps per week for the specified classes.
         If the constraint is not specified for a class, that class will
         not have the constraint.
@@ -1227,19 +1228,26 @@ class TimetableCourses(Courses):
             #    f" {a1}/{aidpair[0]} {a2}/{aidpair[1]}")
         return "ConstraintMinGapsBetweenActivities", clist
 
+#TODO
     def add_class_constraints(self):
-        """Add time constraints according to the "info" entries in the
-        timetable data files for each class.
+        """Add time constraints according to the entries in the database
+        table TT_CLASSES. The default values are in the TIMETABLE
+        configuration: CLASS_CONSTRAINTS.
         """
+        class_info = {}
+        for row in db_read_mappings("TT_CLASSES"):
+            c = row.pop("CLASS")
+            class_info[c] = row
         # Get names and default values of constraints, call handlers
         for name, val in self.TT_CONFIG["CLASS_CONSTRAINTS"].items():
             try:
-                func = getattr(self, f"constraints_{name}")
+                func = getattr(self, f"constraints_{name}", class_info)
             except AttributeError:
                 raise Bug(f"Unknown class constraint: {name}")
             cname, clist = func(val)
             add_constraints(self.time_constraints, cname, clist)
 
+#TODO
     def add_teacher_constraints(self, used):
         blocked = []  # AVAILABLE
         constraints_m = []  # MINPERDAY

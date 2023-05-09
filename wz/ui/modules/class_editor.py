@@ -181,6 +181,9 @@ class ClassEditorPage(Page):
         self.pb_remove.setEnabled(row > 0)
         self.frame_r.setEnabled(row > 0)
 
+    def on_constraints_cellActivated(self, row, col):
+        print("$TODO: ACTIVATED", row, col)
+
     def set_class(self):
         self.class_id = self.class_dict["CLASS"]
         for k, v in self.class_dict.items():

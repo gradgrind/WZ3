@@ -70,7 +70,7 @@ from ui.ui_base import (
 )
 from ui.dialogs.dialog_choose_one_room import ChooseOneRoomDialog
 from ui.dialogs.dialog_class_groups import ClassGroupsDialog
-from ui.dialogs.dialog_number_constraint import NumberConstraintDialog
+from ui.dialogs.dialog_constraint_number import NumberConstraintDialog
 from ui.dialogs.dialog_text_line import TextLineDialog
 from ui.week_table import WeekTable
 
@@ -86,6 +86,7 @@ TT_FIELDS = (
     "MIN_LESSONS_PER_DAY",
     "MAX_GAPS_PER_WEEK",
     "LUNCHBREAK",
+    "CONSTRAINTS",
 )
 
 #TODO: further conditions ...
@@ -100,13 +101,15 @@ class ClassEditorPage(Page):
         self.class_table.horizontalHeader().setSectionResizeMode(
             QHeaderView.ResizeMode.ResizeToContents
         )
+        self.constraints.horizontalHeader().setSectionResizeMode(
+            QHeaderView.ResizeMode.ResizeToContents
+        )
         # Set up activation for the editors for the read-only lesson/block
         # fields:
         for w in (
             self.CLASS, self.NAME, self.CLASSROOM,
             self.DIVISIONS,
             self.MIN_LESSONS_PER_DAY, self.MAX_GAPS_PER_WEEK,
-#            self.constraints,
         ):
             w.installEventFilter(self)
 
@@ -132,6 +135,7 @@ class ClassEditorPage(Page):
         open_database()
         clear_cache()
         self.week_table = WeekTable(self.AVAILABLE, self.week_table_changed)
+        self.TT_CONFIG = MINION(DATAPATH("CONFIG/TIMETABLE"))
         self.init_data()
 
     def  init_data(self):
@@ -181,9 +185,6 @@ class ClassEditorPage(Page):
         self.pb_remove.setEnabled(row > 0)
         self.frame_r.setEnabled(row > 0)
 
-    def on_constraints_cellActivated(self, row, col):
-        print("$TODO: ACTIVATED", row, col)
-
     def set_class(self):
         self.class_id = self.class_dict["CLASS"]
         for k, v in self.class_dict.items():
@@ -198,6 +199,7 @@ class ClassEditorPage(Page):
         except NoRecord:
             ttdict = {f: "" for f in TT_FIELDS}
             db_new_row("TT_CLASSES", CLASS=self.class_id)
+        tt_constraints = ttdict.pop("CONSTRAINTS")
         self.tt_available = ttdict.pop("AVAILABLE")
         self.week_table.setText(self.tt_available)
         lb = ttdict.pop("LUNCHBREAK")
@@ -214,7 +216,29 @@ class ClassEditorPage(Page):
         self.LUNCHBREAK.setCurrentIndex(lbi)
         for k, v in ttdict.items():
             getattr(self, k).setText(v)
+        self.set_constraints(tt_constraints)
 
+    def set_constraints(self, constraints):
+        """Handle the additional constraints from the CONSTRAINTS
+        field of TT_CLASSES.
+        """
+        for c, h, name in self.TT_CONFIG["CLASS_CONSTRAINT_HANDLERS"]:
+            print("???", c, h, name)
+
+        self.constraints
+
+    @Slot(int, int)
+    def on_constraints_cellActivated(self, row, col):
+        print("$TODO: ACTIVATED", row, col)
+
+    @Slot()
+    def on_pb_new_constraint_clicked(self):
+        print("$TODO: new constraint")
+        
+    @Slot()
+    def on_pb_remove_constraint_clicked(self):
+        print("$TODO: remove constraint")
+        
     @Slot()
     def on_pb_new_clicked(self):
         """Add a new class.

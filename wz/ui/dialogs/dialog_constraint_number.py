@@ -1,9 +1,9 @@
 """
-ui/dialogs/dialog_number_constraint.py
+ui/dialogs/dialog_constraint_number.py
 
-Last updated:  2023-03-20
+Last updated:  2023-05-09
 
-Supporting "dialog" for the course editor – handle constraints where
+Supporting "dialog" for the class editor – handle constraints where
 a number of lesson periods is to be specified.
 
 
@@ -35,7 +35,7 @@ if __name__ == "__main__":
     from core.base import start
     start.setup(os.path.join(basedir, 'TESTDATA'))
 
-#T = TRANSLATIONS("ui.dialogs.dialog_number_constraint")
+#T = TRANSLATIONS("ui.dialogs.dialog_constraint_number")
 
 ### +++++
 
@@ -67,7 +67,7 @@ class NumberConstraintDialog(QDialog):
 
     def __init__(self, parent=None):
         super().__init__(parent=parent)
-        uic.loadUi(APPDATAPATH("ui/dialog_number_constraint.ui"), self)
+        uic.loadUi(APPDATAPATH("ui/dialog_constraint_number.ui"), self)
         self.pb_reset = self.buttonBox.button(
             QDialogButtonBox.StandardButton.Reset
         )

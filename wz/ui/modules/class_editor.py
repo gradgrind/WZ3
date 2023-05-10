@@ -75,6 +75,7 @@ from ui.dialogs.dialog_class_groups import ClassGroupsDialog
 from ui.dialogs.dialog_constraint_number import NumberConstraintDialog
 from ui.dialogs.dialog_text_line import TextLineDialog
 from ui.week_table import WeekTable
+import ui.constraint_editors as CONSTRAINT_HANDLERS
 
 CLASS_FIELDS = (
     "CLASS",
@@ -109,9 +110,7 @@ class ClassEditorPage(Page):
         # Set up activation for the editors for the read-only lesson/block
         # fields:
         for w in (
-            self.CLASS, self.NAME, self.CLASSROOM,
-            self.DIVISIONS,
-            self.MIN_LESSONS_PER_DAY, self.MAX_GAPS_PER_WEEK,
+            self.CLASS, self.NAME, self.CLASSROOM, self.DIVISIONS,
         ):
             w.installEventFilter(self)
 
@@ -244,6 +243,18 @@ class ClassEditorPage(Page):
     def on_constraints_cellActivated(self, row, col):
         print("$TODO: ACTIVATED", row, col)
         c, v, h, d, t = self.constraint_list[row]
+        # pass c?, t (label?), v to the handler (from h)
+        # Is '*' available for lunch break? Can this be via "reset"?
+        # Empty values are surely not valid – the constraint can be
+        # removed ...
+        try:
+            handler = getattr(CONSTRAINT_HANDLERS, c)
+        except AttributeError:
+            REPORT("ERROR", T["NO_CONSTRAINT_HANDLER"].format(h=h, t=t))
+            return
+        newval = handler(v, label=t, empty_ok=bool(d))
+        if newval is not None:
+            print("---->>>", newval if newval else d)
 
     @Slot()
     def on_pb_new_constraint_clicked(self):

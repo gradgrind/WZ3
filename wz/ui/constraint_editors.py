@@ -33,6 +33,7 @@ Copyright 2023 Michael Towers
 from core.db_access import (
     db_key_value_list,
 )
+from core.basic_data import get_periods
 from ui.ui_base import (
     ### QtWidgets:
     QHeaderView,
@@ -40,9 +41,36 @@ from ui.ui_base import (
 
 from ui.dialogs.dialog_constraint_number import NumberConstraintDialog
 from ui.dialogs.dialog_constraint_two_subject import TwoSubjectConstraintDialog
+from ui.dialogs.dialog_constraint_check_list import CheckListDialog
 
 ### -----
 
+
+def LUNCHBREAK(val, label, empty_ok):
+    return CheckListDialog.popup(
+        get_periods(),
+        val,
+        label=label,
+        empty_ok=empty_ok,
+    )
+
+
+def MINDAILY(val, label, empty_ok):
+    return NumberConstraintDialog(
+        
+    )
+    pass
+
+def MAXGAPSWEEKLY():
+    pass
+
+def NOTAFTER():
+    pass
+
+def PAIRGAP():
+    pass
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 def N_PERIODS():
     pass

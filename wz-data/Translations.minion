@@ -219,9 +219,6 @@ ui.dialogs.dialog_block_name: {
     UPDATE_ITEM:    "Blockfach oder -kennzeichen ändern"
 }
 
-ui.dialogs.dialog_choose_one_room: {
-    UNKNOWN_ROOM_ID: "Unbekanntes Raumkürzel: „{rid}“"
-}
 ui.dialogs.dialog_choose_one_item_pair: {
     UNKNOWN_KEY:    "unbekanntes Kürzel: „{id}“"
 }
@@ -324,6 +321,7 @@ ui.modules.abi: {
 ui.modules.class_editor: {
     REALLY_DELETE:  "Soll Klasse {CLASS} ({NAME}) wirklich aus der Datenbank entfernt werden?"
     UNKNOWN_CLASS_CONSTRAINT: "unbekannte Bedingung: '{c}' = '{v}'"
+    NO_CONSTRAINT_HANDLER: "Bedingung {h} ({t}): aktuell nicht unterstützt"
 }
 
 ui.modules.course_editor: {

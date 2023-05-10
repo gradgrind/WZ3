@@ -1,7 +1,7 @@
 """
 ui/dialogs/dialog_constraint_two_subject.py
 
-Last updated:  2023-05-09
+Last updated:  2023-05-10
 
 Supporting "dialog" – handle constraints between two subjects.
 
@@ -53,12 +53,14 @@ from core.basic_data import get_subjects
 
 ### -----
 
-# The data is stored in fields with permitted values sid1:sid2%w, where
+# The data is stored in fields with permitted values sid1-sid2%w, where
 # sid1 and sid2 are the subject ids and w is the weight:
 #    -, 1, 2, 3, ... 9, +
 # The intended meaning is that if w = '-' there is no constraint, while
 # w = '+' implies compulsory constraint. The numbers would be intermediate
 # weights, but may not be supported in some systems.
+# Although weight '-' doesn't do anything, it is permitted so that a
+# constraint can be (temporarily) disabled.
 
 class TwoSubjectConstraintDialog(QDialog):
     @classmethod
@@ -105,7 +107,7 @@ class TwoSubjectConstraintDialog(QDialog):
         i2 = self.subject_2.currentIndex()
         w = self.weight.currentText()
         if i1 and i2 and i1 != i2:
-            self.value = f"{self.subjects[i1][0]}:{self.subjects[i2][0]}%{w}"
+            self.value = f"{self.subjects[i1][0]}-{self.subjects[i2][0]}%{w}"
             self.pb_accept.setEnabled(self.value != self.value0)
         else:
             self.pb_accept.setEnabled(False) 
@@ -118,7 +120,7 @@ class TwoSubjectConstraintDialog(QDialog):
         self.value0 = start_value
         try:
             ss, w = start_value.split('%', 1)
-            s1, s2 = ss.split(":", 1)
+            s1, s2 = ss.split("-", 1)
             i1 = self.subjects.index(s1)
             i2 = self.subjects.index(s2)
             if ( iw := self.weight.findText(w)) < 0:
@@ -153,5 +155,5 @@ if __name__ == "__main__":
     from core.db_access import open_database
     open_database()
     print("----->", TwoSubjectConstraintDialog.popup(""))
-    print("----->", TwoSubjectConstraintDialog.popup(("Sp:Eu%5")))
-    print("----->", TwoSubjectConstraintDialog.popup(("En:Fr")))
+    print("----->", TwoSubjectConstraintDialog.popup(("Sp-Eu%5")))
+    print("----->", TwoSubjectConstraintDialog.popup(("En-Fr")))

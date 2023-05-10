@@ -1,10 +1,15 @@
 """
 core/db_access.py
 
-Last updated:  2023-05-09
+Last updated:  2023-05-10
 
 Helper functions for accessing the database.
 
+NOTE: Empty text fields should be NULL in the database.
+Reading NULL must return "", so if a null field contained "" it
+would still be read correctly.
+Writing "" should place NULL in the database field (so writing an
+actual "" should not be possible).
 
 =+LICENCE=============================
 Copyright 2023 Michael Towers
@@ -387,7 +392,10 @@ def db_update_fields(table, field_values, *wheres, **keys):
     fields = []
     for f, v in field_values:
         if isinstance(v, str):
-            fields.append(f'"{f}" = "{v}"')
+            if v:
+                fields.append(f'"{f}" = "{v}"')
+            else:
+                fields.append(f'"{f}" = NULL')
         elif isinstance(v, int):
             fields.append(f'"{f}" = {v}')
         else:
@@ -662,6 +670,6 @@ if __name__ == "__main__":
     ):
         print("  ", row)
 
-# It seems that null entries are read as empty strings ...
+# It seems that null entries are read as empty strings "automatically" ...
 
     migrate_db(start.year_data_path(Dates.next_year()), [])

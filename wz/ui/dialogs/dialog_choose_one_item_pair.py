@@ -63,10 +63,13 @@ class ChooseOneItemDialog(QDialog):
         start_value,
         label=None,
         empty_ok=True,
-        parent=None
+        parent=None,
+        pos=None
     ):
         d = cls(parent)
         d.init(label, items, empty_ok)
+        if pos:
+            d.move(pos)
         return d.activate(start_value)
 
     def __init__(self, parent=None):

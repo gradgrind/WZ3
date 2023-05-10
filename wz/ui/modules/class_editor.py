@@ -83,13 +83,13 @@ CLASS_FIELDS = (
     "DIVISIONS",
 )
 
-TT_FIELDS = (
-    "AVAILABLE",
-    "MIN_LESSONS_PER_DAY",
-    "MAX_GAPS_PER_WEEK",
-    "LUNCHBREAK",
-    "CONSTRAINTS",
-)
+#TT_FIELDS = (
+#    "AVAILABLE",
+#    "MIN_LESSONS_PER_DAY",
+#    "MAX_GAPS_PER_WEEK",
+#    "LUNCHBREAK",
+#    "CONSTRAINTS",
+#)
 
 #TODO: further conditions ...
 # NOTAFTER, PAIRGAP
@@ -196,41 +196,23 @@ class ClassEditorPage(Page):
         self.class_id = self.class_dict["CLASS"]
         for k, v in self.class_dict.items():
             getattr(self, k).setText(v)
-
-#TODO: constraints
+        # Constraints
         try:
-            record = db_read_unique(
+            self.tt_available, tt_constraints = db_read_unique(
                 "TT_CLASSES",
-                TT_FIELDS,
+                ("AVAILABLE", "CONSTRAINTS"),
                 CLASS=self.class_id
             )
-            ttdict = {f: record[i] for i, f in enumerate(TT_FIELDS)}
         except NoRecord:
             ttdict = {f: "" for f in TT_FIELDS}
             db_new_row("TT_CLASSES", CLASS=self.class_id)
-        tt_constraints = ttdict.pop("CONSTRAINTS")
-        self.tt_available = ttdict.pop("AVAILABLE")
         self.week_table.setText(self.tt_available)
-        lb = ttdict.pop("LUNCHBREAK")
-        lbi = self.LUNCHBREAK.findText(lb)
-        if lbi < 0:
-            if lb:
-                db_update_field(
-                    "TT_CLASSES",
-                    "LUNCHBREAK",
-                    '',
-                    CLASS=self.class_id
-                )
-        self.current_lunchbreak = lb
-        self.LUNCHBREAK.setCurrentIndex(lbi)
-        for k, v in ttdict.items():
-            getattr(self, k).setText(v)
         clist = []
         for c, val in read_pairs(tt_constraints):
             try:
                 h, d, t = self.constraint_handlers[c]
 #TODO: Can the validity of the value be checked?
-                clist.append((c, val, h, d, t))
+                clist.append([c, val, h, d, t])
             except KeyError:
                 REPORT(
                     "ERROR",
@@ -239,9 +221,7 @@ class ClassEditorPage(Page):
         self.set_constraints(clist)
 
     def set_constraints(self, clist):
-#TODO: "additional"? ... move all constraints into this group
-        """Handle the additional constraints from the CONSTRAINTS
-        field of TT_CLASSES.
+        """Handle the constraints from the CONSTRAINTS field of TT_CLASSES.
         """
         clist.sort()
         self.constraint_list = clist
@@ -263,11 +243,10 @@ class ClassEditorPage(Page):
     @Slot(int, int)
     def on_constraints_cellActivated(self, row, col):
         print("$TODO: ACTIVATED", row, col)
+        c, v, h, d, t = self.constraint_list[row]
 
     @Slot()
     def on_pb_new_constraint_clicked(self):
-        print("$TODO: new constraint")
-        
         c = ChooseOneItemDialog.popup(
             [(c, hdt[-1]) for c, hdt in self.constraint_handlers.items()],
             "",
@@ -275,11 +254,8 @@ class ClassEditorPage(Page):
         )
         if not c:
             return
-
-
-        #c = "LUNCHBREAK"
         h, d, t = self.constraint_handlers[c]
-        self.constraint_list.append((c, d, h, d, t))
+        self.constraint_list.append([c, d, h, d, t])
         # Save new list
         db_update_field(
             "TT_CLASSES",
@@ -288,7 +264,6 @@ class ClassEditorPage(Page):
             CLASS=self.class_id
         )
         self.set_constraints(self.constraint_list)
-#TODO: select constraint type (add with default value)
 
     @Slot()
     def on_pb_remove_constraint_clicked(self):

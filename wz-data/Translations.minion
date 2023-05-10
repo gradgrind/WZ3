@@ -222,6 +222,9 @@ ui.dialogs.dialog_block_name: {
 ui.dialogs.dialog_choose_one_room: {
     UNKNOWN_ROOM_ID: "Unbekanntes Raumkürzel: „{rid}“"
 }
+ui.dialogs.dialog_choose_one_item_pair: {
+    UNKNOWN_KEY:    "unbekanntes Kürzel: „{id}“"
+}
 
 ui.dialogs.dialog_class_groups: {
     EMPTY_GROUPS_ERROR: "Bei Verarbeitung der Untergruppen:\n\n - {e}"
@@ -320,6 +323,7 @@ ui.modules.abi: {
 
 ui.modules.class_editor: {
     REALLY_DELETE:  "Soll Klasse {CLASS} ({NAME}) wirklich aus der Datenbank entfernt werden?"
+    UNKNOWN_CLASS_CONSTRAINT: "unbekannte Bedingung: '{c}' = '{v}'"
 }
 
 ui.modules.course_editor: {

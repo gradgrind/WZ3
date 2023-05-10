@@ -105,8 +105,11 @@ class NumberConstraintDialog(QDialog):
             self.value = t
             self.pb_accept.setEnabled(self.value != self.value0)
         elif t and w:
-            self.value = f"{t}%{w}"
-            self.pb_accept.setEnabled(self.value != self.value0)
+            if w == '-':
+                self.pb_accept.setEnabled(False)
+            else:
+                self.value = f"{t}%{w}"
+                self.pb_accept.setEnabled(self.value != self.value0)
         else:
             self.pb_accept.setEnabled(False) 
 

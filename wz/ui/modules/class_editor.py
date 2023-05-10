@@ -1,7 +1,7 @@
 """
 ui/modules/class_editor.py
 
-Last updated:  2023-05-09
+Last updated:  2023-05-10
 
 Edit class data.
 
@@ -44,7 +44,7 @@ T = TRANSLATIONS("ui.modules.class_editor")
 ### +++++
 
 #from typing import NamedTuple
-from core.basic_data import clear_cache
+from core.basic_data import clear_cache, get_rooms
 from core.db_access import (
     open_database,
     db_read_unique,
@@ -53,6 +53,8 @@ from core.db_access import (
     db_new_row,
     db_delete_rows,
     NoRecord,
+    read_pairs,
+    write_pairs,
 )
 from ui.ui_base import (
     ### QtWidgets:
@@ -68,7 +70,7 @@ from ui.ui_base import (
     ### uic
     uic,
 )
-from ui.dialogs.dialog_choose_one_room import ChooseOneRoomDialog
+from ui.dialogs.dialog_choose_one_item_pair import ChooseOneItemDialog
 from ui.dialogs.dialog_class_groups import ClassGroupsDialog
 from ui.dialogs.dialog_constraint_number import NumberConstraintDialog
 from ui.dialogs.dialog_text_line import TextLineDialog
@@ -135,7 +137,12 @@ class ClassEditorPage(Page):
         open_database()
         clear_cache()
         self.week_table = WeekTable(self.AVAILABLE, self.week_table_changed)
+# Is this really needed somewhere else? (no self?)
         self.TT_CONFIG = MINION(DATAPATH("CONFIG/TIMETABLE"))
+        self.constraint_handlers = {
+            c: (h, d, name)
+            for c, h, d, name in self.TT_CONFIG["CLASS_CONSTRAINT_HANDLERS"]
+        }
         self.init_data()
 
     def  init_data(self):
@@ -189,6 +196,8 @@ class ClassEditorPage(Page):
         self.class_id = self.class_dict["CLASS"]
         for k, v in self.class_dict.items():
             getattr(self, k).setText(v)
+
+#TODO: constraints
         try:
             record = db_read_unique(
                 "TT_CLASSES",
@@ -216,16 +225,40 @@ class ClassEditorPage(Page):
         self.LUNCHBREAK.setCurrentIndex(lbi)
         for k, v in ttdict.items():
             getattr(self, k).setText(v)
-        self.set_constraints(tt_constraints)
+        clist = []
+        for c, val in read_pairs(tt_constraints):
+            try:
+                h, d, t = self.constraint_handlers[c]
+#TODO: Can the validity of the value be checked?
+                clist.append((c, val, h, d, t))
+            except KeyError:
+                REPORT(
+                    "ERROR",
+                    T["UNKNOWN_CLASS_CONSTRAINT"].format(c=c, v=val)
+                )
+        self.set_constraints(clist)
 
-    def set_constraints(self, constraints):
+    def set_constraints(self, clist):
+#TODO: "additional"? ... move all constraints into this group
         """Handle the additional constraints from the CONSTRAINTS
         field of TT_CLASSES.
         """
-        for c, h, name in self.TT_CONFIG["CLASS_CONSTRAINT_HANDLERS"]:
-            print("???", c, h, name)
-
-        self.constraints
+        clist.sort()
+        self.constraint_list = clist
+        self.constraints.setRowCount(len(clist))
+        for r, cvhdt in enumerate(clist):
+            c, v, h, d, t = cvhdt
+            item = self.constraints.item(r, 0)
+            if not item:
+                item = QTableWidgetItem()
+                self.constraints.setItem(r, 0, item)
+            item.setText(t)
+            item = self.constraints.item(r, 1)
+            if not item:
+                item = QTableWidgetItem()
+                self.constraints.setItem(r, 1, item)
+            item.setText(v)
+        self.pb_remove_constraint.setEnabled(bool(clist))
 
     @Slot(int, int)
     def on_constraints_cellActivated(self, row, col):
@@ -235,10 +268,42 @@ class ClassEditorPage(Page):
     def on_pb_new_constraint_clicked(self):
         print("$TODO: new constraint")
         
+        c = ChooseOneItemDialog.popup(
+            [(c, hdt[-1]) for c, hdt in self.constraint_handlers.items()],
+            "",
+            empty_ok=False,
+        )
+        if not c:
+            return
+
+
+        #c = "LUNCHBREAK"
+        h, d, t = self.constraint_handlers[c]
+        self.constraint_list.append((c, d, h, d, t))
+        # Save new list
+        db_update_field(
+            "TT_CLASSES",
+            "CONSTRAINTS",
+            write_pairs([v[:2] for v in self.constraint_list]),
+            CLASS=self.class_id
+        )
+        self.set_constraints(self.constraint_list)
+#TODO: select constraint type (add with default value)
+
     @Slot()
     def on_pb_remove_constraint_clicked(self):
-        print("$TODO: remove constraint")
-        
+        r = self.constraints.currentRow()
+        if r >= 0:
+            del self.constraint_list[r]
+        # Save new constraint list
+        db_update_field(
+            "TT_CLASSES",
+            "CONSTRAINTS",
+            write_pairs([v[:2] for v in self.constraint_list]),
+            CLASS=self.class_id
+        )
+        self.set_constraints(self.constraint_list)
+
     @Slot()
     def on_pb_new_clicked(self):
         """Add a new class.
@@ -280,7 +345,8 @@ class ClassEditorPage(Page):
             "CLASS", "NAME", "CLASSROOM", "DIVISIONS"
         ):
             if object_name == "CLASSROOM":
-                result = ChooseOneRoomDialog.popup(
+                result = ChooseOneItemDialog.popup(
+                    get_rooms(),
                     self.class_dict[object_name],
                     parent=self
                 )

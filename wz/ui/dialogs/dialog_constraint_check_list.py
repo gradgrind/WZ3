@@ -1,9 +1,10 @@
 """
-ui/dialogs/dialog_check_list.py
+ui/dialogs/dialog_constraint_check_list.py
 
 Last updated:  2023-05-10
 
-Supporting "dialog" – select  items from a list (hidden-key / value).
+Supporting "dialog" – select constraint items from a
+list (hidden-key / value).
 
 
 =+LICENCE=============================
@@ -60,7 +61,7 @@ class CheckListDialog(QDialog):
         items,
         start_value="",
         label=None,
-        empty_ok=None,
+        empty_ok=True,
         parent=None,
         pos=None
     ):
@@ -72,11 +73,11 @@ class CheckListDialog(QDialog):
 
     def __init__(self, parent=None):
         super().__init__(parent=parent)
-        uic.loadUi(APPDATAPATH("ui/dialog_check_list.ui"), self)
-#        self.pb_reset = self.buttonBox.button(
-#            QDialogButtonBox.StandardButton.Reset
-#        )
-#        self.pb_reset.clicked.connect(self.reset)
+        uic.loadUi(APPDATAPATH("ui/dialog_constraint_check_list.ui"), self)
+        self.pb_reset = self.buttonBox.button(
+            QDialogButtonBox.StandardButton.Reset
+        )
+        self.pb_reset.clicked.connect(self.reset)
         self.pb_accept = self.buttonBox.button(
             QDialogButtonBox.StandardButton.Ok
         )
@@ -90,7 +91,6 @@ class CheckListDialog(QDialog):
         self.result = ""
         super().accept()
 
-#TODO
     def init(self, label, items, empty_ok):
         if label:
             if label[-1] == "!":
@@ -99,6 +99,7 @@ class CheckListDialog(QDialog):
             self.label.show()
         else:
             self.label.hide()
+        self.empty_ok = empty_ok
         self.item_pairs = items
         self.item_list.clear()
         for k, v in items:
@@ -107,10 +108,22 @@ class CheckListDialog(QDialog):
     def activate(self, start_value):
         self.result = None
         self.disable_triggers = True
-#        self.pb_reset.setVisible(bool(start_value))
+        self.pb_reset.setVisible(self.empty_ok and bool(start_value))
         self.value0 = start_value
         self.value = start_value
-        iset = set(start_value.split(',')) if start_value else set()
+        try:
+            v, w = start_value.split('%', 1)
+            self.weight.setCurrentText(w)
+            iset = set(v.split(','))
+        except ValueError:
+            if start_value:
+                REPORT(
+                    "ERROR",
+                    f"Bug: check-list constraint = \"{start_value}\""
+                )
+            self.value = ""
+            self.weight.setCurrentIndex(-1)
+            iset = set()
         for i, kv in enumerate(self.item_pairs):
             lwitem = self.item_list.item(i)
             try:
@@ -128,18 +141,30 @@ class CheckListDialog(QDialog):
     def on_item_list_itemChanged(self, i):
         if self.disable_triggers:
             return
-        print("§CHANGED")
+        # print("§CHANGED")
+        self.acceptable()
+
+    @Slot(str)
+    def on_weight_currentTextChanged(self, text):
+        if self.disable_triggers:
+            return
+        # print("§WEIGHT")
         self.acceptable()
 
     def acceptable(self):
-#TODO: empty_ok, '-' weight, ...
+        w = self.weight.currentText()
+        if w == '-' or not w:
+            self.pb_accept.setEnabled(False)
+            return
         v = []
         for i, kv in enumerate(self.item_pairs):
             lwitem = self.item_list.item(i)
             if lwitem.checkState() == Qt.CheckState.Checked:
                 v.append(kv[0])
-
-        self.value = ','.join(v)
+        if not v:
+            self.pb_accept.setEnabled(False)
+            return
+        self.value = f"{','.join(v)}%{w}"
         self.pb_accept.setEnabled(self.value != self.value0)
 
 
@@ -155,7 +180,11 @@ if __name__ == "__main__":
     ))
     print("----->", CheckListDialog.popup(
         [("1", "one"), ("2", "two"), ("3", "three")],
+        "1,2%6",
+    ))
+    print("----->", CheckListDialog.popup(
+        [("1", "one"), ("2", "two"), ("3", "three")],
         "1,3",
-        label="Choose just one!",
+        label="Choose some!",
         empty_ok=True,
     ))

@@ -1,7 +1,7 @@
 """
 ui/dialogs/dialog_constraint_two_subject.py
 
-Last updated:  2023-05-10
+Last updated:  2023-05-11
 
 Supporting "dialog" – handle constraints between two subjects.
 
@@ -64,9 +64,15 @@ from core.basic_data import get_subjects
 
 class TwoSubjectConstraintDialog(QDialog):
     @classmethod
-    def popup(cls, start_value, parent=None):
+    def popup(
+        cls,
+        start_value,
+        label=None,
+        parent=None,
+        pos=None
+    ):
         d = cls(parent)
-        d.init()
+        d.init(label)
         return d.activate(start_value)
 
     def __init__(self, parent=None):
@@ -76,7 +82,14 @@ class TwoSubjectConstraintDialog(QDialog):
             QDialogButtonBox.StandardButton.Ok
         )
 
-    def init(self):
+    def init(self, label):
+        if label:
+            if label[-1] == "!":
+                label = f'<p style="color:#d50000;">{label}</p>'
+            self.label.setText(label)
+            self.label.show()
+        else:
+            self.label.hide()
         self.disable_triggers = True
         self.subjects = get_subjects()
         for k, v in self.subjects:
@@ -154,6 +167,9 @@ class TwoSubjectConstraintDialog(QDialog):
 if __name__ == "__main__":
     from core.db_access import open_database
     open_database()
-    print("----->", TwoSubjectConstraintDialog.popup(""))
+    print("----->", TwoSubjectConstraintDialog.popup(
+        "",
+        "Relationship between two subjects!"
+    ))
     print("----->", TwoSubjectConstraintDialog.popup(("Sp-Eu%5")))
     print("----->", TwoSubjectConstraintDialog.popup(("En-Fr")))

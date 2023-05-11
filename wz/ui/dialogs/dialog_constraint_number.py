@@ -1,7 +1,7 @@
 """
 ui/dialogs/dialog_constraint_number.py
 
-Last updated:  2023-05-10
+Last updated:  2023-05-11
 
 Supporting "dialog" – handle constraints where
 a number of lesson periods is to be specified.
@@ -24,6 +24,10 @@ Copyright 2023 Michael Towers
 
 =-LICENCE========================================
 """
+
+NLIST = [str(n) for n in range(10)]
+
+##########################################
 
 if __name__ == "__main__":
     import sys, os
@@ -54,16 +58,41 @@ from ui.ui_base import (
 ### -----
 
 # The data is stored in fields with permitted values n%w, where
-#   n is an integer from 0 to 9 (?) and
+#   n is an integer, by default from 0 to 9 (?), and
 #   w is the weight: -, 1, 2, 3, ... 9, +
 # Such a field may also be empty, indicating no constraint (if the
 # weight is '-', that also corresponds to "no constraint").
 
 class NumberConstraintDialog(QDialog):
     @classmethod
-    def popup(cls, start_value, parent=None):
+    def popup(
+        cls,
+        start_value,
+        items=None,
+        label=None,
+        empty_ok=True,
+        parent=None,
+        pos=None
+    ):
         d = cls(parent)
+        d.init(label, items, empty_ok)
+        if pos:
+            d.move(pos)
         return d.activate(start_value)
+
+    def init(self, label, items, empty_ok):
+        if label:
+            if label[-1] == "!":
+                label = f'<p style="color:#d50000;">{label}</p>'
+            self.label.setText(label)
+            self.label.show()
+        else:
+            self.label.hide()
+        self.empty_ok = empty_ok
+        self.disable_triggers = True
+        self.number.clear()
+        self.number.addItems(items if items else NLIST)
+        self.disable_triggers = False
 
     def __init__(self, parent=None):
         super().__init__(parent=parent)
@@ -78,17 +107,20 @@ class NumberConstraintDialog(QDialog):
 
     @Slot(str)
     def on_number_currentTextChanged(self, text):
-        if self.disable_triggers:
-            return
+        if not self.disable_triggers:
+            self.number_changed(text)
+
+    def number_changed(self, text):
         print("NUMBER:", text)
         self.disable_triggers = True
-        if text == '*' or not text:
+        if text:
+            self.weight.setEnabled(True)
+            if not self.value:
+                self.weight.setCurrentIndex(self.weight.count() - 1)
+        else:
             self.weight.setEnabled(False)
             self.weight.setCurrentIndex(-1)
-        else:
-            self.weight.setEnabled(True)
-            if self.value == '*' or not self.value:
-                self.weight.setCurrentIndex(self.weight.count() - 1)
+
         self.value_changed()
         self.disable_triggers = False
 
@@ -105,11 +137,8 @@ class NumberConstraintDialog(QDialog):
             self.value = t
             self.pb_accept.setEnabled(self.value != self.value0)
         elif t and w:
-            if w == '-':
-                self.pb_accept.setEnabled(False)
-            else:
-                self.value = f"{t}%{w}"
-                self.pb_accept.setEnabled(self.value != self.value0)
+            self.value = f"{t}%{w}"
+            self.pb_accept.setEnabled(self.value != self.value0)
         else:
             self.pb_accept.setEnabled(False) 
 
@@ -122,15 +151,11 @@ class NumberConstraintDialog(QDialog):
         if start_value:
             self.pb_reset.show()
             try:
-                if start_value == '*':
-                    ni = self.number.findText(n := start_value)
-                    wi = -1
-                else:
-                    n, w = start_value.split('%', 1)
-                    ni = self.number.findText(n)
-                    wi = self.weight.findText(w)
-                    if ni < 0 or wi < 0:
-                        raise ValueError
+                n, w = start_value.split('%', 1)
+                ni = self.number.findText(n)
+                wi = self.weight.findText(w)
+                if ni < 0 or wi < 0:
+                    raise ValueError
             except ValueError:
                 REPORT("ERROR", f"Bug: number constraint = „{start_value}“")
                 ni = -1
@@ -145,7 +170,7 @@ class NumberConstraintDialog(QDialog):
         self.weight.setCurrentIndex(wi)
         self.number.setCurrentIndex(ni)
         self.disable_triggers = False
-        self.on_number_currentTextChanged(n)
+        self.number_changed(n)
         self.exec()
         return self.result
 
@@ -164,6 +189,5 @@ if __name__ == "__main__":
     from core.db_access import open_database
     open_database()
     print("----->", NumberConstraintDialog.popup(""))
-    print("----->", NumberConstraintDialog.popup("*"))
     print("----->", NumberConstraintDialog.popup(("3%5")))
     print("----->", NumberConstraintDialog.popup(("3")))

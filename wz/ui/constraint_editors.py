@@ -1,7 +1,7 @@
 """
 ui/constraint_editors.py
 
-Last updated:  2023-05-10
+Last updated:  2023-05-11
 
 Editor dialogs for timetable constraints.
 
@@ -28,8 +28,6 @@ Copyright 2023 Michael Towers
 
 ### +++++
 
-#TODO ... 
-
 from core.db_access import (
     db_key_value_list,
 )
@@ -48,27 +46,44 @@ from ui.dialogs.dialog_constraint_check_list import CheckListDialog
 
 def LUNCHBREAK(val, label, empty_ok):
     return CheckListDialog.popup(
-        get_periods(),
         val,
+        items=get_periods(),
         label=label,
         empty_ok=empty_ok,
     )
 
 
 def MINDAILY(val, label, empty_ok):
-    return NumberConstraintDialog(
-        
+    return NumberConstraintDialog.popup(
+        val,
+        items=[str(n) for n in range(len(get_periods()) + 1)],
+        label=label,
+        empty_ok=empty_ok,
     )
-    pass
 
-def MAXGAPSWEEKLY():
-    pass
 
-def NOTAFTER():
-    pass
+def MAXGAPSWEEKLY(val, label, empty_ok):
+    return NumberConstraintDialog.popup(
+        val,
+        # items=None,
+        label=label,
+        empty_ok=empty_ok,
+    )
 
-def PAIRGAP():
-    pass
+
+def NOTAFTER(val, label, empty_ok):
+    return TwoSubjectConstraintDialog.popup(
+        val,
+        label=label,
+    )
+
+
+def PAIRGAP(val, label, empty_ok):
+    return TwoSubjectConstraintDialog.popup(
+        val,
+        label=label,
+    )
+
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

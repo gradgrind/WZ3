@@ -1,7 +1,7 @@
 """
 ui/modules/class_editor.py
 
-Last updated:  2023-05-10
+Last updated:  2023-05-11
 
 Edit class data.
 
@@ -83,17 +83,6 @@ CLASS_FIELDS = (
     "CLASSROOM",
     "DIVISIONS",
 )
-
-#TT_FIELDS = (
-#    "AVAILABLE",
-#    "MIN_LESSONS_PER_DAY",
-#    "MAX_GAPS_PER_WEEK",
-#    "LUNCHBREAK",
-#    "CONSTRAINTS",
-#)
-
-#TODO: further conditions ...
-# NOTAFTER, PAIRGAP
 
 ### -----
 
@@ -207,54 +196,80 @@ class ClassEditorPage(Page):
             db_new_row("TT_CLASSES", CLASS=self.class_id)
         self.week_table.setText(self.tt_available)
         clist = []
-        for c, val in read_pairs(tt_constraints):
+        for c, v in read_pairs(tt_constraints):
             try:
-                h, d, t = self.constraint_handlers[c]
+                hdt = self.constraint_handlers[c]
 #TODO: Can the validity of the value be checked?
-                clist.append([c, val, h, d, t])
+                clist.append([c, v])
             except KeyError:
                 REPORT(
                     "ERROR",
-                    T["UNKNOWN_CLASS_CONSTRAINT"].format(c=c, v=val)
+                    T["UNKNOWN_CLASS_CONSTRAINT"].format(c=c, v=v)
                 )
-        self.set_constraints(clist)
+        self.constraint_list = clist
+        self.set_constraints()
 
-    def set_constraints(self, clist):
+    def set_constraints(self):
         """Handle the constraints from the CONSTRAINTS field of TT_CLASSES.
         """
-        clist.sort()
-        self.constraint_list = clist
-        self.constraints.setRowCount(len(clist))
-        for r, cvhdt in enumerate(clist):
-            c, v, h, d, t = cvhdt
+        cdata = self.constraint_handlers
+        self.constraints.setRowCount(len(self.constraint_list))
+        for r, cv in enumerate(self.constraint_list):
+            c, v = cv
             item = self.constraints.item(r, 0)
             if not item:
                 item = QTableWidgetItem()
                 self.constraints.setItem(r, 0, item)
-            item.setText(t)
+            item.setText(cdata[c][-1])
             item = self.constraints.item(r, 1)
             if not item:
                 item = QTableWidgetItem()
                 self.constraints.setItem(r, 1, item)
             item.setText(v)
-        self.pb_remove_constraint.setEnabled(bool(clist))
+        self.pb_remove_constraint.setEnabled(bool(self.constraint_list))
 
     @Slot(int, int)
     def on_constraints_cellActivated(self, row, col):
-        print("$TODO: ACTIVATED", row, col)
-        c, v, h, d, t = self.constraint_list[row]
+        c, v = self.constraint_list[row]
+        newval = self.call_constraint_editor(c, v)
+        if newval is not None:
+            v = newval if newval else '*'
+            self.constraint_list[row][1] = v
+            self.write_constraints()
+            self.set_constraints()  # display
+
+    def call_constraint_editor(self, constraint, value):
+        h, d, t = self.constraint_handlers[constraint]
+#TODO: comment ...
         # pass c?, t (label?), v to the handler (from h)
         # Is '*' available for lunch break? Can this be via "reset"?
         # Empty values are surely not valid – the constraint can be
         # removed ...
         try:
-            handler = getattr(CONSTRAINT_HANDLERS, c)
+            handler = getattr(CONSTRAINT_HANDLERS, constraint)
         except AttributeError:
             REPORT("ERROR", T["NO_CONSTRAINT_HANDLER"].format(h=h, t=t))
             return
-        newval = handler(v, label=t, empty_ok=bool(d))
-        if newval is not None:
-            print("---->>>", newval if newval else d)
+        if value == '*':
+            val = d
+            reset = False
+        else:
+            val = value
+            reset = bool(d)
+        return handler(val, label=t, empty_ok=reset)
+
+
+
+
+
+    def write_constraints(self):
+        self.constraint_list.sort()
+        db_update_field(
+            "TT_CLASSES",
+            "CONSTRAINTS",
+            write_pairs(self.constraint_list),
+            CLASS=self.class_id
+        )
 
     @Slot()
     def on_pb_new_constraint_clicked(self):
@@ -265,30 +280,25 @@ class ClassEditorPage(Page):
         )
         if not c:
             return
-        h, d, t = self.constraint_handlers[c]
-        self.constraint_list.append([c, d, h, d, t])
-        # Save new list
-        db_update_field(
-            "TT_CLASSES",
-            "CONSTRAINTS",
-            write_pairs([v[:2] for v in self.constraint_list]),
-            CLASS=self.class_id
-        )
-        self.set_constraints(self.constraint_list)
+        if self.constraint_handlers[c][1]:
+            # Start new constraint with default value
+            v = '*'
+        else:
+            # Pop up constraint editor to get initial value
+            v = self.call_constraint_editor(c, "")
+            if v is None:
+                return
+        self.constraint_list.append([c, v])
+        self.write_constraints()    # save new list
+        self.set_constraints()      # display
 
     @Slot()
     def on_pb_remove_constraint_clicked(self):
         r = self.constraints.currentRow()
         if r >= 0:
             del self.constraint_list[r]
-        # Save new constraint list
-        db_update_field(
-            "TT_CLASSES",
-            "CONSTRAINTS",
-            write_pairs([v[:2] for v in self.constraint_list]),
-            CLASS=self.class_id
-        )
-        self.set_constraints(self.constraint_list)
+        self.write_constraints()    # save new constraint list
+        self.set_constraints()      # display
 
     @Slot()
     def on_pb_new_clicked(self):
@@ -327,9 +337,7 @@ class ClassEditorPage(Page):
         row = self.class_table.currentRow()
         object_name = obj.objectName()
         ### CLASSES fields
-        if object_name in (
-            "CLASS", "NAME", "CLASSROOM", "DIVISIONS"
-        ):
+        if object_name in CLASS_FIELDS:
             if object_name == "CLASSROOM":
                 result = ChooseOneItemDialog.popup(
                     get_rooms(),
@@ -357,25 +365,7 @@ class ClassEditorPage(Page):
                 self.load_class_table()
                 self.set_row(row)
         else:
-            # The timetable-constraint fields
-            if object_name in (
-                "MIN_LESSONS_PER_DAY",
-                "MAX_GAPS_PER_WEEK",
-            ):
-                result = NumberConstraintDialog.popup(
-                    obj.text(),
-                    parent=self
-                )
-                if result is not None:
-                    db_update_field(
-                        "TT_CLASSES",
-                        object_name,
-                        result,
-                        CLASS=self.class_id
-                    )
-                    obj.setText(result)
-            else:
-                Bug(f"unknown field: {object_name}")
+            Bug(f"unknown field: {object_name}")
 
     def week_table_changed(self):
         """Handle changes to the week table.

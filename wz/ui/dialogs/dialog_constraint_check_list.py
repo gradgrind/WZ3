@@ -1,7 +1,7 @@
 """
 ui/dialogs/dialog_constraint_check_list.py
 
-Last updated:  2023-05-10
+Last updated:  2023-05-11
 
 Supporting "dialog" – select constraint items from a
 list (hidden-key / value).
@@ -58,8 +58,8 @@ from ui.ui_base import (
 class CheckListDialog(QDialog):
     @classmethod
     def popup(cls,
+        start_value,
         items,
-        start_value="",
         label=None,
         empty_ok=True,
         parent=None,
@@ -153,7 +153,7 @@ class CheckListDialog(QDialog):
 
     def acceptable(self):
         w = self.weight.currentText()
-        if w == '-' or not w:
+        if not w:
             self.pb_accept.setEnabled(False)
             return
         v = []
@@ -175,16 +175,16 @@ if __name__ == "__main__":
     open_database()
 
     print("----->", CheckListDialog.popup(
-        [("1", "one"), ("2", "two"), ("3", "three")],
         "",
+        [("1", "one"), ("2", "two"), ("3", "three")],
     ))
     print("----->", CheckListDialog.popup(
-        [("1", "one"), ("2", "two"), ("3", "three")],
         "1,2%6",
+        [("1", "one"), ("2", "two"), ("3", "three")],
     ))
     print("----->", CheckListDialog.popup(
-        [("1", "one"), ("2", "two"), ("3", "three")],
         "1,3",
+        [("1", "one"), ("2", "two"), ("3", "three")],
         label="Choose some!",
         empty_ok=True,
     ))

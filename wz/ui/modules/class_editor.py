@@ -1,7 +1,7 @@
 """
 ui/modules/class_editor.py
 
-Last updated:  2023-05-11
+Last updated:  2023-05-13
 
 Edit class data.
 
@@ -72,7 +72,6 @@ from ui.ui_base import (
 )
 from ui.dialogs.dialog_choose_one_item_pair import ChooseOneItemDialog
 from ui.dialogs.dialog_class_groups import ClassGroupsDialog
-from ui.dialogs.dialog_constraint_number import NumberConstraintDialog
 from ui.dialogs.dialog_text_line import TextLineDialog
 from ui.week_table import WeekTable
 import ui.constraint_editors as CONSTRAINT_HANDLERS
@@ -96,12 +95,9 @@ class ClassEditorPage(Page):
         self.constraints.horizontalHeader().setSectionResizeMode(
             QHeaderView.ResizeMode.ResizeToContents
         )
-        # Set up activation for the editors for the read-only lesson/block
-        # fields:
-        for w in (
-            self.CLASS, self.NAME, self.CLASSROOM, self.DIVISIONS,
-        ):
-            w.installEventFilter(self)
+        # Set up editor-activation for the class fields:
+        for w in CLASS_FIELDS:
+            getattr(self, w).installEventFilter(self)
 
     def eventFilter(self, obj: QWidget, event: QEvent) -> bool:
         """Event filter for the text-line fields.
@@ -114,7 +110,7 @@ class ClassEditorPage(Page):
         ) or (event.type() == QEvent.Type.KeyPress
             and event.key() == Qt.Key.Key_Return
         ):
-#            oname = obj.objectName()
+            # oname = obj.objectName()
             self.field_editor(obj) #, obj.mapToGlobal(QPoint(0,0)))
             return True
         else:
@@ -125,11 +121,10 @@ class ClassEditorPage(Page):
         open_database()
         clear_cache()
         self.week_table = WeekTable(self.AVAILABLE, self.week_table_changed)
-# Is this really needed somewhere else? (no self?)
-        self.TT_CONFIG = MINION(DATAPATH("CONFIG/TIMETABLE"))
+        TT_CONFIG = MINION(DATAPATH("CONFIG/TIMETABLE"))
         self.constraint_handlers = {
             c: (h, d, name)
-            for c, h, d, name in self.TT_CONFIG["CLASS_CONSTRAINT_HANDLERS"]
+            for c, h, d, name in TT_CONFIG["CLASS_CONSTRAINT_HANDLERS"]
         }
         self.init_data()
 
@@ -192,8 +187,8 @@ class ClassEditorPage(Page):
                 CLASS=self.class_id
             )
         except NoRecord:
-            ttdict = {f: "" for f in TT_FIELDS}
             db_new_row("TT_CLASSES", CLASS=self.class_id)
+            self.tt_available, tt_constraints = "", ""
         self.week_table.setText(self.tt_available)
         clist = []
         for c, v in read_pairs(tt_constraints):
@@ -240,11 +235,15 @@ class ClassEditorPage(Page):
 
     def call_constraint_editor(self, constraint, value):
         h, d, t = self.constraint_handlers[constraint]
-#TODO: comment ...
-        # pass c?, t (label?), v to the handler (from h)
-        # Is '*' available for lunch break? Can this be via "reset"?
-        # Empty values are surely not valid – the constraint can be
-        # removed ...
+        # Call an editor (pop-up) for the constraint.
+        # Pass the current value, or the default if the current value is '*'.
+        # Also pass the description field to be used as a label.
+        # If the default is not null (""), it should be possible to "reset"
+        # the constraint value, which means setting it to '*'.
+        # Actual empty values should not really be supported, it would
+        # be more sensible to remove the constraint altogether.
+        # A constraint can be retained in the database but disabled by
+        # setting the weight to '-'.
         try:
             handler = getattr(CONSTRAINT_HANDLERS, constraint)
         except AttributeError:
@@ -257,10 +256,6 @@ class ClassEditorPage(Page):
             val = value
             reset = bool(d)
         return handler(val, label=t, empty_ok=reset)
-
-
-
-
 
     def write_constraints(self):
         self.constraint_list.sort()
@@ -377,20 +372,6 @@ class ClassEditorPage(Page):
             result,
             CLASS=self.class_id
         )
-
-    @Slot(str)
-    def on_LUNCHBREAK_currentTextChanged(self, weight):
-        if weight == '-':
-            self.LUNCHBREAK.setCurrentIndex(-1)
-            return
-        if self.current_lunchbreak != weight:
-            db_update_field(
-                "TT_CLASSES",
-                "LUNCHBREAK",
-                weight,
-                CLASS=self.class_id
-            )
-            self.current_lunchbreak = weight
 
 
 # --#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#

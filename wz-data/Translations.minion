@@ -390,6 +390,8 @@ ui.modules.pupil_editor: {
 
 ui.modules.teacher_editor: {
     REALLY_DELETE:  "Soll {FIRSTNAMES} {LASTNAME} ({TID}) wirklich aus der Datenbank entfernt werden?"
+    UNKNOWN_TEACHER_CONSTRAINT: "unbekannte Bedingung: '{c}' = '{v}'"
+    NO_CONSTRAINT_HANDLER: "Bedingung {h} ({t}): aktuell nicht unterstützt"
 }
 
 ui.modules.timetable_editor: {

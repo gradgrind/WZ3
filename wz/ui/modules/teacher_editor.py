@@ -1,7 +1,7 @@
 """
 ui/modules/teacher_editor.py
 
-Last updated:  2023-04-08
+Last updated:  2023-05-13
 
 Edit teacher data.
 
@@ -53,6 +53,8 @@ from core.db_access import (
     db_new_row,
     db_delete_rows,
     NoRecord,
+    read_pairs,
+    write_pairs,
 )
 from ui.ui_base import (
     ### QtWidgets:
@@ -68,11 +70,12 @@ from ui.ui_base import (
     ### uic
     uic,
 )
+from ui.dialogs.dialog_choose_one_item_pair import ChooseOneItemDialog
 from ui.dialogs.dialog_text_line import TextLineDialog
 from ui.dialogs.dialog_text_line_offer import TextLineOfferDialog
-from ui.dialogs.dialog_number_constraint import NumberConstraintDialog
 from ui.week_table import WeekTable
 from local.name_support import asciify, tvSplit
+import ui.constraint_editors as CONSTRAINT_HANDLERS
 
 TEACHER_FIELDS = (
     "TID",
@@ -80,15 +83,6 @@ TEACHER_FIELDS = (
     "LASTNAME",
     "SIGNED",
     "SORTNAME",
-)
-
-TT_FIELDS = (
-    "AVAILABLE",
-    "MIN_LESSONS_PER_DAY",
-    "MAX_GAPS_PER_DAY",
-    "MAX_GAPS_PER_WEEK",
-    "MAX_CONSECUTIVE_LESSONS",
-    "LUNCHBREAK",
 )
 
 ### -----
@@ -100,15 +94,12 @@ class TeacherEditorPage(Page):
         self.teacher_table.horizontalHeader().setSectionResizeMode(
             QHeaderView.ResizeMode.ResizeToContents
         )
-        # Set up activation for the editors for the read-only lesson/block
-        # fields:
-        for w in (
-            self.TID, self.FIRSTNAMES, self.LASTNAME,
-            self.SIGNED, self.SORTNAME,
-            self.MIN_LESSONS_PER_DAY, self.MAX_GAPS_PER_DAY,
-            self.MAX_GAPS_PER_WEEK, self.MAX_CONSECUTIVE_LESSONS,
-        ):
-            w.installEventFilter(self)
+        self.constraints.horizontalHeader().setSectionResizeMode(
+            QHeaderView.ResizeMode.ResizeToContents
+        )
+        # Set up editor-activation for the teacher fields:
+        for w in TEACHER_FIELDS:
+            getattr(self, w).installEventFilter(self)
 
     def eventFilter(self, obj: QWidget, event: QEvent) -> bool:
         """Event filter for the text-line fields.
@@ -121,7 +112,7 @@ class TeacherEditorPage(Page):
         ) or (event.type() == QEvent.Type.KeyPress
             and event.key() == Qt.Key.Key_Return
         ):
-#            oname = obj.objectName()
+            # oname = obj.objectName()
             self.field_editor(obj) #, obj.mapToGlobal(QPoint(0,0)))
             return True
         else:
@@ -132,6 +123,11 @@ class TeacherEditorPage(Page):
         open_database()
         clear_cache()
         self.week_table = WeekTable(self.AVAILABLE, self.week_table_changed)
+        TT_CONFIG = MINION(DATAPATH("CONFIG/TIMETABLE"))
+        self.constraint_handlers = {
+            c: (h, d, name)
+            for c, h, d, name in TT_CONFIG["TEACHER_CONSTRAINT_HANDLERS"]
+        }
         self.init_data()
 
     def  init_data(self):
@@ -185,32 +181,121 @@ class TeacherEditorPage(Page):
         self.teacher_id = self.teacher_dict["TID"]
         for k, v in self.teacher_dict.items():
             getattr(self, k).setText(v)
+        # Constraints
         try:
-            record = db_read_unique(
+            self.tt_available, tt_constraints = db_read_unique(
                 "TT_TEACHERS",
-                TT_FIELDS,
+                ("AVAILABLE", "CONSTRAINTS"),
                 TID=self.teacher_id
             )
-            ttdict = {f: record[i] for i, f in enumerate(TT_FIELDS)}
         except NoRecord:
-            ttdict = {f: "" for f in TT_FIELDS}
             db_new_row("TT_TEACHERS", TID=self.teacher_id)
-        self.tt_available = ttdict.pop("AVAILABLE")
+            self.tt_available, tt_constraints = "", ""
         self.week_table.setText(self.tt_available)
-        lb = ttdict.pop("LUNCHBREAK")
-        lbi = self.LUNCHBREAK.findText(lb)
-        if lbi < 0:
-            if lb:
-                db_update_field(
-                    "TT_TEACHERS",
-                    "LUNCHBREAK",
-                    '',
-                    TID=self.teacher_id
+        clist = []
+        for c, v in read_pairs(tt_constraints):
+            try:
+                hdt = self.constraint_handlers[c]
+#TODO: Can the validity of the value be checked?
+                clist.append([c, v])
+            except KeyError:
+                REPORT(
+                    "ERROR",
+                    T["UNKNOWN_TEACHER_CONSTRAINT"].format(c=c, v=v)
                 )
-        self.current_lunchbreak = lb
-        self.LUNCHBREAK.setCurrentIndex(lbi)
-        for k, v in ttdict.items():
-            getattr(self, k).setText(v)
+        self.constraint_list = clist
+        self.set_constraints()
+
+    def set_constraints(self):
+        """Handle the constraints from the CONSTRAINTS field of TT_CLASSES.
+        """
+        cdata = self.constraint_handlers
+        self.constraints.setRowCount(len(self.constraint_list))
+        for r, cv in enumerate(self.constraint_list):
+            c, v = cv
+            item = self.constraints.item(r, 0)
+            if not item:
+                item = QTableWidgetItem()
+                self.constraints.setItem(r, 0, item)
+            item.setText(cdata[c][-1])
+            item = self.constraints.item(r, 1)
+            if not item:
+                item = QTableWidgetItem()
+                self.constraints.setItem(r, 1, item)
+            item.setText(v)
+        self.pb_remove_constraint.setEnabled(bool(self.constraint_list))
+
+    @Slot(int, int)
+    def on_constraints_cellActivated(self, row, col):
+        c, v = self.constraint_list[row]
+        newval = self.call_constraint_editor(c, v)
+        if newval is not None:
+            v = newval if newval else '*'
+            self.constraint_list[row][1] = v
+            self.write_constraints()
+            self.set_constraints()  # display
+
+    def call_constraint_editor(self, constraint, value):
+        h, d, t = self.constraint_handlers[constraint]
+        # Call an editor (pop-up) for the constraint.
+        # Pass the current value, or the default if the current value is '*'.
+        # Also pass the description field to be used as a label.
+        # If the default is not null (""), it should be possible to "reset"
+        # the constraint value, which means setting it to '*'.
+        # Actual empty values should not really be supported, it would
+        # be more sensible to remove the constraint altogether.
+        # A constraint can be retained in the database but disabled by
+        # setting the weight to '-'.
+        try:
+            handler = getattr(CONSTRAINT_HANDLERS, constraint)
+        except AttributeError:
+            REPORT("ERROR", T["NO_CONSTRAINT_HANDLER"].format(h=h, t=t))
+            return
+        if value == '*':
+            val = d
+            reset = False
+        else:
+            val = value
+            reset = bool(d)
+        return handler(val, label=t, empty_ok=reset)
+
+    def write_constraints(self):
+        self.constraint_list.sort()
+        db_update_field(
+            "TT_TEACHERS",
+            "CONSTRAINTS",
+            write_pairs(self.constraint_list),
+            TID=self.teacher_id
+        )
+
+    @Slot()
+    def on_pb_new_constraint_clicked(self):
+        c = ChooseOneItemDialog.popup(
+            [(c, hdt[-1]) for c, hdt in self.constraint_handlers.items()],
+            "",
+            empty_ok=False,
+        )
+        if not c:
+            return
+        if self.constraint_handlers[c][1]:
+            # Start new constraint with default value
+            v = '*'
+        else:
+            # Pop up constraint editor to get initial value
+            v = self.call_constraint_editor(c, "")
+            if v is None:
+                return
+        self.constraint_list.append([c, v])
+        self.write_constraints()    # save new list
+        self.set_constraints()      # display
+
+    @Slot()
+    def on_pb_remove_constraint_clicked(self):
+        r = self.constraints.currentRow()
+        if r >= 0:
+            del self.constraint_list[r]
+        self.write_constraints()    # save new constraint list
+        self.set_constraints()      # display
 
     @Slot()
     def on_pb_new_clicked(self):
@@ -248,9 +333,7 @@ class TeacherEditorPage(Page):
         row = self.teacher_table.currentRow()
         object_name = obj.objectName()
         ### TEACHER fields
-        if object_name in (
-            "TID", "FIRSTNAMES", "LASTNAME", "SIGNED", "SORTNAME"
-        ):
+        if object_name in TEACHER_FIELDS:
             if object_name == "SORTNAME":
                 f, t, l = tvSplit(
                     self.teacher_dict["FIRSTNAMES"],
@@ -277,27 +360,7 @@ class TeacherEditorPage(Page):
                 self.load_teacher_table()
                 self.set_row(row)
         else:
-            # The timetable-constraint fields
-            if object_name in (
-                "MIN_LESSONS_PER_DAY",
-                "MAX_GAPS_PER_DAY",
-                "MAX_GAPS_PER_WEEK",
-                "MAX_CONSECUTIVE_LESSONS",
-            ):
-                result = NumberConstraintDialog.popup(
-                    obj.text(),
-                    parent=self
-                )
-                if result is not None:
-                    db_update_field(
-                        "TT_TEACHERS",
-                        object_name,
-                        result,
-                        TID=self.teacher_id
-                    )
-                    obj.setText(result)
-            else:
-                Bug(f"unknown field: {object_name}")
+            Bug(f"unknown field: {object_name}")
 
     def week_table_changed(self):
         """Handle changes to the week table.
@@ -309,20 +372,6 @@ class TeacherEditorPage(Page):
             result,
             TID=self.teacher_id
         )
-
-    @Slot(str)
-    def on_LUNCHBREAK_currentTextChanged(self, weight):
-        if weight == '-':
-            self.LUNCHBREAK.setCurrentIndex(-1)
-            return
-        if self.current_lunchbreak != weight:
-            db_update_field(
-                "TT_TEACHERS",
-                "LUNCHBREAK",
-                weight,
-                TID=self.teacher_id
-            )
-            self.current_lunchbreak = weight
 
 
 # --#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#

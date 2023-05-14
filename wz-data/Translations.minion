@@ -489,6 +489,13 @@ timetable.asc_data: {
 }
 
 timetable.fet_data: {
+    UNKNOWN_TID_CONSTRAINT: "Lehrer {tid}, unbekannte Bedingung: „{c}“"
+    MULTIPLE_TID_CONSTRAINT: "Lehrer {tid}, zu viele Angaben für Bedingung:\n  „{name}“"
+    INVALID_TID_LUNCHBREAK: "Lehrer {tid}, ungültiger Wert für Bedingung „Mittagspause“: {val}"
+    INVALID_CONSTRAINT_VALUE: "ungültiger Wert für Bedingung ({val})"
+    TEACHER_CONDITION:  "Lehrer {tid}, Bedingung „{constraint}“:\n  {e}"
+    UNSUPPORTED_TEACHER_CONSTRAINTS: "Lehrer-Bedingungeg, die von fet nicht unterstützt sind:\n{l}"
+    
 #TODO ... not yet implemented/adapted
     # Entries probably valid not just for "aSc" or "fet"
     WHOLE_CLASS:    alle  # name for a "group" comprising the whole class
@@ -498,7 +505,7 @@ timetable.fet_data: {
     INVALID_TEACHER_CONDITION_VALUE: "Lehrer {tid}, ungültiger Wert für Bedingung {constraint}: '{val}'"
     INVALID_CLASS_CONDITION_VALUE: "Klasse {klass}, ungültiger Wert für Bedingung {constraint}: '{val}'"
     INVALID_GROUP_LIST: "LESSON_GROUP {lg}, Gruppenkombination nicht möglich: {groups}"
-    INVALID_CLASS_CONSTRAINT: "Klasse {klass}: ungültige Wert für Bedingung {constraint}"
+    INVALID_CLASS_CONSTRAINT: "Klasse {klass}: ungültiger Wert für Bedingung {constraint}"
     PARALLEL_SINGLE: "Parallel-Kennung {tag} hat nur eine Unterrichtsstunde"
    
     # Entries probably "aSc"-specific

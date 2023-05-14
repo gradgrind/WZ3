@@ -19,8 +19,6 @@ Copyright 2023 Michael Towers
    limitations under the License.
 """
 
-#TODO: under construction ...
-
 _TEST = False
 #_TEST = True
 _TEST1 = False
@@ -385,9 +383,6 @@ class TimetableCourses(Courses):
         self.timetable_subjects = set()
         # Collect locked placements:
         self.locked_aids: dict[str, Optional[tuple[str,str]]] = {}
-#? I think this can be done separately now ...
-        # Collect activities with "parallel" tags, {tag: [activity-id, ... ]}
-        self.parallel_tags: dict[str, list[str]] = {}
         # Collect more complex room allocations
         self.fancy_rooms = []
 
@@ -811,7 +806,7 @@ class TimetableCourses(Courses):
         # classes with no groups get lunch breaks, add a null string to
         # an empty list.
         atomic_groups = self.group2atoms[klass][""] or [""]
-        print(f"??? {klass}", atomic_groups)
+        # print(f"??? {klass}", atomic_groups)
         constraints = []
         for day, periods0 in possible_breaks.items():
             periods = [p for p in lbplist if p in periods0]
@@ -855,16 +850,6 @@ class TimetableCourses(Courses):
             "ConstraintActivityPreferredStartingTimes",
             constraints,
         )
-
-    def single_constraint(self, clist: tuple[str, list[str]]
-    ) -> Optional[str]:
-        """Check constraint has only one instance, return the value,
-        or <None> if failed.
-        Parameter: (constraint-name, value list)
-        """
-        if len(l := clist[1]) == 1:
-            return l[0]
-        return None
 
     def teacher_lunch_breaks(self, tid, possible_breaks, lb):
         """Add activities and constraints for lunch breaks.
@@ -1108,25 +1093,30 @@ class TimetableCourses(Courses):
             #    f" {a1}/{aidpair[0]} {a2}/{aidpair[1]}")
         return "ConstraintTwoActivitiesOrderedIfSameDay", clist
 
-#TODO: see constraint_NOTAFTER
-    def constraints_PAIRGAP(self, default):
+    def constraints_PAIRGAP(self, cv_list):
         """Two subjects should have at least one lesson in between."""
         aidmap: dict[tuple[str, str], str] = {}
-        classes = get_classes()
-        for klass, _ in classes.get_class_list():
-
-
-
-            data = classes[klass]
+        kmap = {}
+        for k, v in cv_list:
             try:
-                pairs = data.tt_data["PAIRGAP"]
-            except KeyError:
-                # If the constraint is not present, don't add it for
-                # this class
+                p, w = v.split('%', 1)
+                s1, s2 = p.split('-', 1)
+                if w == '-':
+                    continue
+            except ValueError:
+                REPORT("ERROR", T["BAD_SUBJECT_PAIR"].format(
+#TODO: can I get the translated constraint name?
+                    klass=klass, constraint="PAIRGAP", val=v
+                ))
                 continue
-            for aidpairs, percent in self.pair_constraint(
-                klass, pairs, "PAIRGAP"
-            ):
+            val = (s1, s2, w)
+            try:
+                kmap[k].append(val)
+            except KeyError:
+                kmap[k] = [val]
+            # print("§PAIRGAP", val)
+        for klass, pairs in kmap.items():
+            for aidpairs, percent in self.pair_constraint(klass, pairs):
                 for aidpair in aidpairs:
                     # Order the pair elements
                     if aidpair[0] > aidpair[1]:
@@ -1148,10 +1138,10 @@ class TimetableCourses(Courses):
                     "Comments": None,
                 }
             )
-            # a1 = self.activities[aidpair[0] - 1]["Subject"]
-            # a2 = self.activities[aidpair[1] - 1]["Subject"]
+            # a1 = self.activities[int(aidpair[0]) - 1]["Subject"]
+            # a2 = self.activities[int(aidpair[1]) - 1]["Subject"]
             # print(f" ++ ConstraintMinGapsBetweenActivities:"
-            #    f" {a1}/{aidpair[0]} {a2}/{aidpair[1]}")
+            #     f" {a1}/{aidpair[0]} {a2}/{aidpair[1]}")
         return "ConstraintMinGapsBetweenActivities", clist
 
     def add_class_constraints(self):
@@ -1253,7 +1243,7 @@ class TimetableCourses(Courses):
                 )
             else:
                 if minl:
-                    print("$$$$$ MINDAILY", klass, minl)
+                    # print("$$$$$ MINDAILY", klass, minl)
                     constraints_m.append(
                         {
                             "Weight_Percentage": "100",  # necessary!
@@ -1279,7 +1269,7 @@ class TimetableCourses(Courses):
                 )
             else:
                 if gw:
-                    print("$$$$$ MAXGAPSWEEKLY", klass, gw)
+                    # print("$$$$$ MAXGAPSWEEKLY", klass, gw)
                     constraints_gw.append(
                         {
                             "Weight_Percentage": "100",  # necessary!
@@ -1339,10 +1329,8 @@ class TimetableCourses(Courses):
         ### Not-available times
         teachers = get_teachers()
         for tid in teachers:
-            # print("&", tid)
             if tid not in used:
                 continue
-            # print("&1")
             try:
                 available, cstr = tt_constraints[tid]
             except KeyError:
@@ -1386,8 +1374,6 @@ class TimetableCourses(Courses):
                 pass
             else:
                 self.teacher_lunch_breaks(tid, possible_breaks, lb)
-            # print("&2", possible_breaks)
-            # print("&3", constraints)
             # Other constraints ...
             try:
                 minl = self.nperiods_constraint(
@@ -1402,7 +1388,7 @@ class TimetableCourses(Courses):
                 )
             else:
                 if minl:
-                    print("$$$$$ MINDAILY", tid, minl)
+                    # print("$$$$$ MINDAILY", tid, minl)
                     constraints_m.append(
                         {
                             "Weight_Percentage": "100",  # necessary!
@@ -1426,7 +1412,7 @@ class TimetableCourses(Courses):
                 )
             else:
                 if gd:
-                    print("$$$$$ MAXGAPSDAILY", tid, gd)
+                    # print("$$$$$ MAXGAPSDAILY", tid, gd)
                     constraints_gd.append(
                         {
                             "Weight_Percentage": "100",  # necessary!
@@ -1449,7 +1435,7 @@ class TimetableCourses(Courses):
                 )
             else:
                 if gw:
-                    print("$$$$$ MAXGAPSWEEKLY", tid, gw)
+                    # print("$$$$$ MAXGAPSWEEKLY", tid, gw)
                     constraints_gw.append(
                         {
                             "Weight_Percentage": "100",  # necessary!
@@ -1473,7 +1459,7 @@ class TimetableCourses(Courses):
             else:
                 if u:
                     n, w = u
-                    print("$$$$$ MAXBLOCK", tid, u, WEIGHTMAP[w])
+                    # print("$$$$$ MAXBLOCK", tid, u, WEIGHTMAP[w])
                     if w:
                         constraints_u.append(
                             {
@@ -1510,32 +1496,11 @@ class TimetableCourses(Courses):
             pass
         raise ValueError(T["INVALID_CONSTRAINT_VALUE"].format(val=val))
 
-    def class_periods_constraint(
-        self, val: str, klass: str, constraint: str
-    ) -> Optional[tuple[int, int]]:
-        if not val:
-            return None
-        try:
-            v, w = val.split("@", 1)
-        except ValueError:
-            v = val
-            w = -1
-        try:
-            number = int(v)
-            weight = int(w)
-            if number >= 0 and number <= 10 and weight >= -1 and weight <= 10:
-                return number, weight
-        except ValueError:
-            pass
-        REPORT(
-            "ERROR",
-            T["INVALID_CLASS_CONDITION_VALUE"].format(
-                klass=klass, val=val, constraint=constraint
-            ),
-        )
-        return None
-
+#TODO ...
     def add_parallels(self):
+        REPORT("ERROR", "<add_parallels> not updated!")
+        return
+
         parallels = []
         for ptag, aidlist in self.parallel_tags.items():
             l = len(aidlist)
@@ -1563,7 +1528,6 @@ class TimetableCourses(Courses):
 # but direct usage of the fet constraint is easier to implemented here,
 # so I've left it at that for the time being.
 
-
     def add_further_constraints(self):
         """Add any further constraints to deal with particular local
         needs ... .
@@ -1571,8 +1535,8 @@ class TimetableCourses(Courses):
         #TODO: This is rather random at present!
         double_lesson_start_periods = self.TT_CONFIG.get("DOUBLE_LESSON_START")
         try:
-            _weight = self.TT_CONFIG["DOUBLE_LESSON_START_WEIGHT"]
-            weight = WEIGHTS[int(_weight)]
+            w = self.TT_CONFIG["DOUBLE_LESSON_START_WEIGHT"]
+            weight = WEIGHTMAP[w]
         except KeyError:
             weight = "100"
         # print("\n§§§§§§§§§", weight, double_lesson_start_periods)
@@ -1921,19 +1885,15 @@ if __name__ == "__main__":
         for rdata in fet_rooms:
             print("   ", rdata)
 
-    print("\nTeacher constraints ...")
     # Teacher-specific constraints
+    print("\nTeacher constraints ...")
     courses.add_teacher_constraints(courses.timetable_teachers)
 
-#xxxxxxxxxxxxx
     # Class-specific constraints
     print("\nClass constraints ...")
     courses.add_class_constraints()
 
-
-
-
-    quit(0)
+    # quit(0)
 
     if _TEST1:
         print("\nSubject – activity mapping")

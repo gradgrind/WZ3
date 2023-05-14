@@ -48,6 +48,7 @@ from core.basic_data import (
 from core.db_access import (
     db_read_fields,
     db_read_unique,
+    db_read_unique_field,
 )
 from ui.ui_base import (
     ### QtWidgets:
@@ -95,7 +96,7 @@ class ParallelsDialog(QDialog):
         self.value_changed()
         self.lesson_list.clear()
         try:
-            ref_list = self.tag_map[text]
+            ref_list = self.tag_map[text] # [[id, lesson-id, weight], ...]
         except KeyError:
             # no references
             return
@@ -114,19 +115,33 @@ class ParallelsDialog(QDialog):
             if bsid:
                 bname = str(BlockTag.build(bsid, btag))
             else:
-                rlist = db_read_unique(
-                    "COURSE_LESSONS",
-                    ["course"],
-                    lesson_group=lg_id,
+#TODO: need to read WORKLOAD
+                wlist = [
+                    row[0]for row in db_read_fields(
+                        "WORKLOAD",
+                        ["workload"],
+                        lesson_group=lg_id
+                    )
+                ]
+                assert wlist
+#?
+                # Just take the first entry
+                wl = wlist[0]
+                course = db_read_unique_field(
+                    "COURSE_WORKLOAD",
+                    "course",
+                    workload=wl,
                 )
-                course = rlist[0]
                 cdata = db_read_unique(
-                    "COURSE",
+                    "COURSES",
                     ["CLASS", "GRP", "SUBJECT", "TEACHER"],
                     course=course,
                 )
                 bname = f"{cdata[0]}.{cdata[1]}:{cdata[2]}/{cdata[3]}"
             self.lesson_list.addItem(bname + f" || {ll}@{lt} #{r[2]}")
+#TODO: Find some way of differentiating the individual lessons of
+# a lesson-group?
+
 
     @Slot(str)
     def on_weight_currentTextChanged(self, i):

@@ -1,5 +1,5 @@
 """
-core/basic_data.py - last updated 2023-04-08
+core/basic_data.py - last updated 2023-05-14
 
 Handle caching of the basic data sources
 
@@ -44,6 +44,7 @@ PAYMENT_FORMAT = QRegularExpression(f"^{__FLOAT}$")
 __TAG_CHAR = "[A-Za-z0-9_.]"
 TAG_FORMAT = QRegularExpression(f"^{__TAG_CHAR}+$")
 BLOCK_TAG_FORMAT = QRegularExpression(f"^{__TAG_CHAR}*$")
+WEIGHTS = {c for c in '-123456789+'}
 
 ### -----
 
@@ -210,24 +211,24 @@ def sublessons(tag:str, reset:bool=False) -> list[Sublesson]:
 
 class ParallelTag(NamedTuple):
     TAG: str
-    WEIGHTING: int
+    WEIGHTING: str
 
     @classmethod
-    def build(cls, tag: str, weighting: int):
+    def build(cls, tag: str, weighting: str):
         if tag:
             if not TAG_FORMAT.match(tag).hasMatch():
                 REPORT("ERROR", T["TAG_INVALID"].format(tag=tag))
                 tag = ""
-                weighting = 0
-            elif weighting < 0 or weighting > 10:
+                weighting = '-'
+            elif weighting not in WEIGHTS:
                 REPORT(
                     "ERROR",
                     T["WEIGHT_OUT_OF_RANGE"].format(weight=weighting)
                 )
-                weighting = 0
+                weighting = '-'
         elif weighting:
             REPORT("ERROR", T["WEIGHT_NO_TAG"].format(weight=weighting))
-            weighting = 0
+            weighting = ''
         return cls(tag, weighting)
 
     def __str__(self):

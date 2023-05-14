@@ -492,9 +492,12 @@ timetable.fet_data: {
     UNKNOWN_TID_CONSTRAINT: "Lehrer {tid}, unbekannte Bedingung: „{c}“"
     MULTIPLE_TID_CONSTRAINT: "Lehrer {tid}, zu viele Angaben für Bedingung:\n  „{name}“"
     INVALID_TID_LUNCHBREAK: "Lehrer {tid}, ungültiger Wert für Bedingung „Mittagspause“: {val}"
+    INVALID_CLASS_LUNCHBREAK: "Klasse {klass}, ungültiger Wert für Bedingung „Mittagspause“: {val}"
     INVALID_CONSTRAINT_VALUE: "ungültiger Wert für Bedingung ({val})"
-    TEACHER_CONDITION:  "Lehrer {tid}, Bedingung „{constraint}“:\n  {e}"
+    TEACHER_CONSTRAINT:  "Lehrer {tid}, Bedingung „{constraint}“:\n  {e}"
+    CLASS_CONSTRAINT:  "Klasse {klass}, Bedingung „{constraint}“:\n  {e}"
     UNSUPPORTED_TEACHER_CONSTRAINTS: "Lehrer-Bedingungeg, die von fet nicht unterstützt sind:\n{l}"
+    BAD_SUBJECT_PAIR:   "Klasse {klass}, Bedingung „{constraint}“ ...\n  ungültiger Wert: {val}"
     
 #TODO ... not yet implemented/adapted
     # Entries probably valid not just for "aSc" or "fet"

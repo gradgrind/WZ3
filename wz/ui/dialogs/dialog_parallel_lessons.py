@@ -1,7 +1,7 @@
 """
 ui/dialogs/dialog_parallel_lessons.py
 
-Last updated:  2023-03-26
+Last updated:  2023-05-15
 
 Supporting "dialog" for the course editor – handle wishes for lessons
 starting at the same time.
@@ -64,6 +64,11 @@ from ui.ui_base import (
 
 ### -----
 
+#TODO: How to organize the tags when there are many?
+# The simple list might become difficult to navigate.
+# What about splitting on the first '.' and using the
+# first part as a combobox selector?
+
 # The data is stored in the db table PARALLEL_LESSONS, with fields
 #   (id: primary key)
 #   lesson_id: foreign key -> LESSONS.id (unique, non-null)
@@ -112,10 +117,11 @@ class ParallelsDialog(QDialog):
                 ["BLOCK_SID", "BLOCK_TAG"],
                 lesson_group=lg_id,
             )
+            courses = []
             if bsid:
                 bname = str(BlockTag.build(bsid, btag))
             else:
-#TODO: need to read WORKLOAD
+            # There can be multiple WORKLOAD entries
                 wlist = [
                     row[0]for row in db_read_fields(
                         "WORKLOAD",
@@ -124,24 +130,30 @@ class ParallelsDialog(QDialog):
                     )
                 ]
                 assert wlist
-#?
-                # Just take the first entry
-                wl = wlist[0]
-                course = db_read_unique_field(
-                    "COURSE_WORKLOAD",
-                    "course",
-                    workload=wl,
-                )
-                cdata = db_read_unique(
-                    "COURSES",
-                    ["CLASS", "GRP", "SUBJECT", "TEACHER"],
-                    course=course,
-                )
-                bname = f"{cdata[0]}.{cdata[1]}:{cdata[2]}/{cdata[3]}"
-            self.lesson_list.addItem(bname + f" || {ll}@{lt} #{r[2]}")
-#TODO: Find some way of differentiating the individual lessons of
-# a lesson-group?
-
+                bname = None
+                for wl in wlist:
+                    # There can be multiple COURSE_WORKLOAD entries
+                    for row in db_read_fields(
+                        "COURSE_WORKLOAD",
+                        ["course"],
+                        workload=wl,
+                    ):
+                        cdata = db_read_unique(
+                            "COURSES",
+                            ["CLASS", "GRP", "SUBJECT", "TEACHER"],
+                            course=row[0],
+                        )
+                        n = f"{cdata[0]}.{cdata[1]}:{cdata[2]}/{cdata[3]}"
+                        if bname is None:
+                            bname = n
+                        else:
+                            courses.append(n)
+                assert bname
+            self.lesson_list.addItem(
+                f"{lid}: {bname} || {ll}@{lt or '-'} %{r[2]}"
+            )
+            for c in courses:
+                self.lesson_list.addItem(f"  + {c}")
 
     @Slot(str)
     def on_weight_currentTextChanged(self, i):

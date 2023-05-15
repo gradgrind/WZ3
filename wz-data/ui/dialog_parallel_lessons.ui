@@ -57,7 +57,7 @@
          <item>
           <widget class="QComboBox" name="weight">
            <property name="currentText">
-            <string>+</string>
+            <string>-</string>
            </property>
            <property name="maxVisibleItems">
             <number>12</number>
@@ -128,7 +128,10 @@
        <item>
         <widget class="QLabel" name="label_3">
          <property name="text">
-          <string>Kurse bzw. Blöcke</string>
+          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; font-weight:700;&quot;&gt;Kurse bzw. Blöcke&lt;/span&gt;&lt;/p&gt;&lt;p&gt;Stundenkennung: Kurs(od. Block) || Länge@Pflichtzeit %Gewicht&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+         </property>
+         <property name="wordWrap">
+          <bool>true</bool>
          </property>
         </widget>
        </item>

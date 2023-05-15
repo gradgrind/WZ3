@@ -84,7 +84,6 @@ from core.db_access import (
 )
 from core.classes import ClassGroups
 from core.list_activities import read_db
-from timetable.activities import Courses
 
 
 ### -----
@@ -346,7 +345,7 @@ def collect_activity_groups() -> dict[int, ActivityGroup]:
     return lg_data
 
 
-class TimetableCourses(Courses):
+class TimetableCourses:
     __slots__ = (
         "TT_CONFIG",
         "timetable_teachers",
@@ -368,7 +367,6 @@ class TimetableCourses(Courses):
     def __init__(self, fet_classes):
         self.fet_classes = fet_classes
         self.group2atoms = fet_classes.g2a
-        super().__init__(self.group2atoms)
         self.TT_CONFIG = MINION(DATAPATH("CONFIG/TIMETABLE"))
 
     def read_lessons(self):
@@ -403,10 +401,10 @@ class TimetableCourses(Courses):
             self.timetable_classes.append(year_entry)
 #            self.group2atoms[klass] = g2atoms
 #            atoms2grouplist[klass] = a2glist
-#? was <atoms2grouplist> (the value was a list, now a single group)
+#TODO: This was <atoms2grouplist> (the value was a list, now it is a
+# single group). Has this a negative impact anywhere?
         atoms2group = self.fet_classes.a2g
 
-#NEW:
         ### Collect data for each lesson-group
         lg_map = collect_activity_groups()
         ### Add fet activities

@@ -1,5 +1,5 @@
 """
-timetable/fet_data.py - last updated 2023-05-14
+timetable/fet_data.py - last updated 2023-05-15
 
 Prepare fet-timetables input from the database ...
 
@@ -69,7 +69,6 @@ from core.basic_data import (
     get_subjects,
     get_rooms,
     sublessons,
-    get_simultaneous_weighting,
     timeslot2index,
     BlockTag,
 )
@@ -1496,28 +1495,45 @@ class TimetableCourses(Courses):
             pass
         raise ValueError(T["INVALID_CONSTRAINT_VALUE"].format(val=val))
 
-#TODO ...
     def add_parallels(self):
-        REPORT("ERROR", "<add_parallels> not updated!")
-        return
-
+        """Add constraints for lessons starting at same time.
+        """
         parallels = []
-        for ptag, aidlist in self.parallel_tags.items():
-            l = len(aidlist)
-            if l > 1:
-                w = WEIGHTS[get_simultaneous_weighting(ptag)]
-                if w:
+        ptags = {}
+        for lid, tag, w in db_read_fields(
+            "PARALLEL_LESSONS",
+            ("lesson_id", "TAG", "WEIGHTING")
+        ):
+            ptags.setdefault(tag, []).append((lid, w))
+        for tag in sorted(ptags):
+            awlist = ptags[tag]
+            # print("§PARALLEL:", tag, awlist)
+            if (l := len(awlist)) > 1:
+                aidlist = []
+                # fet doesn't support different weights on the individual
+                # linked items. Use the lowest weight here.
+                wx = '+'
+                for aid, w in awlist:
+                    if w == '-':
+                        # Suppress constraint
+                        aidlist.clear()
+                        break
+                    aidlist.append(aid)
+                    if w != '+' and (wx == '+' or w < wx):
+                        wx = w
+                if aidlist:
+                    # print("§PARALLEL +:", wx, aidlist)
                     parallels.append(
                         {
-                            "Weight_Percentage": w,
+                            "Weight_Percentage": WEIGHTMAP[wx],
                             "Number_of_Activities": str(l),
                             "Activity_Id": aidlist,
                             "Active": "true",
-                            "Comments": None,
+                            "Comments": f"// {tag}",
                         }
                     )
             else:
-                REPORT("WARNING", T["PARALLEL_SINGLE"].format(tag=ptag))
+                REPORT("WARNING", T["PARALLEL_SINGLE"].format(tag=tag))
         add_constraints(
             self.time_constraints,
             "ConstraintActivitiesSameStartingTime",

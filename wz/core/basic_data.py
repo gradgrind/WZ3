@@ -1,5 +1,5 @@
 """
-core/basic_data.py - last updated 2023-05-14
+core/basic_data.py - last updated 2023-05-15
 
 Handle caching of the basic data sources
 
@@ -175,16 +175,6 @@ def get_sublessons(reset:bool=False) -> dict[str,list[Sublesson]]:
             slmap[sl.TAG] = [sl]
     SHARED_DATA["SUBLESSONS"] = slmap
     return slmap
-
-
-def get_simultaneous_weighting(tag, with_default=True):
-    try:
-        return db_read_unique_field("PARALLEL_LESSONS", "WEIGHTING", TAG=tag)
-    except NoRecord:
-        if with_default:
-            return 10
-        else:
-            raise
 
 
 def sublessons(tag:str, reset:bool=False) -> list[Sublesson]:

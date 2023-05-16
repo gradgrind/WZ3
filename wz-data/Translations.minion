@@ -43,6 +43,7 @@ core.classes: {
     TOO_FEW_GROUPS:     "Klassenteilung „{div}“: mindestens zwei Gruppen erforderlich"
     FILTER_NOT_ATOM:    "„{sub}“ ist keine Elementargruppe"
     EMPTY_GROUP:        "Schülergruppe „{g}“ ist als leer konfiguriert"
+    INVALID_GROUP_ENTRY: "Fehlerhafte Klassengruppenangabe: {text}"
 }
 
 core.list_activities: {

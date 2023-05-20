@@ -122,7 +122,7 @@ def getActivities(working_folder):
             history = fh.read().split()
         d.setHistory(history)
         if history:
-            print("$$$", history)
+            # print("$$$", history)
             d.setDirectory(history[0])
     d.exec()
     files = d.selectedFiles()
@@ -142,7 +142,7 @@ def prepare_asc_config(outdir, placements):
         pxfile = os.path.join(outdir, pfile)
         if pxfile != placements:
             copyfile(placements, pxfile)
-        # print(f"Reading from\n  {fet_file} and\n  {placements}")
+        print(f"Reading from\n  {fet_file} and\n  {placements}")
         read_placements(fet_file, pxfile)
         db_backup(pbase)
 

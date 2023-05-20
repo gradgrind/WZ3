@@ -28,6 +28,8 @@ _SUBJECTS_AND_TEACHERS = False
 
 FET_VERSION = "6.9.0"
 
+LESSONS_FIELDS = ("id", "LENGTH", "TIME", "PLACEMENT", "ROOMS")
+
 WEIGHTMAP = { '-': None,
     '1': "50", '2': "67", '3': "80", '4': "88", '5': "93",
     '6': "95", '7': "97", '8': "98", '9': "99", '+': "100"
@@ -329,9 +331,7 @@ def collect_activity_groups() -> dict[int, ActivityGroup]:
                 pass
             lessons = [
                 row for row in db_read_fields(
-                    "LESSONS",
-                    ("id", "LENGTH", "TIME"),
-                    lesson_group=lg
+                    "LESSONS", LESSONS_FIELDS, lesson_group=lg
                 )
             ]
             lg_data[lg] = ActivityGroup(
@@ -349,7 +349,8 @@ class TimetableCourses:
         "timetable_teachers",
         "timetable_subjects",
         "timetable_classes",
-        "parallel_tags",
+        "class_handlers",
+        "teacher_handlers",
         "locked_aids",
         "fet_classes",
         "group2atoms",
@@ -533,7 +534,8 @@ class TimetableCourses:
             durations = {}
             total_duration = 0
             # Need the LESSONS data: id, length, time
-            for lid, l, t in act.lessons:
+            for ldata in act.lessons:
+                lid, l, t = ldata[:3]
                 total_duration += l
                 lt = (lid, t)
                 try:

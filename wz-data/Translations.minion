@@ -486,15 +486,9 @@ timetable.activities: {
 }
 
 timetable.asc_data: {
-#TODO ... not yet implemented/adapted
     # Entries probably valid not just for "aSc"
     WHOLE_CLASS:    alle  # name for a "group" comprising the whole class
-    BAD_PLAIN_BLOCK: "{course}: für Kennzeichen {tag} muss es genau einen Kurs geben"
     ROOM_TODO:      "Raum muss noch festgelegt werden"
-
-    # Entries probably "aSc"-specific
-    INVALID_PLACE:  "Im Kurs (Gruppe {klass}.{group}, Fach-id {sid}, Lehrer {tid}), unbekannter Raum (Ort): '{rid}'"
-    BAD_TIME:       "Ungültige Zeitangabe: '{time}' (lesson-id {id})"
 }
 
 timetable.fet_data: {
@@ -513,6 +507,7 @@ timetable.fet_data: {
     UNSUPPORTED_TEACHER_CONSTRAINTS: "Lehrer-Bedingungeg, die von fet nicht unterstützt sind:\n{l}"
     INVALID_CONSTRAINT_VALUE: "ungültiger Wert für Bedingung ({val})"
     PARALLEL_SINGLE: "Parallel-Kennung {tag} hat nur eine Unterrichtsstunde"
+    LUNCH_BREAK:    "Mittagspause"
 }
 
 timetable.fet_read_results: {

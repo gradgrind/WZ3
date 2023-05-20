@@ -20,7 +20,7 @@ Copyright 2023 Michael Towers
 """
 
 __TEST = False
-__TEST = True
+#__TEST = True
 __TESTX = False
 __TESTY = False
 
@@ -226,12 +226,16 @@ def get_groups_aSc():
 def timeoff_aSc(available: str) -> str:
     """Return a "timeoff" entry for the given "AVAILABLE" data.
     """
+    try:
+        day_periods = available.split("_")
+    except:
+        day_periods = ""
     weektags = []
     nperiods = len(get_periods())
     for d in range(len(get_days())):
         default = "1"
         try:
-            ddata = available[d]
+            ddata = day_periods[d]
         except IndexError:
             ddata = ""
         daytags = []
@@ -247,19 +251,27 @@ def timeoff_aSc(available: str) -> str:
 
 
 def get_teachers_aSc(teachers):
-    """Return an ordered list of aSc elements for the teachers."""
+    """Return an ordered list of aSc elements for the teachers.
+    """
+    availables = {
+        tid: av
+        for tid, av in db_read_fields(
+            "TT_TEACHERS",
+            ("TID", "AVAILABLE")
+        )
+    }
     return [
         {
-            "@id": idsub(tdata.tid),
-            "@short": tdata.tid,
+            "@id": idsub(tid),
+            "@short": tid,
             "@name": tdata.signed,
-            # TODO: "@gender": "M" or "F"?
+# TODO: "@gender": "M" or "F"?
             "@firstname": tdata.firstname,
             "@lastname": tdata.lastname,
-            "@timeoff": timeoff_aSc(tdata.tt_data),
+            "@timeoff": timeoff_aSc(availables.get(tid) or ""),
         }
-        for tdata in get_teachers().values()
-        if tdata.tid in teachers
+        for tid, tdata in get_teachers().items()
+        if tid in teachers
     ]
 
 
@@ -288,6 +300,7 @@ class TimetableCourses:
         ### Add asc activities
         lg_map = collect_activity_groups()
         for lg, act in lg_map.items():
+            ## Collect classes / groups
             class_set = set()
             group_set = set()
             teacher_set = set()
@@ -298,15 +311,13 @@ class TimetableCourses:
                 if g and klass != "--":
                     # Only add a group "Students" entry if there is a
                     # group and a (real) class
-                    if g == "*":
-                        g = ""
                     group_set.update(asc_class_groups[klass][g])
                 if tid != "--":
                     teacher_set.add(tid)
- 
-            # Get the subject-id from the block-tag, if it has a
-            # subject, otherwise from the course (of which there
-            # should be only one!)
+
+            ## Get the subject-id from the block-tag, if it has a
+            ## subject, otherwise from the course (of which there
+            ## should be only one!)
             if (bt := act.block_tag):
                 sid = bt.sid
 
@@ -324,12 +335,12 @@ class TimetableCourses:
             ## Divide lessons up according to duration
             durations = {}
             # Need the LESSONS data: id, length, time
-            for lid, l, t in act.lessons:
-                lt = (lid, t)
+            for ldata in act.lessons:
+                nlessons = ldata[1]
                 try:
-                    durations[l].append(lt)
+                    durations[nlessons].append(ldata)
                 except KeyError:
-                    durations[l] = [lt]
+                    durations[nlessons] = [ldata]
             # Build aSc lesson items
             for l in sorted(durations):
                 self.aSc_lesson(
@@ -390,10 +401,10 @@ class TimetableCourses:
         # aSc-lesson item.
         # The rooms should be taken from the aSc-lesson item if the
         # sublesson has none.
-#TODO
+        # LESSONS_FIELDS = ("id", "LENGTH", "TIME", "PLACEMENT", "ROOMS")
         for sl in sl_list:
-            timefield = sl.TIME
-            placement_field = sl.PLACEMENT
+            timefield = sl[2]
+            placement_field = sl[3]
             fixed_time = False
             d, p = None, None
             if placement_field:
@@ -404,15 +415,10 @@ class TimetableCourses:
             if timefield:
                 try:
                     d0, p0 = timeslot2index(timefield)
-                    if d is None:
-                        d, p = d0. p0
-                        fixed_time = True
-                    elif (d0 == d) and (p0 == p):
-                        fixed_time = True
-                    else:
-                        d, p = d0. p0
-                except ValueError:
-                    pass
+                    fixed_time = True
+                    d, p = d0, p0
+                except ValueError as e:
+                    REPORT("ERROR", f"[TIME] {str(e)}")
             if d is None:
                 continue
             self.asc_card_list.append(
@@ -420,7 +426,7 @@ class TimetableCourses:
                     "@lessonid": asc_id,
                     "@period": str(p + 1),
                     "@day": str(d + 1),
-                    "@classroomids": sl.ROOMS if sl.ROOMS else asc_rooms,
+                    "@classroomids": sl[4] if sl[4] else asc_rooms,
                     "@locked": "1" if fixed_time else "0",
                 }
             )

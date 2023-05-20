@@ -84,6 +84,7 @@ from core.db_access import (
 )
 from core.list_activities import read_db
 
+LUNCH_BREAK = '^'
 
 ### -----
 
@@ -131,8 +132,7 @@ def get_subjects_fet(used_set) -> list[dict[str, str]]:
         for sid, name in get_subjects()
         if sid in used_set
     ]
-    sid, name = T["LUNCH_BREAK"].split(":", 1)
-    slist.append({"Name": sid, "Comments": name})
+    slist.append({"Name": LUNCH_BREAK, "Comments": T["LUNCH_BREAK"]})
     return slist
 
 
@@ -770,7 +770,6 @@ class TimetableCourses:
         As the breaks are implemented here by means of a lunch-break
         activity, the weight isn't of much use.
         """
-        lb_sid = T["LUNCH_BREAK"].split(":", 1)[0]
         try:
             lbp, lbw = lb.split('%')
             if lbw == '-':
@@ -807,7 +806,7 @@ class TimetableCourses:
                 aid_s = str(self.next_activity_id())
                 activity = {
                     # no teacher
-                    "Subject": lb_sid,
+                    "Subject": LUNCH_BREAK,
                     "Students": f"{klass}.{g}" if g else klass,
                     "Duration": "1",
                     "Total_Duration": "1",
@@ -846,7 +845,6 @@ class TimetableCourses:
         because if only one period is possible it would probably be
         better to set the teacher as "not available" in that period.
         """
-        lb_sid = T["LUNCH_BREAK"].split(":", 1)[0]
         try:
             lbp, lbw = lb.split('%')
             if lbw == '-':
@@ -877,7 +875,7 @@ class TimetableCourses:
             aid_s = str(self.next_activity_id())
             activity = {
                 "Teacher": tid,
-                "Subject": lb_sid,
+                "Subject": LUNCH_BREAK,
                 # no students
                 "Duration": "1",
                 "Total_Duration": "1",
@@ -1046,8 +1044,9 @@ class TimetableCourses:
                     continue
             except ValueError:
                 REPORT("ERROR", T["BAD_SUBJECT_PAIR"].format(
-#TODO: can I get the translated constraint name?
-                    klass=klass, constraint="NOTAFTER", val=v
+                    klass=klass,
+                    constraint=self.class_handlers["NOTAFTER"],
+                    val=v
                 ))
                 continue
             val = (s1, s2, w)
@@ -1094,8 +1093,9 @@ class TimetableCourses:
                     continue
             except ValueError:
                 REPORT("ERROR", T["BAD_SUBJECT_PAIR"].format(
-#TODO: can I get the translated constraint name?
-                    klass=klass, constraint="PAIRGAP", val=v
+                    klass=klass,
+                    constraint=self.class_handlers["PAIRGAP"],
+                    val=v
                 ))
                 continue
             val = (s1, s2, w)
@@ -1139,7 +1139,7 @@ class TimetableCourses:
         configuration: CLASS_CONSTRAINT_HANDLERS.
         """
         ### Fetch class constraint data
-        handlers = {
+        self.class_handlers = {
             c: (d, t)   # The "handler" field is not needed here
             for c, h, d, t in self.TT_CONFIG["CLASS_CONSTRAINT_HANDLERS"]
         }
@@ -1170,7 +1170,7 @@ class TimetableCourses:
             constraints = {}
             for c, v in read_pairs(cstr):
                 try:
-                    d, t = handlers[c]
+                    d, t = self.class_handlers[c]
                 except KeyError:
                     REPORT(
                         "ERROR",
@@ -1227,7 +1227,9 @@ class TimetableCourses:
                 REPORT(
                     "ERROR",
                     T["CLASS_CONSTRAINT"].format(
-                        klass=klass, constraint=handlers["MINDAILY"][-1], e=e
+                        klass=klass,
+                        constraint=self.class_handlers["MINDAILY"][-1],
+                        e=e
                     ),
                 )
             else:
@@ -1252,7 +1254,7 @@ class TimetableCourses:
                     "ERROR",
                     T["CLASS_CONSTRAINT"].format(
                         klass=klass,
-                        constraint=handlers["MAXGAPSWEEKLY"][-1],
+                        constraint=self.class_handlers["MAXGAPSWEEKLY"][-1],
                         e=e
                     ),
                 )
@@ -1268,7 +1270,7 @@ class TimetableCourses:
                             "Comments": None,
                         }
                     )
-        uc = [handlers[c][-1] for c in unsupported]
+        uc = [self.class_handlers[c][-1] for c in unsupported]
         if uc:
             REPORT(
                 "WARNING",
@@ -1290,7 +1292,7 @@ class TimetableCourses:
         configuration: TEACHER_CONSTRAINT_HANDLERS.
         """
         ### Fetch teacher constraint data
-        handlers = {
+        self.teacher_handlers = {
             c: (d, t)   # The "handler" field is not needed here
             for c, h, d, t in self.TT_CONFIG["TEACHER_CONSTRAINT_HANDLERS"]
         }
@@ -1327,7 +1329,7 @@ class TimetableCourses:
             constraints = {}
             for c, v in read_pairs(cstr):
                 try:
-                    d, t = handlers[c]
+                    d, t = self.teacher_handlers[c]
                 except KeyError:
                     REPORT(
                         "ERROR",
@@ -1372,7 +1374,9 @@ class TimetableCourses:
                 REPORT(
                     "ERROR",
                     T["TEACHER_CONSTRAINT"].format(
-                        tid=tid, constraint=handlers["MINDAILY"][-1], e=e
+                        tid=tid,
+                        constraint=self.teacher_handlers["MINDAILY"][-1],
+                        e=e
                     ),
                 )
             else:
@@ -1396,7 +1400,9 @@ class TimetableCourses:
                 REPORT(
                     "ERROR",
                     T["TEACHER_CONSTRAINT"].format(
-                        tid=tid, constraint=handlers["MAXGAPSDAILY"][-1], e=e
+                        tid=tid,
+                        constraint=self.teacher_handlers["MAXGAPSDAILY"][-1],
+                        e=e
                     ),
                 )
             else:
@@ -1419,7 +1425,9 @@ class TimetableCourses:
                 REPORT(
                     "ERROR",
                     T["TEACHER_CONSTRAINT"].format(
-                        tid=tid, constraint=handlers["MAXGAPSWEEKLY"][-1], e=e
+                        tid=tid,
+                        constraint=self.teacher_handlers["MAXGAPSWEEKLY"][-1],
+                        e=e
                     ),
                 )
             else:
@@ -1442,7 +1450,9 @@ class TimetableCourses:
                 REPORT(
                     "ERROR",
                     T["TEACHER_CONSTRAINT"].format(
-                        tid=tid, constraint=handlers["MAXBLOCK"][-1], e=e
+                        tid=tid,
+                        constraint=self.teacher_handlers["MAXBLOCK"][-1],
+                        e=e
                     ),
                 )
             else:
@@ -1460,7 +1470,7 @@ class TimetableCourses:
                             }
                         )
             unsupported.update(constraints)
-        uc = [handlers[c][-1] for c in unsupported]
+        uc = [self.teacher_handlers[c][-1] for c in unsupported]
         if uc:
             REPORT(
                 "WARNING",
@@ -1516,7 +1526,7 @@ class TimetableCourses:
                     if w != '+' and (wx == '+' or w < wx):
                         wx = w
                 if aidlist:
-                    print("§PARALLEL +:", wx, aidlist)
+                    # print("§PARALLEL +:", wx, aidlist)
                     parallels.append(
                         {
                             "Weight_Percentage": WEIGHTMAP[wx],
@@ -1577,43 +1587,6 @@ class TimetableCourses:
                 },
             )
 
-    def placements_extern(self, xmlfile):
-        """Get the preset placements from a fet "activities" file (passed
-        as a file path) generated by a successful run of fet.
-        The "locked" status is obtained from the original data.
-        """
-        # Get the placement data
-        with open(xmlfile, "rb") as fh:
-            xml = fh.read()
-        pos_data = xmltodict.parse(xml)
-        pos_list = pos_data["Activities_Timetable"]["Activity"]
-        aid_data = {}
-        db_backup()
-        for p in pos_list:
-            aid = p["Id"]
-            try:
-                activity = self.activities[int(aid) - 1]
-            except:
-                # Could indicate a mismatch between input data and result file ...
-                print(" BAD INDEX:", aid)
-                continue
-            lesson_id = activity["Comments"]
-            if lesson_id:
-                if aid in self.locked_aids:
-                    ptime = f"{p['Day']}.{p['Hour']}"
-                else:
-                    ptime = f"?{p['Day']}.{p['Hour']}"
-                field_values = [("TIME", ptime)]
-                room = p['Room']
-                if room:
-                    rlist = p.get('Real_Room')
-                    if rlist:
-                        field_values.append(("ROOMS", ','.join(rlist)))
-                    else:
-                        field_values.append(("ROOMS", room))
-                # print("§§§", lesson_id, field_values)
-                db_update_fields("LESSONS", field_values, id=int(lesson_id))
-
 
 def add_constraint(constraints, ctype, constraint):
     """Add a constraint of type <ctype> to the master constraint
@@ -1635,34 +1608,6 @@ def add_constraints(constraints, ctype, constraint_list):
             constraints[ctype] += constraint_list
         except KeyError:
             constraints[ctype] = constraint_list
-
-
-############################################################################
-
-def getActivities(working_folder):
-    from qtpy.QtWidgets import QApplication, QFileDialog
-    app = QApplication.instance()
-    if app is None:
-        # if it does not exist then a QApplication is created
-        app = QApplication(sys.argv)
-#TODO: T ...
-    d = QFileDialog(None, "Open fet 'activities' file", "", "'Activities' Files (*_activities.xml)")
-    d.setFileMode(QFileDialog.ExistingFile)
-    d.setOptions(QFileDialog.DontUseNativeDialog)
-    history_file = os.path.join(working_folder, "activities_history")
-    if os.path.isfile(history_file):
-        with open(history_file, "r", encoding="utf-8") as fh:
-            history = fh.read().split()
-        d.setHistory(history)
-        if history:
-            d.setDirectory(history[-1])
-    d.exec()
-    files = d.selectedFiles()
-    if files:
-        with open(history_file, "w", encoding="utf-8") as fh:
-            fh.write("\n".join(d.history()[-10:]))
-        return files[0]
-    return None
 
 
 # --#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#
@@ -1775,10 +1720,6 @@ if __name__ == "__main__":
 
     outdir = DATAPATH("TIMETABLE/out")
     os.makedirs(outdir, exist_ok=True)
-#    xmlfile = getActivities(outdir)
-#    if xmlfile:
-#        courses.placements_extern(xmlfile)
-#    else:
     if True:
 
         xml_fet = xmltodict.unparse(courses.gen_fetdata(), pretty=True)

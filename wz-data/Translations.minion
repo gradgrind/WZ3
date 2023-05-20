@@ -497,32 +497,24 @@ timetable.asc_data: {
 }
 
 timetable.fet_data: {
+    INVALID_GROUP_LIST: "LESSON_GROUP {lg}, Gruppenkombination nicht möglich: {groups}"
+    ROOM_BLOCK_CONFLICT: "Räume nicht unabhängig für Kurs(e) mit Kennzeichen {tag}, Klasse(n) {classes}: {rooms}"
+    INVALID_CLASS_LUNCHBREAK: "Klasse {klass}, ungültiger Wert für Bedingung „Mittagspause“: {val}"
+    INVALID_TID_LUNCHBREAK: "Lehrer {tid}, ungültiger Wert für Bedingung „Mittagspause“: {val}"
+    BAD_SUBJECT_PAIR:   "Klasse {klass}, Bedingung „{constraint}“ ...\n  ungültiger Wert: {val}"
+    UNKNOWN_CLASS_CONSTRAINT: "Klasse {klass}, unbekannte Bedingung: „{c}“"
+    MULTIPLE_CLASS_CONSTRAINT: "Klasse {klass}, zu viele Angaben für Bedingung:\n  „{name}“"
+    CLASS_CONSTRAINT:  "Klasse {klass}, Bedingung „{constraint}“:\n  {e}"
+    UNSUPPORTED_CLASS_CONSTRAINTS: "Bedingungeg für eine Klasse, die von fet nicht unterstützt sind:\n{l}"
     UNKNOWN_TID_CONSTRAINT: "Lehrer {tid}, unbekannte Bedingung: „{c}“"
     MULTIPLE_TID_CONSTRAINT: "Lehrer {tid}, zu viele Angaben für Bedingung:\n  „{name}“"
-    INVALID_TID_LUNCHBREAK: "Lehrer {tid}, ungültiger Wert für Bedingung „Mittagspause“: {val}"
-    INVALID_CLASS_LUNCHBREAK: "Klasse {klass}, ungültiger Wert für Bedingung „Mittagspause“: {val}"
-    INVALID_CONSTRAINT_VALUE: "ungültiger Wert für Bedingung ({val})"
     TEACHER_CONSTRAINT:  "Lehrer {tid}, Bedingung „{constraint}“:\n  {e}"
-    CLASS_CONSTRAINT:  "Klasse {klass}, Bedingung „{constraint}“:\n  {e}"
     UNSUPPORTED_TEACHER_CONSTRAINTS: "Lehrer-Bedingungeg, die von fet nicht unterstützt sind:\n{l}"
-    BAD_SUBJECT_PAIR:   "Klasse {klass}, Bedingung „{constraint}“ ...\n  ungültiger Wert: {val}"
-    
-#TODO ... not yet implemented/adapted
-    # Entries probably valid not just for "aSc" or "fet"
-    WHOLE_CLASS:    alle  # name for a "group" comprising the whole class
-    BAD_PLAIN_BLOCK: "{course}: für Kennzeichen {tag} muss es genau einen Kurs geben"
-    ROOM_TODO:      "Raum muss noch festgelegt werden"
-    ROOM_BLOCK_CONFLICT: "Räume nicht unabhängig für Kurs(e) mit Kennzeichen {tag}, Klasse(n) {classes}: {rooms}"
-    INVALID_TEACHER_CONDITION_VALUE: "Lehrer {tid}, ungültiger Wert für Bedingung {constraint}: '{val}'"
-    INVALID_CLASS_CONDITION_VALUE: "Klasse {klass}, ungültiger Wert für Bedingung {constraint}: '{val}'"
-    INVALID_GROUP_LIST: "LESSON_GROUP {lg}, Gruppenkombination nicht möglich: {groups}"
-    INVALID_CLASS_CONSTRAINT: "Klasse {klass}: ungültiger Wert für Bedingung {constraint}"
+    INVALID_CONSTRAINT_VALUE: "ungültiger Wert für Bedingung ({val})"
     PARALLEL_SINGLE: "Parallel-Kennung {tag} hat nur eine Unterrichtsstunde"
-   
-    # Entries probably "aSc"-specific
-    INVALID_PLACE:  "Im Kurs (Gruppe {klass}.{group}, Fach-id {sid}, Lehrer {tid}), unbekannter Raum (Ort): '{rid}'"
-    BAD_TIME:       "Ungültige Zeitangabe: '{time}' (lesson-id {id})"
+}
 
-    # Entries possibly "fet"-specific
-    LUNCH_BREAK:    "mp:Mittagspause"
+timetable.fet_read_results: {
+    Open_fet_activities_file: "fet-„Activities“ laden"
+    Activities_files:       "'Activities' Dateien"
 }

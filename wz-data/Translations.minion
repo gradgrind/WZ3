@@ -470,6 +470,7 @@ ui.week_table: {
     none:           "(keine)"
 }
 
+#deprecated?
 timetable.activities: {
 #TODO ... not yet implemented/adapted
     CourseData:     "<Kurs: Klasse={klass}, Gruppe={group}, Fach={sid}, Lehrer={tid}>"
@@ -517,4 +518,6 @@ timetable.fet_data: {
 timetable.fet_read_results: {
     Open_fet_activities_file: "fet-„Activities“ laden"
     Activities_files:       "'Activities' Dateien"
+    Open_Directory:         "Zielordner öffnen"
+    BAD_PLACEMENTS_ENDING:  "Die fet-Ergebnisse sind in einer Datei mit Endung „{ending}“"
 }

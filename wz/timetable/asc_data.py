@@ -1,5 +1,5 @@
 """
-timetable/asc_data.py - last updated 2023-05-16
+timetable/asc_data.py - last updated 2023-05-20
 
 Prepare aSc-timetables input from the database ...
 
@@ -23,8 +23,6 @@ __TEST = False
 __TEST = True
 __TESTX = False
 __TESTY = False
-
-MULTICLASS = "XX"   # class "tag" for lesson items involving more than 1 class
 
 # IMPORTANT: Before importing the data generated here, some setting up of
 # the school data is required, especially the setting of the total number
@@ -69,9 +67,7 @@ from core.basic_data import (
     sublessons,
     timeslot2index,
 )
-
-#from timetable.activities import Courses
-
+from timetable.fet_data import collect_activity_groups
 
 def idsub(tag):
     """In aSc, "id" fields may only contain ASCII alphanumeric characters,
@@ -79,8 +75,12 @@ def idsub(tag):
     """
     return re.sub("[^-_A-Za-z0-9]", "_", tag)
 
-
 WHOLE_CLASS = T["WHOLE_CLASS"]
+
+#TODO: I should probably use multiple rooms ...
+EXTRA_ROOM = "NNN"  # lesson placement: "extra" / unallocated room
+
+MULTICLASS = "XXX"  # class "tag" for lesson items involving more than 1 class
 
 ### -----
 
@@ -134,8 +134,8 @@ def get_rooms_aSc() -> list[dict]:
     ]
     rooms.append(
         {
-            "@id": CONFIG["EXTRA_ROOM"],
-            "@short": CONFIG["EXTRA_ROOM"],
+            "@id": EXTRA_ROOM,
+            "@short": EXTRA_ROOM,
             "@name": T["ROOM_TODO"],
         }
     )
@@ -181,9 +181,11 @@ def asc_group(klass, group):
 
 def get_groups_aSc():
     """Return an ordered list of aSc elements for the groups within the classes.
+    As a second result return a klass to group to asc-group-list mapping.
     """
     group_list = []
     classes = get_classes()
+    k2g2g_asc = {}
     for klass, _ in classes.get_class_list():
         g = WHOLE_CLASS
         group_list.append(
@@ -195,116 +197,30 @@ def get_groups_aSc():
                 "@divisiontag": "0",
             }
         )
-
-#TODO
-
-        # See which groups are used – seek dotted groups
-        g1, gn = set(), set()
-        for row in db_read_fields("COURSES", ["GRP"], CLASS=klass):
-            g = row[0]
-            if g:
-                if g == '*':
-                    continue
-                if '.' in g:
-                    gn.add(g)
+        cdata = classes[klass]
+        cg = cdata.divisions
+        divs = cg.divisions
+#?
+        g2g_asc = {'*': [idsub(klass)]}
+        for dix, div in enumerate(divs, start=1):
+            for g, sgl in div:
+                if sgl is None:
+                    ascg = asc_group(klass, g)
+                    group_list.append(
+                        {
+                            "@id": ascg,
+                            "@classid": klass,
+                            "@name": g,
+                            "@entireclass": "0",
+                            "@divisiontag": str(dix),
+                        }
+                    )
+                    g2g_asc[g] = [ascg]
                 else:
-                    g1.add(g)
-        
-        print("§§§§", klass, g1, gn)
-        cdata = classes[klass]
-        cg = cdata.divisions
-        divs = cg.divisions
-        print("  +", divs)
-        g2d = {}
-        for i, d in enumerate(divs):
-            for g in d:
-                g2d[g] = i
-        print("  #", g2d)
-#TODO ... 
-        if gn:
-            dx = {}
-            for gg in gn:
-                gl = gg.split('.')
-                ds = {g2d[g] for g in gl}
-                for i in ds:
-                    pass
-
-
-
-                for g in gs:
-                    try:
-                        dx[g]
-                    except KeyError:
-                        continue
-
-        continue
-    quit(0)
-    if False:
-
-        # Sort out the divisions ...
-#def get_classes_fet() -> list[tuple]:
-        """Build the structure for the classes definition.
-        Return this as a list of tuples (one per class):
-            1) class tag (short name)
-            2) fet class entry – <dict> representing XML structure
-            3) {teaching group -> [atom, ...] (list of "minimal subgroups".
-            4) {(atom, ...) -> [group, ...]
-        """
-#    classes = get_classes()
-#    fet_classes = FetClasses()
-#    for klass, kname in classes.get_class_list():
-#        ### Build a fet students_list/year entry for the given class
-        cdata = classes[klass]
-        cg = cdata.divisions
-        # Essentially, fet deals with "minimal subgroups". These are
-        # groups with no shared members. In WZ these have sometimes
-        # been called "atomic groups".
-        # For convenience fet provides (at the user interface level)
-        # higher level groups, which it calls "Year" (in WZ "class"),
-        # "Category" (which can correspond to a "division" in WZ),
-        # "Division" (which can correspond to a group within a division
-        # in WZ) and "Group" (a group of pupils – within a class –
-        # which can be assigned to a "course").
-        # For each Year-Group combination there needs to be a list of
-        # (minimal) subgroups.
-        # The following is an attempt to reduce the "categories" to 0
-        # or 1, all the minimal subgroups being the fet "divisions".
-        divs = cg.divisions
-        g2a = {
-            cg.set2group(gg): tuple(
-                sorted(cg.set2group(g) for g in a)
-            ) for gg, a in cg.group2atoms.items()
-        }
-        g2a[""] = g2a.pop("*")
-        a2g = {
-            tuple(
-                sorted(cg.set2group(g) for g in a)
-            ): "" if (ggg := cg.set2group(gg)) == "*" else ggg
-            for a, gg in cg.atoms2group.items()
-        }
-        atoms = tuple(
-            sorted(cg.set2group(g) for g in cg.filtered_atomic_groups)
-        )
-
-
-
-
-
-        divisions = classes.group_info(klass)["INDEPENDENT_DIVISIONS"]
-        dix = 0
-        for div in divisions:
-            dix += 1
-            for grp in div:
-                group_list.append(
-                    {
-                        "@id": asc_group(klass, grp),
-                        "@classid": klass,
-                        "@name": grp,
-                        "@entireclass": "0",
-                        "@divisiontag": str(dix),
-                    }
-                )
-    return group_list
+                    g2g_asc[g] = [asc_group(klass, sg) for sg in sgl]
+        # print("§asc_class_group", klass, g2g_asc)
+        k2g2g_asc[klass] = g2g_asc
+    return group_list, k2g2g_asc
 
 
 def timeoff_aSc(available: str) -> str:
@@ -347,17 +263,17 @@ def get_teachers_aSc(teachers):
     ]
 
 
-#class TimetableCourses(Courses):
+#TODO: This used to inherit from <Courses> in module "timetable.activities".
 class TimetableCourses:
-    def read_class_lessons(self):
+    def read_lessons(self, asc_class_groups):
         """Organize the data according to classes.
         Produce a list of aSc-lesson items with item identifiers
         including the class of the lesson – to aid sorting and searching.
         Lessons involving more than one class are collected under the
         class "tag" <MULTICLASS>.
-        Any blocks with no sublessons are ignored.
         Any sublessons which have (time) placements are added to a list
         of aSc-card items.
+        <asc_class_groups> is a mapping {klass: {group: [asc-group, ...]}}
         """
         # Collect teachers and subjects with timetable entries:
         self.timetable_teachers = set()
@@ -369,41 +285,51 @@ class TimetableCourses:
         # For counting items within the classes:
         self.class_counter = {}  # {class -> number}
 
-        # tag2entries: {block-tag -> [BlockInfo, ... ]}
-        for tag, blocklist in self.tag2entries.items():
-            lessons = sublessons(tag)
-            if not lessons:
-                continue
+        ### Add asc activities
+        lg_map = collect_activity_groups()
+        for lg, act in lg_map.items():
             class_set = set()
             group_set = set()
             teacher_set = set()
             room_list = []
             extra_room = False
-            for blockinfo in blocklist:
-                course = blockinfo.course
-                class_set.add(course.klass)
-                kgroup = full_group(course.klass, course.group)
-                group_set.update(kgroup)
-                teacher_set.add(course.tid)
-                # Add rooms, retaining order
-                for room in blockinfo.rooms:
-                    if room == "+":
-                        extra_room = True
-                    elif room not in room_list:
-                        room_list.append(room)
+            for klass, g, sid, tid in act.course_list:
+                class_set.add(klass)
+                if g and klass != "--":
+                    # Only add a group "Students" entry if there is a
+                    # group and a (real) class
+                    if g == "*":
+                        g = ""
+                    group_set.update(asc_class_groups[klass][g])
+                if tid != "--":
+                    teacher_set.add(tid)
+ 
             # Get the subject-id from the block-tag, if it has a
-            # subject, otherwise from the course
-            sid = blockinfo.block.sid or course.sid
+            # subject, otherwise from the course (of which there
+            # should be only one!)
+            if (bt := act.block_tag):
+                sid = bt.sid
+
+            ## Handle rooms
+            ## aSc doesn't support xml-input of complex room info, so
+            ## just make a simple list.
+            for r in act.room_list:
+                if (rs := r.rstrip('+')):
+                    for rl in rs.split('/'):
+                        room_list.append(rl)
+                if r[-1] == '+':
+                    extra_room = True
             if extra_room:
-                room_list.append(CONFIG["EXTRA_ROOM"])
-            # Divide lessons up according to duration
+                room_list.append(EXTRA_ROOM)
+            ## Divide lessons up according to duration
             durations = {}
-            for sl in lessons:
-                l = sl.LENGTH
+            # Need the LESSONS data: id, length, time
+            for lid, l, t in act.lessons:
+                lt = (lid, t)
                 try:
-                    durations[l].append(sl)
+                    durations[l].append(lt)
                 except KeyError:
-                    durations[l] = [sl]
+                    durations[l] = [lt]
             # Build aSc lesson items
             for l in sorted(durations):
                 self.aSc_lesson(
@@ -415,9 +341,10 @@ class TimetableCourses:
                     duration=l,
                     rooms=room_list,
                 )
+        ### Sort activities
         self.asc_lesson_list.sort(key=lambda x: x["@id"])
-        # TODO: ? extend sorting?
-        # Am I doing this right with multiple items? Should it be just one card?
+# TODO: ? extend sorting?
+# Am I doing this right with multiple items? Should it be just one card?
         self.asc_card_list.sort(key=lambda x: x["@lessonid"])
 
     def aSc_lesson(self, classes, sid, groups, tids, sl_list, duration, rooms):
@@ -427,7 +354,6 @@ class TimetableCourses:
         to the list <self.asc_card_list>.
         """
         if tids:
-            tids.discard("--")
             self.timetable_teachers.update(tids)
         classes.discard("--")
         if groups and classes:
@@ -435,8 +361,7 @@ class TimetableCourses:
         else:
             __classes = []
         if sid:
-            if sid == "--":
-                raise Bug("sid = '--'")
+            assert sid != "--"
             self.timetable_subjects.add(sid)
         klass = MULTICLASS if len(__classes) != 1 else idsub(__classes[0])
         i = (self.class_counter.get(klass) or 0) + 1
@@ -461,9 +386,11 @@ class TimetableCourses:
         )
 
         # Now add aSc-card items for the sublessons which have placements.
-        # The identifier must be the same as the corresponding aSc-lesson item.
+        # The identifier must be the same as that of the corresponding
+        # aSc-lesson item.
         # The rooms should be taken from the aSc-lesson item if the
         # sublesson has none.
+#TODO
         for sl in sl_list:
             timefield = sl.TIME
             placement_field = sl.PLACEMENT
@@ -497,21 +424,6 @@ class TimetableCourses:
                     "@locked": "1" if fixed_time else "0",
                 }
             )
-
-
-def full_group(klass, group):
-    """Return the group as a "full group" – also containing the class.
-    As some groups need to be represented as "compounds", return the
-    result as a set.
-    """
-    if klass and klass != "--":
-        if group:
-            if group == "*":
-                return {asc_group(klass, WHOLE_CLASS)}
-            # Some groups are compounds – I need to get the components!
-            groups = get_classes().group_info(klass)["GROUP_MAP"][group]
-            return {asc_group(klass, g) for g in groups}
-    return set()
 
 
 ########################################################################
@@ -621,16 +533,16 @@ if __name__ == "__main__":
         for cdata in classes:
             print("   ", cdata)
 
-    groups = get_groups_aSc()
+    groups, asc_class_groups = get_groups_aSc()
     if __TEST:
         print("\n*** CLASS-GROUPS ***")
         for gdata in groups:
             print("   ", gdata)
 
-    quit(0)
+    # quit(0)
 
     courses = TimetableCourses()
-    courses.read_class_lessons()
+    courses.read_lessons(asc_class_groups)
 
     #    quit(0)
 

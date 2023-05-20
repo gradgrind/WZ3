@@ -1,5 +1,5 @@
 """
-timetable/fet_read_results.py - last updated 2023-05-16
+timetable/fet_read_results.py - last updated 2023-05-20
 
 Fetch the placements after a fet run and update the database accordingly.
 There is also a function to generate an aSc-file.
@@ -20,6 +20,8 @@ Copyright 2023 Michael Towers
    limitations under the License.
 """
 
+ACTIVITIES_ENDING = "_activities.xml"
+
 ########################################################################
 
 import sys, os
@@ -37,7 +39,7 @@ if __name__ == "__main__":
 
 from typing import Optional
 
-#T = TRANSLATIONS("timetable.fet_data")
+T = TRANSLATIONS("timetable.fet_read_results")
 #Tc = TRANSLATIONS("timetable.constraints_class")
 
 ### +++++
@@ -106,8 +108,12 @@ def read_placements(fet_file, placement_file):
 
 
 def getActivities(working_folder):
-#TODO: T ...
-    d = QFileDialog(None, "Open fet 'activities' file", "", "'Activities' Files (*_activities.xml)")
+    d = QFileDialog(
+        None,
+        T["Open_fet_activities_file"],
+        "",
+        T["Activities_files"] + " (*_activities.xml)"
+    )
     d.setFileMode(QFileDialog.FileMode.ExistingFile)
     d.setOptions(QFileDialog.Option.DontUseNativeDialog)
     history_file = os.path.join(working_folder, "activities_history")
@@ -127,6 +133,39 @@ def getActivities(working_folder):
     return None
 
 
+def prepare_asc_config(outdir, placements):
+    pfile = os.path.basename(placements)
+    pbase = pfile[:-(len(ACTIVITIES_ENDING))]
+    if True:
+#        db_backup()
+        fet_file = os.path.join(outdir, pbase + ".fet")
+        pxfile = os.path.join(outdir, pfile)
+        if pxfile != placements:
+            copyfile(placements, pxfile)
+        # print(f"Reading from\n  {fet_file} and\n  {placements}")
+        read_placements(fet_file, pxfile)
+        db_backup(pbase)
+
+    # Generate aSc-file
+    ascfile_redirect = os.path.join(outdir, "ascdir")
+    if os.path.isfile(ascfile_redirect):
+        with open(ascfile_redirect, "r", encoding="utf-8") as fh:
+            odir = fh.read().strip()
+    else:
+        odir = QFileDialog.getExistingDirectory(
+            None,
+            T["Open Directory"],
+            options = (
+                QFileDialog.Option.DontUseNativeDialog
+                #| QFileDialog.Option.ShowDirsOnly
+            )
+        )
+        with open(ascfile_redirect, "w", encoding="utf-8") as fh:
+            fh.write(odir)
+    asc_file = os.path.join((odir or outdir), pbase + "_asc.xml")
+    make_asc_file(asc_file)
+
+
 def make_asc_file(asc_file):
     from timetable.asc_data import (
         TimetableCourses,
@@ -143,9 +182,9 @@ def make_asc_file(asc_file):
     periods = get_periods_aSc()
     allrooms = get_rooms_aSc()
     classes = get_classes_aSc()
-    groups = get_groups_aSc()
+    groups, asc_class_groups = get_groups_aSc()
     courses = TimetableCourses()
-    courses.read_class_lessons()
+    courses.read_lessons(asc_class_groups)
     allsubjects = get_subjects_aSc(courses.timetable_subjects)
     teachers = get_teachers_aSc(courses.timetable_teachers)
     xml_aSc = xmltodict.unparse(
@@ -162,11 +201,9 @@ def make_asc_file(asc_file):
         ),
         pretty=True,
     )
-
     with open(asc_file, "w", encoding="utf-8") as fh:
         fh.write(xml_aSc.replace("\t", "   "))
-#TODO: T ...
-    REPORT("INFO", f"TIMETABLE XML -> {asc_file}")
+    REPORT("INFO", f"aSc-XML -> {asc_file}")
 
 
 # --#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#
@@ -177,49 +214,17 @@ if __name__ == "__main__":
 
     open_database()
 
-    outdir = DATAPATH("TIMETABLE/out")
-    os.makedirs(outdir, exist_ok=True)
-    placements = getActivities(outdir)
-    ending = "_activities.xml"
-    if placements:
-        if placements.endswith(ending):
-            pfile = os.path.basename(placements)
-            pbase = pfile[:-(len(ending))]
-            if True:
-#                db_backup()
-                fet_file = os.path.join(outdir, pbase + ".fet")
-                pxfile = os.path.join(outdir, pfile)
-                if pxfile != placements:
-                    copyfile(placements, pxfile)
-                # print(f"Reading from\n  {fet_file} and\n  {placements}")
-                read_placements(fet_file, pxfile)
-#
-#                quit(0)
-
-                db_backup(pbase)
-
-            # Generate asc-file
-            ascfile_redirect = os.path.join(outdir, "ascdir")
-            if os.path.isfile(ascfile_redirect):
-                with open(ascfile_redirect, "r", encoding="utf-8") as fh:
-                    odir = fh.read().strip()
-            else:
-                odir = QFileDialog.getExistingDirectory(
-                    None,
-#TODO: T ...
-                    "Open Directory",
-                    options = (
-                        QFileDialog.Option.DontUseNativeDialog
-                        #| QFileDialog.Option.ShowDirsOnly
-                    )
-                )
-                with open(ascfile_redirect, "w", encoding="utf-8") as fh:
-                    fh.write(odir)
-            asc_file = os.path.join((odir or outdir), pbase + "_asc.xml")
-            make_asc_file(asc_file)
+    __outdir = DATAPATH("TIMETABLE/out")
+    os.makedirs(__outdir, exist_ok=True)
+    __placements = getActivities(__outdir)
+    if __placements:
+        if __placements.endswith(ACTIVITIES_ENDING):
+            prepare_asc_config(__outdir, __placements)
         else:
-#TODO: T ...
-            REPORT("ERROR", f"Placements file-name must end with '{ending}'")
+            REPORT(
+                "ERROR",
+                T["BAD_PLACEMENTS_ENDING"].format(ending=ACTIVITIES_ENDING)
+            )
 
     quit(0)
 

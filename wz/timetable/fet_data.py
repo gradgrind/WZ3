@@ -532,7 +532,7 @@ class TimetableCourses:
             ## Divide lessons up according to duration
             durations = {}
             total_duration = 0
-                # Need the LESSONS data: id, length, time
+            # Need the LESSONS data: id, length, time
             for lid, l, t in act.lessons:
                 total_duration += l
                 lt = (lid, t)

@@ -1,5 +1,5 @@
 """
-timetable/fet_data.py - last updated 2023-05-15
+timetable/fet_data.py - last updated 2023-05-19
 
 Prepare fet-timetables input from the database ...
 
@@ -24,7 +24,7 @@ _TEST = False
 _TEST1 = False
 #_TEST1 = True
 _SUBJECTS_AND_TEACHERS = False
-_SUBJECTS_AND_TEACHERS = True
+#_SUBJECTS_AND_TEACHERS = True
 
 FET_VERSION = "6.9.0"
 
@@ -82,7 +82,6 @@ from core.db_access import (
     read_pairs,
     db_read_mappings,
 )
-from core.classes import ClassGroups
 from core.list_activities import read_db
 
 
@@ -179,24 +178,12 @@ def get_classes_fet() -> list[tuple]:
         # The following is an attempt to reduce the "categories" to 0
         # or 1, all the minimal subgroups being the fet "divisions".
         divs = cg.divisions
-        g2a = {
-            cg.set2group(gg): tuple(
-                sorted(cg.set2group(g) for g in a)
-            ) for gg, a in cg.group2atoms.items()
-        }
-        g2a[""] = g2a.pop("*")
-        a2g = {
-            tuple(
-                sorted(cg.set2group(g) for g in a)
-            ): "" if (ggg := cg.set2group(gg)) == "*" else ggg
-            for a, gg in cg.atoms2group.items()
-        }
-        atoms = tuple(
-            sorted(cg.set2group(g) for g in cg.filtered_atomic_groups)
-        )
-        # The groups are all the "elemental" groups plus any dotted groups
-        # which are used, excluding any "atomic" groups already defined
-        # as subgroups.
+#TODO: Do I need tuples?
+        g2ags = cg.group_atoms()
+        atoms = cg.atomic_groups
+#        g2ags[""] = atoms
+        # The groups are all the "primary" groups, unless they are atomic
+        # groups already defined as subgroups.
         year_entry = {
             "Name": klass,
             "Number_of_Students": "0",
@@ -205,48 +192,60 @@ def get_classes_fet() -> list[tuple]:
             "Separator": ".",
         }
         if divs:
-            _groups = []
-            _agset = set()
-            for g in sorted(g2a):
-                if not g:
-                    continue
-                sgs = g2a[g]
-                if g in sgs:
+            groups = []
+            agset = set()
+            pending = set()
+            for g, ags in g2ags.items():
+                assert g
+                if g in atoms:
                     # This group is an atomic group
-                    if g not in _agset:
-                        _agset.add(g)
-                        _groups.append(
-                            {
-                                "Name": f"{klass}.{g}",
-                                "Number_of_Students": "0",
-                                "Comments": None,
-                            }
-                        )
+                    pending.add(g)
                 else:
-                    _agset.update(sgs)
-                    _subgroups = [
+                    agset.update(ags)
+                    subgroups = [
                         {
-                            "Name": f"{klass}.{sg}",
+                            "Name": f"{klass}.{ag}",
                             "Number_of_Students": "0",
                             "Comments": None,
                         }
-                        for sg in sorted(sgs)
+                        for ag in sorted(ags)
                     ]
-                    _groups.append(
+                    groups.append(
                         {
                             "Name": f"{klass}.{g}",
                             "Number_of_Students": "0",
                             "Comments": None,
-                            "Subgroup": _subgroups,
+                            "Subgroup": subgroups,
                         }
                     )
+            # Add any pending groups which haven't been included as subgroups
+            for g in pending:
+                if g not in agset:
+                    groups.append(
+                        {
+                            "Name": f"{klass}.{g}",
+                            "Number_of_Students": "0",
+                            "Comments": None,
+                        }
+                    )
+            groups.sort(key=lambda x: x["Name"])
             year_entry["Category"] = {
                 "Number_of_Divisions": f"{len(atoms)}",
                 "Division": atoms,
             }
-            year_entry["Group"] = _groups
-
-#TODO: Have I got an atoms -> group LIST mappping? Do I still need one?
+            year_entry["Group"] = groups
+        # Prepare the <FetClasses> item
+        g2a = {
+            g: tuple(ags)
+            for g, ags in g2ags.items()
+        }
+        g2a[""] = tuple(atoms)
+        # print("&&&&&", klass, g2a)
+        a2g = {
+            a: g
+            for g, a in g2a.items()
+        }
+        # print("   ~~", a2g)
         fet_classes.append(klass, year_entry, g2a, a2g)
     return fet_classes
 
@@ -356,6 +355,7 @@ class TimetableCourses:
         "fet_classes",
         "group2atoms",
         "activities",
+        "lid_aid",
         "__virtual_room_map",
         "__virtual_rooms",
         "time_constraints",
@@ -386,6 +386,7 @@ class TimetableCourses:
         self.time_constraints = {}
         self.space_constraints = {}
         self.activities: list[dict] = []  # fet activities
+        self.lid_aid = {}   # map lesson id to activity id
         # Used for managing "virtual" rooms:
         self.__virtual_room_map: dict[str, str] = {}  # rooms hash -> room id
         self.__virtual_rooms: dict[str, dict] = {}  # room id -> fet room
@@ -409,7 +410,6 @@ class TimetableCourses:
         lg_map = collect_activity_groups()
         ### Add fet activities
         for lg, act in lg_map.items():
-
             class_set = set()
             group_sets = {} # {klass -> set of atomic groups}
             teacher_set = set()
@@ -554,6 +554,7 @@ class TimetableCourses:
                 dstr = str(l)
                 for lid, time in durations[l]:
                     id_str = str(id0)
+                    self.lid_aid[lid] = id_str
                     activity = activity0.copy()
                     activity["Id"] = id_str
                     activity["Duration"] = dstr
@@ -1502,25 +1503,29 @@ class TimetableCourses:
             "PARALLEL_LESSONS",
             ("lesson_id", "TAG", "WEIGHTING")
         ):
-            ptags.setdefault(tag, []).append((lid, w))
+            lid_w = (lid, w)
+            try:
+                ptags[tag].append(lid_w)
+            except KeyError:
+                ptags[tag] = [lid_w]
         for tag in sorted(ptags):
             awlist = ptags[tag]
-            # print("§PARALLEL:", tag, awlist)
+            print("§PARALLEL:", tag, awlist)
             if (l := len(awlist)) > 1:
                 aidlist = []
                 # fet doesn't support different weights on the individual
                 # linked items. Use the lowest weight here.
                 wx = '+'
-                for aid, w in awlist:
+                for lid, w in awlist:
                     if w == '-':
                         # Suppress constraint
                         aidlist.clear()
                         break
-                    aidlist.append(aid)
+                    aidlist.append(self.lid_aid[lid])
                     if w != '+' and (wx == '+' or w < wx):
                         wx = w
                 if aidlist:
-                    # print("§PARALLEL +:", wx, aidlist)
+                    print("§PARALLEL +:", wx, aidlist)
                     parallels.append(
                         {
                             "Weight_Percentage": WEIGHTMAP[wx],

@@ -36,14 +36,15 @@ core.basic_data: {
 }
 
 core.classes: {
-    GROUP_ERRORS:       "Fehlerhafte Gruppenangabe: {source}\n{prefix}{errors}"
     CLASS_GROUPS_ERROR: "Fehler in Klassengruppen: {text}\n\n{e}"
     INVALID_GROUP_TAG:  "Klassenteilung „{div}“: ungültige Gruppenbezeichnung: „{g}“"
     REPEATED_GROUP:     "Klassenteilung „{div}“: wiederholte Gruppenbezeichnung: „{g}“"
+    INVALID_GROUP_SHORTCUT: "Ungültige Hilfsgruppe: {text}"
+    TOO_FEW_PRIMARIES:  "Klassenteilung „{div}“: Hilfsgruppe ({g}) muss mind. zwei primäre Gruppen enthalten"
+    NOT_PRIMARY_GROUP:  "Klassenteilung „{div}“: Gruppe {g} ist keine primäre Gruppe"
+    TOO_MANY_PRIMARIES: "Klassenteilung „{div}“: Hilfsgruppe ({g}) darf nicht alle primäre Gruppen enthalten"
+    REPEATED_EXTRA:     "Klassenteilung „{div}“: Hilfsgruppe {x} existiert schon als {g}"
     TOO_FEW_GROUPS:     "Klassenteilung „{div}“: mindestens zwei Gruppen erforderlich"
-    FILTER_NOT_ATOM:    "„{sub}“ ist keine Elementargruppe"
-    EMPTY_GROUP:        "Schülergruppe „{g}“ ist als leer konfiguriert"
-    INVALID_GROUP_ENTRY: "Fehlerhafte Klassengruppenangabe: {text}"
 }
 
 core.list_activities: {
@@ -226,6 +227,11 @@ ui.dialogs.dialog_choose_one_item_pair: {
 
 ui.dialogs.dialog_class_groups: {
     EMPTY_GROUPS_ERROR: "Bei Verarbeitung der Untergruppen:\n\n - {e}"
+    INVALID_GROUP_NAME: "Ungültige Gruppenbezeichnung"
+    AT_LEAST_TWO:       "Mindestens zwei Gruppen müssen gewählt werden"
+    NOT_ALL:            "Sämtliche Gruppen gewählt – es muss eine Untermenge sein"
+    DUPLICATE_EXTRA:    "Hilfsgruppe schon vorhanden ({g})"
+    NAME_IN_USE:        "Die Gruppenbezeichnung wird schon verwendet"
 }
 
 ui.dialogs.dialog_course_fields: {
@@ -236,6 +242,7 @@ ui.dialogs.dialog_course_fields: {
     NO_CHANGES:     "Die Daten sind unverändert ... trotzdem schließen?"
     LOSE_CHANGES_TITLE: "Ungespeicherte Änderungen"
     LOSE_CHANGES:   "Die Änderungen werden verworfen ... trotzdem schließen?"
+    UNKNOWN_GROUP:  "In Klasse {klass}: Gruppe „{g}“ ist nicht definiert"
 }
 
 #ui.dialogs.dialog_day_period: {
@@ -256,8 +263,8 @@ ui.dialogs.dialog_make_course_tables: {
 
 ui.dialogs.dialog_pupil_groups: {
     EMPTY_GROUPS_ERROR: "Bei Verarbeitung der Untergruppen:\n\n - {e}"
-    INVALID_GROUP_COMBINATION: "Unzulässige Gruppenkombination: {g}"
     MULTIPLE_GROUPS_IN_DIV: "Ungültige gespeicherte Gruppen: {g1} + {g2}"
+    INVALID_GROUPS:     "Unbekannte Gruppe(n): {g}"
 }
 
 ui.dialogs.dialog_room_choice: {

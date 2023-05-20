@@ -1,7 +1,7 @@
 """
 ui/dialogs/dialog_class_groups.py
 
-Last updated:  2023-03-23
+Last updated:  2023-05-19
 
 Supporting "dialog" for the class-data editor – specify the ways a class
 can be divided into groups.
@@ -40,6 +40,8 @@ T = TRANSLATIONS("ui.dialogs.dialog_class_groups")
 ### +++++
 
 from typing import Optional
+import math
+
 from ui.ui_base import (
     ### QtWidgets:
     QDialog,
@@ -55,12 +57,16 @@ from ui.ui_base import (
 )
 from core.classes import ClassGroups
 
+DUMMY_GROUP = '?'
+
 ### -----
 
 class ClassGroupsDialog(QDialog):
     @classmethod
-    def popup(cls, start_value, parent=None):
+    def popup(cls, start_value, parent=None, pos=None):
         d = cls(parent)
+        if pos:
+            d.move(pos)
         return d.activate(start_value)
 
     def __init__(self, parent=None):
@@ -74,50 +80,306 @@ class ClassGroupsDialog(QDialog):
             QDialogButtonBox.StandardButton.Ok
         )
 
-    @Slot(str)
-    def on_divisions_currentTextChanged(self, text):
-        if self.line_error:
-            self.set_line_error(False)
-            # Handle jumping away from a bad edit
-            self.init_division_list(self.divisions.currentRow())
+    def activate(self, start_value:str) -> Optional[str]:
+        """Open the dialog.
+        """
+        self.result = None
+        self.value0 = start_value
+        self.pb_reset.setVisible(bool(start_value))
+        self.edit_division.setStyleSheet("")
+        self.class_groups = ClassGroups(start_value)
+        # Set up the initial data
+        self.init_division_list(0)
+        self.set_value()
+        self.exec()
+        return self.result
+
+    def init_division_list(self, row):
+        """Fill the divisions list widget.
+        Subsequently the other display widgets are set up.
+        """
+        self.disable_triggers = True
+        self.divisions.clear()
+        divlist = self.class_groups.division_lines(with_extras=False)
+        if divlist:
+            self.divisions.addItems(divlist)
+            self.divisions.setEnabled(True)
+            self.new_division.setEnabled(True)
         else:
-            self.edit_division.setText(text)
+            self.divisions.setEnabled(False)
+            self.divisions.addItem("")
+            self.new_division.setEnabled(False)
+        self.divisions.setCurrentRow(row)
+        self.remove_division.setEnabled(len(divlist) > 1)
+        self.disable_triggers = False
+        self.division_selected()
+
+    def division_selected(self):
+        self.disable_triggers = True
+        self.set_line_error("")
+        row = self.divisions.currentRow()
+        divs = self.class_groups.divisions
+        # print("§division_selected", row, divs)
+        self.primary_groups.clear()
+        if row >= len(divs):
+            # Empty or pending item
+            self.current_division = None
+            self.edit_division.setText("")
+            self.extra_groups.setRowCount(0)
+            self.extra_frame.setEnabled(False)
+            self.disable_triggers = False
+            return
+        self.current_division = divs[row]
+        self.edit_division.setText(self.divisions.currentItem().text())
+        self.pgroups, self.xgroups = [], []
+        for g_v in self.current_division:
+            if g_v[1] is None:
+                self.pgroups.append(g_v[0])
+            else:
+                self.xgroups.append(g_v)
+        # Add primary groups to check-list
+        for g in self.pgroups:
+            item = QListWidgetItem(g)
+            item.setCheckState(Qt.CheckState.Unchecked)
+            self.primary_groups.addItem(item)
+        if (lp := len(self.pgroups)) > 2:
+            self.extra_frame.setEnabled(True)
+            # Calculate the max. number of extra groups
+            self.xgmax = sum(math.comb(lp, n) for n in range(2, lp))
+            self.set_extra_groups(0)
+        else:
+            self.extra_groups.setRowCount(0)
+            self.extra_frame.setEnabled(False)
+        self.disable_triggers = False
+
+    def set_extra_groups(self, row):
+        self.remove_extra.setEnabled(bool(self.xgroups))
+        nx = len(self.xgroups)
+        self.new_extra.setEnabled(nx < self.xgmax)
+        self.extra_groups.setRowCount(len(self.xgroups))
+        for r, g_v in enumerate(self.xgroups):
+            item = self.extra_groups.item(r, 0)
+            if not item:
+                item = QTableWidgetItem()
+                self.extra_groups.setItem(r, 0, item)
+            item.setText(g_v[0])
+            item = self.extra_groups.item(r, 1)
+            if not item:
+                item = QTableWidgetItem()
+                self.extra_groups.setItem(r, 1, item)
+            item.setText('+'.join(g_v[1]))
+        if row < nx:
+            self.extra_groups.setCurrentCell(row, 0)
+            self.extra_group_selected()
+            self.primary_groups.setEnabled(nx < self.xgmax)
+        else:
+            self.primary_groups.setEnabled(False)
+            self.edit_extra_group.setEnabled(False)
+            self.edit_extra_group.clear()
+
+    def extra_group_selected(self):
+        xrow = self.extra_groups.currentRow()
+        xg, plist = self.xgroups[xrow]
+        self.set_x_error("")
+        self.edit_extra_group.setText(xg)
+        dt = self.disable_triggers
+        self.disable_triggers = True
+        for i, g in enumerate(self.pgroups):
+            self.primary_groups.item(i).setCheckState(
+                Qt.CheckState.Checked if g in plist
+                else Qt.CheckState.Unchecked
+            )
+        self.disable_triggers = dt
+
+    def set_value(self):
+        self.value = self.class_groups.text_value()
+        self.pb_accept.setEnabled(self.value != self.value0)
+
+    def reset(self):
+        self.result = ""
+        super().accept()
+
+    def accept(self):
+        self.result = self.value
+        super().accept()
+
+    def set_line_error(self, e:str):
+        self.analysis.setText(e)
+        self.edit_division.setStyleSheet(
+            "color: #d50000;" if e else ""
+        )
+
+    def set_x_error(self, e:str):
+        self.analysis.setText(e)
+        if e:
+            self.edit_extra_group.setStyleSheet("color: #d50000;")
+        else:
+            self.edit_extra_group.setStyleSheet("")
+
+    @Slot(int,int,int,int)
+    def on_extra_groups_currentCellChanged(self, r, c, r0, c0):
+        if self.disable_triggers:
+            return
+        self.extra_group_selected()
+
+    @Slot(QListWidgetItem)
+    def on_primary_groups_itemChanged(self, item):
+        if self.disable_triggers:
+            return
+        xrow = self.extra_groups.currentRow()
+        xgroup = self.xgroups[xrow]
+        xg = xgroup[0]
+        glist = []
+        for i, g in enumerate(self.pgroups):
+            item = self.primary_groups.item(i)
+            if item.checkState() == Qt.CheckState.Checked:
+                glist.append(g)
+        l = len(glist)
+        if l < 2:
+            e = T["AT_LEAST_TWO"]
+        elif l == len(self.pgroups):
+            e = T["NOT_ALL"]
+        else:
+            # Check that the group list is not a duplicate
+            for i, xg_plist in enumerate(self.xgroups):
+                if xg_plist[1] == glist:
+                    if i == xrow: # no change
+                        e = ""
+                    else:
+                        e = T["DUPLICATE_EXTRA"].format(g=xg_plist[0])
+                    break
+            else:
+                e = ""
+                xgroup[1] = glist
+                # The xgroup items are references to those in the main
+                # division list, so the main list needs no additional
+                # changes – except for new items, which are only entered
+                # into the main list when they are valid.
+                if xg == DUMMY_GROUP:
+                    # Add the extra group to the division in the main list
+                    xgn = self.edit_extra_group.text()
+                    xgroup[0] = xgn
+                    self.current_division.append(xgroup)
+                    # Do a redisplay here, to ensure that the '+' button
+                    # is correctly enabled/disabled.
+                    self.set_extra_groups(xrow)
+                    self.extra_groups.setEnabled(True)
+                else:
+                    self.extra_groups.item(xrow, 1).setText('+'.join(glist))
+                self.set_value()
+        self.set_x_error(e)
+        self.edit_extra_group.setEnabled(xg == DUMMY_GROUP or not e)
+
+    @Slot(str)
+    def on_edit_extra_group_textEdited(self, text):
+        if text.isalnum() and text.isascii():
+            # Update the table and value if the new value is no repeat
+            xrow = self.extra_groups.currentRow()
+            xgroup = self.xgroups[xrow]
+            xg0 = xgroup[0]
+            if text == xg0: # no change
+                self.set_x_error("")
+                self.primary_groups.setEnabled(True)
+                return
+            divs = self.class_groups.divisions
+            for div in divs:
+                for g, v in div:
+                    if g == text:
+                        self.set_x_error(T["NAME_IN_USE"])
+                        self.primary_groups.setEnabled(False)
+                        return
+            # I am assuming here that the extra groups are not sorted.
+            # If they are, a redisplay would be needed!
+            if xg0 == DUMMY_GROUP:
+                # A valid name for the new group has been entered.
+                # Now valid members must be selected.
+                self.on_primary_groups_itemChanged(None)
+                self.primary_groups.setEnabled(True)
+                return
+            xgroup[0] = text
+            # The xgroup items are references to those in the main
+            # division list, so the main list needs no additional
+            # changes.
+            self.extra_groups.item(xrow, 0).setText(text)
+            self.set_x_error("")
+            self.primary_groups.setEnabled(len(self.xgroups) < self.xgmax)
+            self.set_value()
+        else:
+            self.set_x_error(T["INVALID_GROUP_NAME"])
+            self.primary_groups.setEnabled(False)
+
+    @Slot()
+    def on_new_extra_clicked(self):
+        # Add an extra group with no subgroups and illegal name to
+        # the extra groups table – not yet to the main divisions list.
+        self.new_extra.setEnabled(False)
+        nrow = len(self.xgroups)
+        self.xgroups.append([DUMMY_GROUP, []])
+        self.extra_groups.setEnabled(False)
+        self.extra_groups.insertRow(nrow)
+        item = QTableWidgetItem(DUMMY_GROUP)
+        self.extra_groups.setItem(nrow, 0, item)
+        item = QTableWidgetItem("")
+        self.extra_groups.setItem(nrow, 1, item)
+        self.edit_extra_group.setText(DUMMY_GROUP)
+        self.extra_groups.setCurrentCell(nrow, 0)
+        self.on_edit_extra_group_textEdited(DUMMY_GROUP)
+        self.edit_extra_group.setEnabled(True)
+
+    @Slot()
+    def on_remove_extra_clicked(self):
+        xrow = self.extra_groups.currentRow()
+        xg = self.xgroups[xrow][0]
+        del self.xgroups[xrow]
+        if xg != DUMMY_GROUP:
+            # The entry in the main list must be removed
+            n = 0
+            for i, g_v in enumerate(self.current_division):
+                if g_v[1] is None:
+                    continue
+                if xrow == n:
+                    del self.current_division[i]
+                    break
+                n += 1
+            self.set_value()
+        if xrow > 0:
+            xrow -= 1
+        self.set_extra_groups(xrow)
+
+    @Slot(int)
+    def on_divisions_currentRowChanged(self, row):
+        if self.disable_triggers:
+            return
+        self.division_selected()
 
     @Slot(str)
     def on_edit_division_textEdited(self, text):
         cg = self.class_groups
+        print("$$$$", cg.divisions)
         ## Check just structure of division text
         div, e = cg.check_division(text, set())
+        self.set_line_error(e)
         if e:
-            self.set_line_error(True)
-            self.clear_results()
-            self.set_analysis_report(e)
+            self.extra_frame.setEnabled(False)
+            self.pb_accept.setEnabled(False)
             return
-        self.set_line_error(False)
         ## Update division list
         row = self.divisions.currentRow()
-        divlist = [
-            self.divisions.item(r).text()
-            for r in range(self.divisions.count())
-        ]
-        divlist[row] = text
-        e = cg.init_divisions(divlist, report_errors=False)
+        divlines = cg.division_lines()
+        if row < len(divlines):
+            divlines[row] = text
+        else:
+            # new line
+            divlines.append(text)
+        e = cg.init_divisions(divlines, report_errors=False)
         if e:
-            self.clear_results()
-            self.set_analysis_report(e)
+            self.set_line_error(e)
+            self.extra_frame.setEnabled(False)
+            self.pb_accept.setEnabled(False)
             return
+        self.extra_frame.setEnabled(True)
         self.init_division_list(row)
-        
-    def set_line_error(self, e:bool):
-        if self.line_error:
-            if not e:
-                self.edit_division.setStyleSheet("")
-        elif e:
-            self.edit_division.setStyleSheet("color: rgb(255, 0, 0);")
-        self.line_error = e
-
-    def set_analysis_report(self, text):
-        self.analysis.setText(text)
+        self.set_value()
 
     @Slot()
     def on_new_division_clicked(self):
@@ -129,130 +391,13 @@ class ClassGroupsDialog(QDialog):
     @Slot()
     def on_remove_division_clicked(self):
         row = self.divisions.currentRow()
-        divlist = [
-            self.divisions.item(r).text()
-            for r in range(self.divisions.count())
-        ]
-        assert(len(divlist) > 1)
-        del(divlist[row])
-        self.class_groups.init_divisions(divlist, report_errors=True)
+        cg = self.class_groups
+        divlines = cg.division_lines()
+        del divlines[row]
+        self.class_groups.init_divisions(divlines, report_errors=True)
         n = len(self.class_groups.divisions)
         self.init_division_list(row if row < n else n-1)
-
-    def activate(self, start_value:str) -> Optional[str]:
-        """Open the dialog.
-        """
-        self.result = None
-        self.value0 = start_value
-        self.pb_reset.setVisible(bool(start_value))
-        self.edit_division.setStyleSheet("")
-        self.line_error = False
-        self.class_groups = ClassGroups(start_value)
-        self.init_division_list(0)
-        self.exec()
-        return self.result
-
-    def init_division_list(self, row):
-        """Fill the divisions list widget.
-        Subsequently the other display widgets are set up.
-        """
-        self.divisions.clear()
-        divlist = self.class_groups.division_lines()
-        if divlist:
-            self.divisions.addItems(divlist)
-            self.divisions.setEnabled(True)
-            self.new_division.setEnabled(True)
-        else:
-            self.divisions.setEnabled(False)
-            self.divisions.addItem("")
-            self.new_division.setEnabled(False)
-        self.divisions.setCurrentRow(row)
-        self.remove_division.setEnabled(len(divlist) > 1)
-        ## Set up the atomic groups display and the general groups display
-        self.set_atomic_groups()
-        self.fill_group_table()
-
-    def set_atomic_groups(self):
-        self.atomic_groups.clear()
-        elist = self.class_groups.filter_atomic_groups()
-        if elist:
-            REPORT(
-                "WARNING",
-                T["EMPTY_GROUPS_ERROR"].format(e="\n - ".join(elist))
-            )
-        self.atomic_groups_list = [
-            (self.class_groups.set2group(ag), ag)
-            for ag in self.class_groups.atomic_groups
-        ]
-        self.atomic_groups_list.sort()
-        for agstr, ag in self.atomic_groups_list:
-            item = QListWidgetItem(agstr)
-            active = ag in self.class_groups.filtered_atomic_groups
-            item.setCheckState(
-                Qt.CheckState.Checked if active
-                else Qt.CheckState.Unchecked
-            )
-            self.atomic_groups.addItem(item)
-
-    def reset(self):
-        self.result = ""
-        super().accept()
-
-    def accept(self):
-        self.result = self.value
-        super().accept()
-
-    def clear_results(self):
-        """Clear result tables and disable "accept" button.
-        """
-        self.atomic_groups.clear()
-        self.group_table.clearContents()
-        self.pb_accept.setEnabled(False)
-
-    def fill_group_table(self):
-        cg = self.class_groups
-        aglist = [
-            (
-                len(g),
-                cg.set2group(g), 
-                "; ".join(cg.set2group(a) for a in alist)
-            )
-            for g, alist in cg.group2atoms.items()
-        ]
-        aglist.sort()
-        self.group_table.setRowCount(len(aglist))
-        i = 0
-        for l, g, agl in aglist:
-            item = self.group_table.item(i, 0)
-            if not item:
-                item = QTableWidgetItem()
-                self.group_table.setItem(i, 0, item)
-            item.setText(g)
-            item = self.group_table.item(i, 1)
-            if not item:
-                item = QTableWidgetItem()
-                self.group_table.setItem(i, 1, item)
-            item.setText(agl)
-            i += 1
-        self.set_analysis_report("")
-        ## Regenerate the current text value
-        self.value = cg.text_value()
-        self.pb_accept.setEnabled(self.value != self.value0)
-
-    def on_atomic_groups_itemChanged(self, item):
-        # print("§§§§0:", self.class_groups.subgroup_empties.values())
-        row = self.atomic_groups.row(item)
-        agstr, ag = self.atomic_groups_list[row]
-        if item.checkState() == Qt.CheckState.Unchecked:
-            self.class_groups.subgroup_empties[ag] = agstr
-        else:
-            del(self.class_groups.subgroup_empties[ag])
-        ## Update group table
-        # print("§§§§1:", self.class_groups.subgroup_empties.values())
-        elist = self.class_groups.filter_atomic_groups()
-        if elist:
-            REPORT("WARNING", "\n".join(elist))
-        self.fill_group_table()
+        self.set_value()
 
 
 # --#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#
@@ -260,10 +405,9 @@ class ClassGroupsDialog(QDialog):
 if __name__ == "__main__":
 #    from core.db_access import open_database
 #    open_database()
-    print(
-        "----->",
-        ClassGroupsDialog.popup("G+R;A+B;I+II+III-A.R.I-A.R.II-A.R.III")
-    )
+    print("----->", ClassGroupsDialog.popup("A+BG+R/G=A+BG/B=BG+R"))
+    print("----->", ClassGroupsDialog.popup("A+BG+R;I+II+III"))
+    print("----->", ClassGroupsDialog.popup(""))
+    print("----->", ClassGroupsDialog.popup("A+B"))
     print("----->", ClassGroupsDialog.popup("A+B;G+R;B+A"))
     print("----->", ClassGroupsDialog.popup("A+B;G+r:I+II+III"))
-    print("----->", ClassGroupsDialog.popup(""))

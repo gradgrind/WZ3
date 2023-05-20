@@ -6,16 +6,16 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>597</width>
-    <height>321</height>
+    <width>511</width>
+    <height>288</height>
    </rect>
   </property>
   <property name="windowTitle">
    <string>Klassenteilungen</string>
   </property>
-  <layout class="QVBoxLayout" name="verticalLayout">
+  <layout class="QVBoxLayout" name="verticalLayout_4">
    <item>
-    <layout class="QHBoxLayout" name="horizontalLayout_4" stretch="1,1,0,4">
+    <layout class="QHBoxLayout" name="horizontalLayout_5">
      <item>
       <layout class="QVBoxLayout" name="verticalLayout_3">
        <item>
@@ -47,20 +47,21 @@
          </property>
          <item>
           <property name="text">
-           <string>A+B</string>
-          </property>
-         </item>
-         <item>
-          <property name="text">
-           <string>G+R</string>
+           <string>A+BG+R</string>
           </property>
          </item>
         </widget>
        </item>
        <item>
         <widget class="QLineEdit" name="edit_division">
+         <property name="toolTip">
+          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Die „Primärgruppen“ bestehen aus Buchstaben und Ziffern. Sie sind durch „+“ getrennt.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+         </property>
          <property name="styleSheet">
           <string notr="true"/>
+         </property>
+         <property name="text">
+          <string>A+BG+R</string>
          </property>
         </widget>
        </item>
@@ -118,143 +119,223 @@
       </layout>
      </item>
      <item>
-      <layout class="QVBoxLayout" name="verticalLayout_2">
-       <property name="spacing">
-        <number>7</number>
-       </property>
-       <item>
-        <widget class="QLabel" name="label_3">
-         <property name="text">
-          <string>Elementargruppen</string>
-         </property>
-        </widget>
-       </item>
-       <item>
-        <widget class="QListWidget" name="atomic_groups">
-         <property name="sizePolicy">
-          <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
-           <horstretch>0</horstretch>
-           <verstretch>0</verstretch>
-          </sizepolicy>
-         </property>
-         <property name="focusPolicy">
-          <enum>Qt::NoFocus</enum>
-         </property>
-         <property name="selectionMode">
-          <enum>QAbstractItemView::NoSelection</enum>
-         </property>
-         <item>
-          <property name="text">
-           <string>A.G</string>
-          </property>
-          <property name="checkState">
-           <enum>Checked</enum>
-          </property>
-         </item>
-         <item>
-          <property name="text">
-           <string>A.R</string>
-          </property>
-          <property name="checkState">
-           <enum>Unchecked</enum>
-          </property>
-         </item>
-         <item>
-          <property name="text">
-           <string>B.G</string>
-          </property>
-          <property name="checkState">
-           <enum>Checked</enum>
-          </property>
-         </item>
-         <item>
-          <property name="text">
-           <string>B.R</string>
-          </property>
-          <property name="checkState">
-           <enum>Checked</enum>
-          </property>
-         </item>
-        </widget>
-       </item>
-      </layout>
-     </item>
-     <item>
-      <widget class="Line" name="line_2">
+      <widget class="Line" name="line">
        <property name="orientation">
         <enum>Qt::Vertical</enum>
        </property>
       </widget>
      </item>
      <item>
-      <widget class="QTableWidget" name="group_table">
-       <property name="sizePolicy">
-        <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
-         <horstretch>0</horstretch>
-         <verstretch>0</verstretch>
-        </sizepolicy>
-       </property>
-       <property name="focusPolicy">
-        <enum>Qt::NoFocus</enum>
-       </property>
-       <property name="editTriggers">
-        <set>QAbstractItemView::NoEditTriggers</set>
-       </property>
-       <property name="selectionMode">
-        <enum>QAbstractItemView::NoSelection</enum>
-       </property>
-       <property name="selectionBehavior">
-        <enum>QAbstractItemView::SelectRows</enum>
-       </property>
-       <attribute name="horizontalHeaderDefaultSectionSize">
-        <number>60</number>
-       </attribute>
-       <attribute name="horizontalHeaderStretchLastSection">
-        <bool>true</bool>
-       </attribute>
-       <attribute name="verticalHeaderVisible">
-        <bool>false</bool>
-       </attribute>
-       <row>
-        <property name="text">
-         <string>New Row</string>
+      <widget class="QWidget" name="extra_frame" native="true">
+       <layout class="QHBoxLayout" name="horizontalLayout" stretch="2,1">
+        <property name="leftMargin">
+         <number>0</number>
         </property>
-       </row>
-       <column>
-        <property name="text">
-         <string>Gruppe</string>
+        <property name="topMargin">
+         <number>0</number>
         </property>
-       </column>
-       <column>
-        <property name="text">
-         <string>Elementargruppen</string>
+        <property name="rightMargin">
+         <number>0</number>
         </property>
-       </column>
+        <property name="bottomMargin">
+         <number>0</number>
+        </property>
+        <item>
+         <layout class="QVBoxLayout" name="verticalLayout_2">
+          <item>
+           <widget class="QTableWidget" name="extra_groups">
+            <property name="sizePolicy">
+             <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
+              <horstretch>0</horstretch>
+              <verstretch>0</verstretch>
+             </sizepolicy>
+            </property>
+            <property name="focusPolicy">
+             <enum>Qt::NoFocus</enum>
+            </property>
+            <property name="editTriggers">
+             <set>QAbstractItemView::NoEditTriggers</set>
+            </property>
+            <property name="selectionMode">
+             <enum>QAbstractItemView::SingleSelection</enum>
+            </property>
+            <property name="selectionBehavior">
+             <enum>QAbstractItemView::SelectRows</enum>
+            </property>
+            <attribute name="horizontalHeaderDefaultSectionSize">
+             <number>70</number>
+            </attribute>
+            <attribute name="horizontalHeaderStretchLastSection">
+             <bool>true</bool>
+            </attribute>
+            <attribute name="verticalHeaderVisible">
+             <bool>false</bool>
+            </attribute>
+            <row>
+             <property name="text">
+              <string>New Row</string>
+             </property>
+            </row>
+            <column>
+             <property name="text">
+              <string>Gruppe</string>
+             </property>
+            </column>
+            <column>
+             <property name="text">
+              <string>Komponenten</string>
+             </property>
+            </column>
+            <item row="0" column="0">
+             <property name="text">
+              <string>G</string>
+             </property>
+            </item>
+            <item row="0" column="1">
+             <property name="text">
+              <string>A+BG</string>
+             </property>
+            </item>
+           </widget>
+          </item>
+          <item>
+           <widget class="QLineEdit" name="edit_extra_group">
+            <property name="styleSheet">
+             <string notr="true"/>
+            </property>
+            <property name="text">
+             <string>G</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <layout class="QHBoxLayout" name="horizontalLayout_4">
+            <item>
+             <widget class="QToolButton" name="remove_extra">
+              <property name="text">
+               <string>...</string>
+              </property>
+              <property name="icon">
+               <iconset>
+                <normaloff>../icons/icon_remove.svg</normaloff>../icons/icon_remove.svg</iconset>
+              </property>
+              <property name="iconSize">
+               <size>
+                <width>24</width>
+                <height>24</height>
+               </size>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <spacer name="horizontalSpacer_3">
+              <property name="orientation">
+               <enum>Qt::Horizontal</enum>
+              </property>
+              <property name="sizeHint" stdset="0">
+               <size>
+                <width>20</width>
+                <height>20</height>
+               </size>
+              </property>
+             </spacer>
+            </item>
+            <item>
+             <widget class="QToolButton" name="new_extra">
+              <property name="text">
+               <string>...</string>
+              </property>
+              <property name="icon">
+               <iconset>
+                <normaloff>../icons/icon_new.svg</normaloff>../icons/icon_new.svg</iconset>
+              </property>
+              <property name="iconSize">
+               <size>
+                <width>24</width>
+                <height>24</height>
+               </size>
+              </property>
+             </widget>
+            </item>
+           </layout>
+          </item>
+         </layout>
+        </item>
+        <item>
+         <layout class="QVBoxLayout" name="verticalLayout">
+          <item>
+           <widget class="QLabel" name="label_3">
+            <property name="text">
+             <string>Primärgruppen</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QListWidget" name="primary_groups">
+            <property name="sizePolicy">
+             <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
+              <horstretch>0</horstretch>
+              <verstretch>0</verstretch>
+             </sizepolicy>
+            </property>
+            <property name="minimumSize">
+             <size>
+              <width>120</width>
+              <height>0</height>
+             </size>
+            </property>
+            <property name="focusPolicy">
+             <enum>Qt::NoFocus</enum>
+            </property>
+            <property name="selectionMode">
+             <enum>QAbstractItemView::NoSelection</enum>
+            </property>
+            <item>
+             <property name="text">
+              <string>A</string>
+             </property>
+             <property name="checkState">
+              <enum>Checked</enum>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>BG</string>
+             </property>
+             <property name="checkState">
+              <enum>Checked</enum>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>R</string>
+             </property>
+             <property name="checkState">
+              <enum>Unchecked</enum>
+             </property>
+            </item>
+           </widget>
+          </item>
+         </layout>
+        </item>
+       </layout>
       </widget>
      </item>
     </layout>
    </item>
    <item>
-    <layout class="QHBoxLayout" name="horizontalLayout_3">
-     <item>
-      <widget class="QLabel" name="label_5">
-       <property name="text">
-        <string>Bericht:</string>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QLineEdit" name="analysis">
-       <property name="styleSheet">
-        <string notr="true">color: rgb(217, 0, 0);
+    <widget class="QLineEdit" name="analysis">
+     <property name="toolTip">
+      <string>Fehlerbericht</string>
+     </property>
+     <property name="styleSheet">
+      <string notr="true">color: rgb(217, 0, 0);
 background-color: rgb(249, 255, 199);</string>
-       </property>
-       <property name="readOnly">
-        <bool>true</bool>
-       </property>
-      </widget>
-     </item>
-    </layout>
+     </property>
+     <property name="readOnly">
+      <bool>true</bool>
+     </property>
+    </widget>
    </item>
    <item>
     <widget class="QDialogButtonBox" name="buttonBox">

@@ -1,5 +1,5 @@
 """
-core/classes.py - last updated 2023-05-01
+core/classes.py - last updated 2023-05-18
 
 Manage class data.
 
@@ -35,35 +35,18 @@ T = TRANSLATIONS("core.classes")
 
 ### +++++
 
-from typing import NamedTuple
-from itertools import combinations, product
+from typing import NamedTuple, Optional
+from itertools import product
 
 from core.db_access import open_database, db_read_fields
 
-class Subgroup(frozenset):
-    """This <frozenset> wrapper is used for groups and subgroups within
-    a class.
-    The <__str__> method does not follow the intentions of <ClassGroups>, it
-    is primarily for testing purposes within this module itself. For
-    "correctness" use the <set2group> method of <ClassGroups>.
-    """
-    def __str__(self):
-        return '.'.join(sorted(self))
-
-class Groupset(frozenset):
-    """A <frozenset> wrapper  modifying the <__str__> method.
-    The <__str__> method does not follow the intentions of <ClassGroups>, it
-    is primarily for testing purposes within this module itself.
-    """
-    def __str__(self):
-        return f"<<{' + '.join(sorted((str(m) for m in self)))}>>"
+GROUP_ALL = "*"
 
 ### -----
 
 class Classes(dict):
     def __init__(self):
         super().__init__()
-        # ?    open_database()
         for klass, name, classroom, divisions in db_read_fields(
             "CLASSES",
             ("CLASS", "NAME", "CLASSROOM", "DIVISIONS"),
@@ -95,37 +78,18 @@ class ClassGroups:
     A primary group is designated by an alphanumeric string.
     A class may be divided in several ways, each division being a list
     of primary groups. Each group may only occur in a single division.
-    Also subgroups are possible, combining groups from various divisions.
-    To avoid confusion, subgroup names order the primary group names
-    according to their divisions. If there are two divisions, "A+Z"
-    and "P+Q", the subgroup "Z.P" will be chosen rather than "P.Z".
-    The cartesian product of all the divisions gives the smallest
-    independent subgroups. Some of these may be empty (no pupils). It
-    is possible to specify which of these minimal subgroups ("atomic"
-    groups) are empty, which can simplify (well, shorten ...) group naming.
+
+    It is also possible to specify a short form for a set of primary
+    groups within a division. For example, a division may contain groups
+    A, BG and R. For convenience, the additional groups G=A+BG and B=BG+R
+    may be defined.
     """
     def __init__(self, source:str):
         self.source = source
-        divs = source.replace(' ', '')
-        # Split off empty subgroups
-        empty_subgroups = divs.split('-')
-        divs = empty_subgroups[0]
-        self.subgroup_empties = {
-            self.group2set(s): s for s in empty_subgroups[1:]
-        }
-        if divs:
+        if (divs := source.replace(' ', '')):
             self.init_divisions(divs.split(';'))
         else:
             self.init_divisions([])
-        elist = self.filter_atomic_groups()
-        if elist:
-            prefix = "\n - "
-            REPORT(
-                "ERROR",
-                T["GROUP_ERRORS"].format(
-                    source=source, prefix=prefix, errors=prefix.join(elist)
-                )
-            )
  
     def init_divisions(
         self,
@@ -134,9 +98,10 @@ class ClassGroups:
     ) -> str:
         self.primary_groups = set()
         self.divisions = []
+        div0 = []
         if divlist:
             for div in divlist:
-                gset, e = self.check_division(div, self.primary_groups)
+                gmap, e = self.check_division(div, self.primary_groups)
                 if e:
                     if report_errors:
                         REPORT(
@@ -148,145 +113,130 @@ class ClassGroups:
                     else:
                         return e
                 else:
-                    self.divisions.append(gset)
-            self.atomic_groups = Groupset(
-                Subgroup(ag) for ag in product(*self.divisions)
-            )
+                    self.divisions.append(gmap)
+                div0.append(tuple(g for g, v in gmap if v is None))
+            self.atomic_groups = ['.'.join(ag) for ag in product(*div0)]
         else:
-            self.atomic_groups = Groupset()
+            self.atomic_groups = []
         return ""
 
     def check_division(
         self,
         div:str,
         all_groups:set[str]
-    ) -> tuple[set[str],str]:
-        divset = set()
-        for g in div.split('+'):
-            if not g.isalnum():
+    ) -> list[ list[ str, Optional[list[str]] ] ]:
+        divmap = []
+        d_shortcuts = div.split('/')
+        pgroups = []    # primary groups
+        for g in d_shortcuts[0].split('+'):
+            if not (g.isalnum() and g.isascii()):
                 return (
-                    divset,
-                    T["INVALID_GROUP_TAG"].format(
-                        div=div,
-                        g=g
-                    )
+                    divmap,
+                    T["INVALID_GROUP_TAG"].format(div=div, g=g)
                 )
             if g in all_groups:
                 return (
-                    divset,
-                    T["REPEATED_GROUP"].format(
-                        div=div,
-                        g=g
-                    )
+                    divmap,
+                    T["REPEATED_GROUP"].format(div=div, g=g)
                 )
-            divset.add(g)
+            pgroups.append(g)
+            divmap.append([g, None])
             all_groups.add(g)
-        if len(divset) > 1:
-            return (divset, "")
-        return (divset, T["TOO_FEW_GROUPS"].format(div=div))
+        # Manage group "shortcuts"
+        for sc in d_shortcuts[1:]:
+            try:
+                g, gs = sc.split('=', 1)
+            except ValueError:
+                return (
+                    divmap,
+                    T["INVALID_GROUP_SHORTCUT"].format(text=sc)
+                )
+            if g in all_groups:
+                return (
+                    divmap,
+                    T["REPEATED_GROUP"].format(div=div, g=g)
+                )
+            glist = sorted(gs.split('+'))
+            if len(glist) < 2:
+                return (
+                    divmap,
+                    T["TOO_FEW_PRIMARIES"].format(div=div, g=sc)
+                )
+            for gg in glist:
+                if gg not in pgroups:
+                    return(
+                        divmap,
+                        T["NOT_PRIMARY_GROUP"].format(div=div, g=gg)
+                    )
+            if len(glist) >= len(pgroups):
+                return (
+                    divmap,
+                    T["TOO_MANY_PRIMARIES"].format(div=div, g=sc)
+                )
+            for gx, scx in divmap:
+                if scx == glist:
+                    return (
+                        divmap,
+                        T["REPEATED EXTRA"].format(div=div, g=gx, x=sc)
+                    )
+            all_groups.add(g)
+            divmap.append([g, glist])
+        if len(divmap) < 2:
+            return (divmap, T["TOO_FEW_GROUPS"].format(div=div))
+        return (divmap, "")
 
-    def division_lines(self) -> list[str]:
+    def division_lines(self, with_extras=True) -> list[str]:
         """Return a list of the divisions as text lines.
+        If <with_extras> is true, any "extra" groups will be included.
         """
-        return [
-            "+".join(sorted(d))
-            for d in self.divisions
-        ]
-
+        divs = []
+        for div in self.divisions:
+            glist = []
+            sclist = []
+            for g, v in div:
+                if v is None:
+                    glist.append(g)
+                else:
+                    # <v> is sorted (see method <check_division>)
+                    sclist.append(f"{g}={'+'.join(v)}")
+            pgroups = "+".join(glist)
+            if with_extras and sclist:
+                divs.append('/'.join([pgroups] + sclist))
+            else:
+                divs.append(pgroups)
+        return divs
+        
     def text_value(self) -> str:
         """Return a text representation of the data:
             - divisions as '+'-separated primary groups
+            - followed by optional "shortcuts"
             - divisions seprated by ';'
-            - after the divisions a '-'-separated empty subgroup list
-              (there is a '-' before the first such subgroup, too)
-            - the empty subgroups must be valid "atomic" groups
         """
-        divs = ';'.join(self.division_lines())
-        if self.subgroup_empties:
-            empties = [self.set2group(fs) for fs in self.subgroup_empties]
-            empties.sort()
-            return f"{divs}-{'-'.join(empties)}"
-        return divs
+        return ';'.join(self.division_lines())
 
-    def group2set(self, g:str) -> Subgroup[str]:
-        return Subgroup(g.split('.'))
-
-    def set2group(self, s:set) -> str:
-        if str(s) == "*": return "*"
-        glist = []
-        for d in self.divisions:
-            isct = s & d
-            if len(isct) == 1:
-                for g in isct: break
-                glist.append(g)
-            elif len(isct) != 0:
-                raise Bug(f"Invalid class-group: '{s}'")
-        if len(glist) != len(s):
-            raise Bug(f"Invalid class-group: '{s}'")
-        return ".".join(glist)
-
-    def filter_atomic_groups(self) -> list[str]:
-        filtered_atomic_groups = {
-            Subgroup(ag) for ag in self.atomic_groups
-        }
-        elist = []
-        if self.subgroup_empties:
-            # Remove the specified empty atomic groups
-            duds = set()
-            for fs, sub in self.subgroup_empties.items():
+    def group_atoms(self):
+        """Build a mapping from the primary groups – including the
+        "shortcuts" – to their constituent "atomic groups",
+            {group: [atom, ... ]}
+        """
+        g2a = {}
+        for ag in self.atomic_groups:
+            for g in ag.split('.'):
                 try:
-                    filtered_atomic_groups.remove(fs)
+                    g2a[g].append(ag)
                 except KeyError:
-                    duds.add(fs)
-                    elist.append(T["FILTER_NOT_ATOM"].format(sub=sub))
-            for fs in duds:
-                del(self.subgroup_empties[fs])
-        # Get the (filtered) atomic groups for the primary groups
-        gdict = {}
-        for bg in self.primary_groups:
-            faglist = []
-            for fag in filtered_atomic_groups:
-                if bg in fag:
-                    faglist.append(fag)
-            if faglist:
-                gdict[Groupset(faglist)] = Subgroup([bg])
-            else:
-                elist.append(T["EMPTY_GROUP"].format(g=bg))
-        # Add the atomic groups for all possible subgroups, starting
-        # with the shortest
-        for l in range(2, len(self.divisions)):
-            c_set = set()
-            for fag in filtered_atomic_groups:
-                for c in combinations(fag, l):
-                    c_set.add(Subgroup(c))
-            for c in c_set:
-                faglist = []
-                for fag in filtered_atomic_groups:
-                    if c < fag:
-                        faglist.append(fag)
-                if faglist:
-                    fs = Groupset(faglist)
-                    if fs not in gdict:
-                        gdict[fs] = c
-        self.filtered_atomic_groups = Groupset(filtered_atomic_groups)
-        # Add atomic groups, if they are not already represented by
-        # shorter group tags
-        for fag in filtered_atomic_groups:
-            fs = Groupset([fag])
-            if fs not in gdict:
-                gdict[fs] = fag
-        gdict[self.filtered_atomic_groups] = Subgroup(["*"])
-        self.atoms2group = gdict
-        # Reverse the mapping to get the group -> atoms mapping
-        self.group2atoms = {v: k for k, v in gdict.items()}
-        return elist
+                    g2a[g] = [ag]
+        # Add "shortcuts"
+        for div in self.divisions:
+            for g, v in div:
+                if v is None:
+                    continue
+                ggs = set()
+                for gg in v:
+                    ggs.update(g2a[gg])
+                g2a[g] = sorted(ggs)
+        return g2a
 
-    def atoms2grouplist(self):
-        """Return a mapping {(atom, ... ): (group, ... )} where the keys
-        are all possible (sorted) combinations of the minimal subgroups.
-        The corresponding value is a minimal list of groups representing
-        the key.
-        """
 
 class ClassData(NamedTuple):
     klass: str
@@ -300,16 +250,26 @@ class ClassData(NamedTuple):
 if __name__ == "__main__":
 
     for cglist in (
-        "G+R;A+B;I+II+III-A.R.I-A.R.II-A.R.III-B.G.I-B.G.II",
+        "A+BG+R/G=A+BG/B=BG+R",
+        "A+BG+R/G=A+BG/B=BG+R;I+II+III",
         "",
-        "A+B;G+R;B+A-A.R",
-        "A+B;G+r:I+II+III",
-        "E+e;K+k;M+m;S+s-E.K.M.S-E.K.m.s-E.M.k.s-E.S.k.m-E.k.m.s" \
-            "-K.M.S.e-K.e.m.s-M.e.k.s-S.e.k.m-e.k.m.s",
+        "A+B;G+R",
+        "E+e;k+m+s/K=m+s/M=k+s/S=k+m",
     ):
         cg = ClassGroups(cglist)
-        print(f"\n{cglist} ->", cg.filtered_atomic_groups)
-        print("divisions:", cg.divisions)
+        print("\ndivisions:", cg.divisions)
+        print("atomic groups:", cg.atomic_groups)
+        print(" -->", cg.text_value())
+
+        for g, alist in cg.group_atoms().items():
+            print(f" *** {g} ->", alist)
+
+
+
+    quit(0)
+   
+    if True:
+
         for g, alist in cg.group2atoms.items():
             print(
 #                cg.set2group(g),

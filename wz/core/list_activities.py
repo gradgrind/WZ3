@@ -1,7 +1,7 @@
 """
 core/list_activities.py
 
-Last updated:  2023-05-08
+Last updated:  2023-05-20
 
 Present information on activities for teachers and classes/groups.
 The information is formatted in pdf documents using the reportlab
@@ -44,7 +44,7 @@ from typing import NamedTuple, Optional
 from io import BytesIO
 
 from core.base import class_group_join
-from core.classes import Subgroup
+from core.classes import GROUP_ALL#, Subgroup
 from core.basic_data import (
     Workload,
     BlockTag,
@@ -53,7 +53,7 @@ from core.basic_data import (
     get_classes,
 )
 from core.db_access import db_read_fields
-from core.course_data import WHOLE_CLASS, WHOLE_CLASS_SG
+#from core.course_data import WHOLE_CLASS, WHOLE_CLASS_SG
 import lib.pylightxl as xl
 from tables.pdf_table import TablePages
 
@@ -89,6 +89,7 @@ class TeacherData(NamedTuple):
     lessons: str
     nlessons: int
     workgroup: int  # the WORKLOAD index
+    lesson_group: int
     paynum: str     # for blocks/"Epochen" *can* be the number
     paystr: str
     pay: float
@@ -221,6 +222,7 @@ def teacher_list(tlist: list[ActivityItem]):
             t_lessons,
             nlessons,
             data.workload,
+            data.lesson_group,
             *pdata
         )
         courses.append(tdata)
@@ -236,7 +238,7 @@ def print_class_group(klass, group):
     Otherwise return the standard form for class + cgroup.
     """
     if group:
-        if group == WHOLE_CLASS:
+        if group == GROUP_ALL:
             return klass
         return class_group_join(klass, group)
     return f"({klass})"
@@ -352,18 +354,18 @@ def make_class_table_xlsx(activity_lists):
         # Each LESSON_GROUPS entry must be counted only once FOR
         # EACH GROUP, so keep track:
         lgsets = {}
-        fag2lessons = {}
+        ag2lessons = {}
         class_groups = get_classes()[c].divisions
-        g2fags = class_groups.group2atoms
-        no_subgroups = not class_groups.filtered_atomic_groups
+        g2ags = class_groups.group_atoms()
+        no_subgroups = not g2ags
         if no_subgroups:
-            # Add whole-class target
-            fag2lessons[WHOLE_CLASS_SG] = 0
-            lgsets[WHOLE_CLASS_SG] = set()
+        # Add whole-class target
+            ag2lessons[GROUP_ALL] = 0
+            lgsets[GROUP_ALL] = set()
         else:
-            for fag in class_groups.filtered_atomic_groups:
-                fag2lessons[fag] = 0
-                lgsets[fag] = set()
+            for ag in class_groups.atomic_groups:
+                ag2lessons[ag] = 0
+                lgsets[ag] = set()
         # Add "worksheet" to table builder
         db.add_ws(ws=c)
         sheet = db.ws(ws=c)
@@ -377,15 +379,20 @@ def make_class_table_xlsx(activity_lists):
                 and (lg := data.lesson_group)
                 and (lessons := data.nlessons)
             ):
-                if g == WHOLE_CLASS and no_subgroups:
-                    if lg not in lgsets[WHOLE_CLASS_SG]:
-                        lgsets[WHOLE_CLASS_SG].add(lg)
-                        fag2lessons[WHOLE_CLASS_SG] += lessons
+                if no_subgroups:
+                    assert g == GROUP_ALL, (
+                        f"group ({g}) lessons in class ({klass})"
+                        " without subgroups???"
+                    )
+                    if lg in lgsets[GROUP_ALL]: continue
+                    lgsets[GROUP_ALL].add(lg)
+                    ag2lessons[GROUP_ALL] += lessons
                 else:
-                    for fag in g2fags[Subgroup(g.split('.'))]:
-                        if lg not in lgsets[fag]:
-                            lgsets[fag].add(lg)
-                            fag2lessons[fag] += lessons
+                    ags = lgsets.keys() if g == GROUP_ALL else g2ags[g]
+                    for ag in ags:
+                        if lg in lgsets[ag]: continue
+                        lgsets[ag].add(lg)
+                        ag2lessons[ag] += lessons
             # Gather the display info for this line
             line = [
                 data.subject,
@@ -403,35 +410,38 @@ def make_class_table_xlsx(activity_lists):
             row_id += 1
         # Collate the lesson counts
         if no_subgroups:
-            ln = fag2lessons.pop(WHOLE_CLASS_SG)
-            assert not fag2lessons, "group lessons in class without subgroups???"
-            group_data = [("", ln)]
+            results = [("", ag2lessons[GROUP_ALL])]
         else:
-            # Simplify groups
+            # Simplify groups: seek primary groups which cover the various
+            # numeric results
+            # print("§ag2lessons:", ag2lessons)
             ln_lists = {}
-            for fag, l in fag2lessons.items():
+            for ag, l in ag2lessons.items():
                 try:
-                    ln_lists[l].append(fag)
+                    ln_lists[l].add(ag)
                 except KeyError:
-                    ln_lists[l] = [fag]
-            fags2g = class_groups.atoms2group
-            group_data = []
-            for l, fags in ln_lists.items():
-                g = str(fags2g[frozenset(fags)])
-                if g == WHOLE_CLASS:
-                    assert len(ln_lists) == 1, "WHOLE_CLASS *and* group lessons???"
-                    group_data = [("", l)]
-                    break
-                group_data.append((str(fags2g[frozenset(fags)]), l))
-            else:
-                group_data.sort()
+                    ln_lists[l] = {ag}
+            results = []
+            for l, agset in ln_lists.items():
+                for g, ags in g2ags.items():
+                    if set(ags) == agset:
+                        results.append((g, l))
+                        break
+                else:
+                    if set(class_groups.atomic_groups) == agset:
+                        g = ""
+                    else:
+                        g = f"<{','.join(sorted(agset))}>"
+                    results.append((g, l))
+            results.sort()
         # Total
         lastcol = len(headers)
-        for g, l in group_data:
+        for g, l in results:
             sheet.update_index(row=row_id, col=lastcol, val=l)
             sheet.update_index(
                 row=row_id,
                 col=lastcol - 1,
+#TODO: T ...
                 val=g if g else "insgesamt"
             )
             row_id += 1
@@ -482,7 +492,9 @@ def make_teacher_table_room(activity_lists):
         items = teacher_list(datalist)
 
         workgroups = {} # for detecting parallel groups
+        lesson_groups = set()
         pay_total = 0.0
+        lessons_total = 0
         for item in items:
             w = item.workgroup
             if w in workgroups:
@@ -490,8 +502,19 @@ def make_teacher_table_room(activity_lists):
             else:
                 workgroups[w] = 0
                 pay_total += item.pay
-        # pdf.add_paragraph(f"Deputat, insgesamt: {PAY_FORMAT(pay_total)}")
-        # pdf.add_vspace(5)
+            if item.lesson_group not in lesson_groups:
+                lesson_groups.add(item.lesson_group)
+                lessons_total += item.nlessons
+#        pdf.add_text(
+##TODO: T ...
+#            f"Deputat, insgesamt: {PAY_FORMAT(pay_total)}"
+#            f"   &   Stundenplanbelegung: {lessons_total}"
+#        )
+        pdf.add_text(
+#TODO: T ...
+            f"Stundenplanbelegung: {lessons_total}"
+        )
+        pdf.add_vspace(5)
 
         klass = None
         for item in items:
@@ -595,7 +618,9 @@ def make_teacher_table_pay(activity_lists):
         items = teacher_list(datalist)
 
         workgroups = {} # for detecting parallel groups
+        lesson_groups = set()
         pay_total = 0.0
+        lessons_total = 0
         for item in items:
             w = item.workgroup
             if w in workgroups:
@@ -603,7 +628,14 @@ def make_teacher_table_pay(activity_lists):
             else:
                 workgroups[w] = 0
                 pay_total += item.pay
-        pdf.add_paragraph(f"Deputat, insgesamt: {PAY_FORMAT(pay_total)}")
+            if item.lesson_group not in lesson_groups:
+                lesson_groups.add(item.lesson_group)
+                lessons_total += item.nlessons
+        pdf.add_text(
+#TODO: T ...
+            f"Deputat, insgesamt: {PAY_FORMAT(pay_total)}"
+            f"   &   Stundenplanbelegung: {lessons_total}"
+        )
         pdf.add_vspace(5)
 
         klass = None
@@ -686,21 +718,20 @@ def make_class_table_pdf(activity_lists, lg_2_c):
         # Each LESSON_GROUPS entry must be counted only once FOR
         # EACH GROUP, so keep track:
         lgsets = {}
-        fag2lessons = {}
+        ag2lessons = {}
         class_groups = class_data.divisions
-        g2fags = class_groups.group2atoms
-        no_subgroups = not class_groups.filtered_atomic_groups
+        g2ags = class_groups.group_atoms()
+        no_subgroups = not g2ags
         if no_subgroups:
             # Add whole-class target
-            fag2lessons[WHOLE_CLASS_SG] = 0
-            lgsets[WHOLE_CLASS_SG] = set()
+            ag2lessons[GROUP_ALL] = 0
+            lgsets[GROUP_ALL] = set()
         else:
-            for fag in class_groups.filtered_atomic_groups:
-                fag2lessons[fag] = 0
-                lgsets[fag] = set()
+            for ag in class_groups.atomic_groups:
+                ag2lessons[ag] = 0
+                lgsets[ag] = set()
         # Add page to table builder
         pdf.add_page(f"{klass}: {class_data.name}")
-
         lessonblocks = {}
         simplelessons = []
         for data in items:
@@ -713,7 +744,6 @@ def make_class_table_pdf(activity_lists, lg_2_c):
                     data.paystr,
                     "",
                 )
-
                 try:
                     lbtagmap = lessonblocks[data.block_subject]
                 except KeyError:
@@ -746,53 +776,57 @@ def make_class_table_pdf(activity_lists, lg_2_c):
                     "",
                     l,
                 ))
-
             # Allocate the lessons to the minimal subgroups
             if (
                 (g := data.group)
                 and (lg := data.lesson_group)
                 and (lessons := data.nlessons)
             ):
-                if g == WHOLE_CLASS and no_subgroups:
-                    if lg not in lgsets[WHOLE_CLASS_SG]:
-                        lgsets[WHOLE_CLASS_SG].add(lg)
-                        fag2lessons[WHOLE_CLASS_SG] += lessons
+                if no_subgroups:
+                    assert g == GROUP_ALL, (
+                        f"group ({g}) lessons in class ({klass})"
+                        " without subgroups???"
+                    )
+                    if lg in lgsets[GROUP_ALL]: continue
+                    lgsets[GROUP_ALL].add(lg)
+                    ag2lessons[GROUP_ALL] += lessons
                 else:
-                    for fag in g2fags[Subgroup(g.split('.'))]:
-                        if lg not in lgsets[fag]:
-                            lgsets[fag].add(lg)
-                            fag2lessons[fag] += lessons
-
+                    ags = lgsets.keys() if g == GROUP_ALL else g2ags[g]
+                    for ag in ags:
+                        if lg in lgsets[ag]: continue
+                        lgsets[ag].add(lg)
+                        ag2lessons[ag] += lessons
         # Collate the lesson counts
         if no_subgroups:
-            ln = fag2lessons.pop(WHOLE_CLASS_SG)
-            assert not fag2lessons, "group lessons in class without subgroups???"
-            group_data = [("", ln)]
+            results = [("", ag2lessons[GROUP_ALL])]
         else:
-            # Simplify groups
+            # Simplify groups: seek primary groups which cover the various
+            # numeric results
+            # print("§ag2lessons:", ag2lessons)
             ln_lists = {}
-            for fag, l in fag2lessons.items():
+            for ag, l in ag2lessons.items():
                 try:
-                    ln_lists[l].append(fag)
+                    ln_lists[l].add(ag)
                 except KeyError:
-                    ln_lists[l] = [fag]
-            fags2g = class_groups.atoms2group
-            group_data = []
-            for l, fags in ln_lists.items():
-                g = str(fags2g[frozenset(fags)])
-                if g == WHOLE_CLASS:
-                    assert len(ln_lists) == 1, "WHOLE_CLASS *and* group lessons???"
-                    group_data = [("", l)]
-                    break
-                group_data.append((str(fags2g[frozenset(fags)]), l))
-            else:
-                group_data.sort()
-
+                    ln_lists[l] = {ag}
+            results = []
+            for l, agset in ln_lists.items():
+                for g, ags in g2ags.items():
+                    if set(ags) == agset:
+                        results.append((g, l))
+                        break
+                else:
+                    if set(class_groups.atomic_groups) == agset:
+                        g = ""
+                    else:
+                        g = f"<{','.join(sorted(agset))}>"
+                    results.append((g, l))
+            results.sort()
         # Total
-        if len(group_data) == 1:
-            gl = [group_data[0][1]]
+        if len(results) == 1:
+            gl = [results[0][1]]
         else:
-            gl = [f"{g}: {l}" for g, l in group_data]
+            gl = [f"{g}: {l}" for g, l in results]
         pdf.add_list_table(
             (T["total_lessons"], *gl),
             skip0=True,

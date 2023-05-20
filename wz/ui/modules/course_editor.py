@@ -1,7 +1,7 @@
 """
 ui/modules/course_editor.py
 
-Last updated:  2023-05-08
+Last updated:  2023-05-19
 
 Edit course and blocks+lessons data.
 
@@ -709,7 +709,7 @@ class CourseEditorPage(Page):
             totals = class_workload(self.filter_value, activities)
             if len(totals) == 1:
                 g, n = totals[0]
-                assert not g, "unexpected single group"
+                assert not g, f"unexpected single group: {g}"
                 text = str(n)
             else:
                 text = " ;  ".join((f"{g}: {n}") for g, n in totals)

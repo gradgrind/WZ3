@@ -1,7 +1,7 @@
 """
 ui/ui_base.py
 
-Last updated:  2023-04-15
+Last updated:  2023-05-19
 
 Support stuff for the GUI: application initialization, dialogs, etc.
 
@@ -124,15 +124,15 @@ def date2qt(strftime):
 class HLine(QFrame):
     def __init__(self):
         super().__init__()
-        self.setFrameShape(QFrame.HLine)
-        self.setFrameShadow(QFrame.Sunken)
+        self.setFrameShape(QFrame.Shape.HLine)
+        self.setFrameShadow(QFrame.Shadow.Sunken)
 
 
 class VLine(QFrame):
     def __init__(self):
         super().__init__()
-        self.setFrameShape(QFrame.VLine)
-        self.setFrameShadow(QFrame.Sunken)
+        self.setFrameShape(QFrame.Shape.VLine)
+        self.setFrameShadow(QFrame.Shadow.Sunken)
 
 
 def get_icon(name):

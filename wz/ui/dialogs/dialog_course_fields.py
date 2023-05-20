@@ -1,7 +1,7 @@
 """
 ui/dialogs/dialog_course_fields.py
 
-Last updated:  2023-04-14
+Last updated:  2023-05-19
 
 Supporting "dialog", for the course editor – edit course fields.
 
@@ -34,6 +34,7 @@ from core.db_access import (
     db_check_unique_entry,
 )
 from core.basic_data import get_classes
+from core.classes import GROUP_ALL
 from ui.ui_base import (
     ### QtWidgets:
     QDialog,
@@ -150,16 +151,19 @@ class CourseEditorForm(QDialog):
         if klass != "--":
             # N.B. The null class should have no groups.
             class_groups = get_classes()[klass].divisions
-            # <groups> is a mapping to the atomic groups
-            # (keys and values are <Subgroup> instances, not strings)
-            groups = class_groups.group2atoms
+            # <groups> is a mapping of the primary groups to the atomic groups
+            groups = class_groups.group_atoms()
+            self.cb_group.addItem(GROUP_ALL)
             if groups:
-                glist = sorted(str(g) for g in groups)
-                self.cb_group.addItems(glist)
-            if group in glist:
-                self.cb_group.setCurrentText(group)
-            elif group:
-                raise Bug(f"Unknown group in class '{klass}': '{group}'")
+                self.cb_group.addItems(groups)
+            if group and group != GROUP_ALL:
+                if group not in groups:
+                    REPORT(
+                        "ERROR",
+                        T["UNKNOWN_GROUP"].format(klass=klass, g=group)
+                    )
+                    group = ""
+            self.cb_group.setCurrentText(group)
 
     def accept(self):
         changes = self.get_changes()

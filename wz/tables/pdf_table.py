@@ -1,7 +1,7 @@
 """
 tables/pdf_table.py
 
-Last updated:  2023-04-23
+Last updated:  2023-05-20
 
 Generate tabular reports as PDF files with multiple pages.
 
@@ -41,6 +41,7 @@ from io import BytesIO
 from reportlab.platypus import (
     SimpleDocTemplate,
     Paragraph,
+    Preformatted,
     Spacer,
     PageBreak,
     Table,
@@ -245,6 +246,11 @@ class TablePages:
             self.pages[-1]["PRE" if pre else "POST"].append(
                 Paragraph(text, s)
             )
+
+    def add_text(self, text, pre=True):
+        self.pages[-1]["PRE" if pre else "POST"].append(
+            Preformatted(text, self.body_style)
+        )
 
     def add_list_table(self, data, pre=True, **kargs):
         self.pages[-1]["PRE" if pre else "POST"].append(

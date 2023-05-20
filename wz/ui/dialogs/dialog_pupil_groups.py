@@ -1,10 +1,10 @@
 """
 ui/dialogs/dialog_pupil_groups.py
 
-Last updated:  2023-05-02
+Last updated:  2023-05-18
 
-Supporting "dialog" for the class-data editor – specify the ways a class
-can be divided into groups.
+Supporting "dialog" for the class-data editor – specify the groups of
+which a pupil is a member.
 
 
 =+LICENCE=============================
@@ -40,7 +40,6 @@ T = TRANSLATIONS("ui.dialogs.dialog_pupil_groups")
 ### +++++
 
 from typing import Optional
-from itertools import product
 
 from ui.ui_base import (
     ### QtWidgets:
@@ -61,40 +60,39 @@ from core.db_access import db_read_unique_field
 
 class PupilGroupsDialog(QDialog):
     @classmethod
-    def popup(cls, klass, start_value, parent=None):
-        d = cls(klass, parent)
+    def popup(cls, klass, start_value, parent=None, pos=None):
+        d = cls(parent)
+        d.init(klass)
+        if pos:
+            d.move(pos)
         return d.activate(start_value)
 
-    def __init__(self, klass, parent=None):
+    def __init__(self, parent=None):
         super().__init__(parent=parent)
         uic.loadUi(APPDATAPATH("ui/dialog_pupil_groups.ui"), self)
         self.pb_accept = self.buttonBox.button(
             QDialogButtonBox.StandardButton.Ok
         )
+
+    def init(self, klass):
         divisions = db_read_unique_field("CLASSES", "DIVISIONS", CLASS=klass)
         self.class_groups = ClassGroups(divisions)
-        elist = self.class_groups.filter_atomic_groups()
-        if elist:
-            REPORT(
-                "WARNING",
-                T["EMPTY_GROUPS_ERROR"].format(e="\n - ".join(elist))
-            )
 
     def activate(self, start_value:str) -> Optional[str]:
         """Open the dialog.
         """
         self.result = None
         self.value0 = start_value
-        self.pgroups = set(start_value.split())
-        self.set_groups()
+        self.set_groups(start_value)
         self.exec()
         return self.result
 
     def print_groups(self):
         return " ".join(g for g in self.divchoice if g)
 
-    def set_groups(self):
-        self.block_handler = True
+    def set_groups(self, istring):
+        pgroups = set(istring.split())
+        self.disable_triggers = True
         self.grouplist.clear()
         self.divmap = {}    # group -> division index
         self.groupmap = {}  # group -> list item
@@ -103,12 +101,18 @@ class PupilGroupsDialog(QDialog):
             if d != 0:
                 # Add division spacer
                 self.grouplist.addItem(QListWidgetItem())
-            for g in sorted(div):
+            for g, v in div:
+                if v is not None:
+                    continue    # Only include primitive groups
                 self.divmap[g] = d
                 item = QListWidgetItem(g)
                 self.groupmap[g] = item
                 checkstate = Qt.CheckState.Unchecked
-                if g in self.pgroups:
+                try:
+                    pgroups.remove(g)
+                except KeyError:
+                    pass
+                else:
                     if self.divchoice[d]:
                         REPORT(
                             "ERROR",
@@ -119,58 +123,31 @@ class PupilGroupsDialog(QDialog):
                     else:
                         # Check combination
                         self.divchoice[d] = g
-                        if self.check_groups():
-                            checkstate = Qt.CheckState.Checked
-                        else:
-                            REPORT(
-                                "ERROR",
-                                T["INVALID_GROUP_COMBINATION"].format(
-                                    g = self.print_groups()
-                                )
-                            )
-                            self.divchoice[d] = ""
+                        checkstate = Qt.CheckState.Checked
                 item.setCheckState(checkstate)
                 self.grouplist.addItem(item)
         self.set_accept_enable()
-        self.block_handler = False
-
-    def check_groups(self):
-        atomics = self.class_groups.filtered_atomic_groups
-        trial = []
-        for i, div in enumerate(self.class_groups.divisions):
-            if ( g := self.divchoice[i]):
-                trial.append([g])
-            else:
-                trial.append(div)
-        for cp in product(*trial):
-            if frozenset(cp) in atomics:
-                return True
-        return False
+        self.disable_triggers = False
+        if pgroups:
+            REPORT(
+                "ERROR",
+                T["INVALID_GROUPS"].format(g=", ".join(sorted(pgroups)))
+            )
 
     @Slot(QListWidgetItem)
     def on_grouplist_itemChanged(self, lwi):
-        if self.block_handler:
+        if self.disable_triggers:
             return
         g = lwi.text()
         d = self.divmap[g]
         if lwi.checkState() == Qt.CheckState.Checked:
-            self.block_handler = True
+            self.disable_triggers = True
             g0 = self.divchoice[d]
             self.divchoice[d] = g
-            if self.check_groups():
-                if g0:
-                    # Group in division already set, deselect it
-                    self.groupmap[g0].setCheckState(Qt.CheckState.Unchecked)
-            else:
-                REPORT(
-                    "WARNING",
-                    T["INVALID_GROUP_COMBINATION"].format(
-                        g = self.print_groups()
-                    )
-                )
-                lwi.setCheckState(Qt.CheckState.Unchecked)
-                self.divchoice[d] = g0
-            self.block_handler = False
+            if g0:
+                # Group in division already set, deselect it
+                self.groupmap[g0].setCheckState(Qt.CheckState.Unchecked)
+            self.disable_triggers = False
         else:
             self.divchoice[d] = ""
         self.set_accept_enable()
@@ -191,7 +168,11 @@ if __name__ == "__main__":
     open_database()
     print(
         "----->",
-        PupilGroupsDialog.popup("11G", "B")
+        PupilGroupsDialog.popup("03K", "X")
+    )
+    print(
+        "----->",
+        PupilGroupsDialog.popup("13", "m")
     )
     print(
         "----->",

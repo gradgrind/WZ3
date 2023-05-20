@@ -1,7 +1,7 @@
 """
 core/course_data.py
 
-Last updated:  2023-05-08
+Last updated:  2023-05-19
 
 Support functions dealing with courses, lessons, etc.
 
@@ -49,10 +49,7 @@ from core.db_access import (
     NoRecord,
 )
 from core.basic_data import BlockTag, Workload, get_classes
-from core.classes import Subgroup
-
-WHOLE_CLASS = "*"
-WHOLE_CLASS_SG = Subgroup([WHOLE_CLASS])
+from core.classes import GROUP_ALL
 
 ### -----
 
@@ -177,25 +174,25 @@ def teacher_workload(activity_list: list[dict]) -> tuple[int, float]:
 
 
 def class_workload(klass:str, activity_list: list[tuple[str, dict]]
-) -> list[tuple[Subgroup, int]]:
+) -> list[tuple[str, int]]:
     """Calculate the total number of lessons for the pupils.
     The results should cover all (sub-)groups.
     """
     # Each LESSON_GROUPS entry must be counted only once FOR EACH GROUP,
     # so keep track:
     lgsets = {}
-    fag2lessons = {}
+    ag2lessons = {}
     class_groups = get_classes()[klass].divisions
-    g2fags = class_groups.group2atoms
-    no_subgroups = not class_groups.filtered_atomic_groups
+    g2ags = class_groups.group_atoms()
+    no_subgroups = not g2ags
     if no_subgroups:
         # Add whole-class target
-        fag2lessons[WHOLE_CLASS_SG] = 0
-        lgsets[WHOLE_CLASS_SG] = set()
+        ag2lessons[GROUP_ALL] = 0
+        lgsets[GROUP_ALL] = set()
     else:
-        for fag in class_groups.filtered_atomic_groups:
-            fag2lessons[fag] = 0
-            lgsets[fag] = set()
+        for ag in class_groups.atomic_groups:
+            ag2lessons[ag] = 0
+            lgsets[ag] = set()
     # Collect lessons per group
     for g, data in activity_list:
         assert g, "This function shouldn't receive activities with no group"
@@ -206,39 +203,45 @@ def class_workload(klass:str, activity_list: list[tuple[str, dict]]
         for l in (data.get("lessons") or []):
             lessons += l["LENGTH"]
         if lessons:
-            if g == WHOLE_CLASS and no_subgroups:
-                if lg in lgsets[WHOLE_CLASS_SG]: continue
-                lgsets[WHOLE_CLASS_SG].add(lg)
-                fag2lessons[WHOLE_CLASS_SG] += lessons
+            if no_subgroups:
+                assert g == GROUP_ALL, "group in class without subgroups???"
+                if lg in lgsets[GROUP_ALL]: continue
+                lgsets[GROUP_ALL].add(lg)
+                ag2lessons[GROUP_ALL] += lessons
             else:
-                for fag in g2fags[Subgroup(g.split('.'))]:
-                    if lg in lgsets[fag]: continue
-                    lgsets[fag].add(lg)
-                    fag2lessons[fag] += lessons
+                ags = lgsets.keys() if g == GROUP_ALL else g2ags[g]
+                for ag in ags:
+                    if lg in lgsets[ag]: continue
+                    lgsets[ag].add(lg)
+                    ag2lessons[ag] += lessons
     if no_subgroups:
-        ln = fag2lessons.pop(WHOLE_CLASS_SG)
-        assert not fag2lessons, "group lessons in class without subgroups???"
-        return [("", ln)]
-    # Simplify groups
+        return [("", ag2lessons[GROUP_ALL])]
+    # Simplify groups: seek primary groups which cover the various
+    # numeric results
+    # print("§ag2lessons:", ag2lessons)
     ln_lists = {}
-    for fag, l in fag2lessons.items():
+    for ag, l in ag2lessons.items():
         try:
-            ln_lists[l].append(fag)
+            ln_lists[l].add(ag)
         except KeyError:
-            ln_lists[l] = [fag]
-    fags2g = class_groups.atoms2group
-    result = []
-    for l, fags in ln_lists.items():
-        g = str(fags2g[frozenset(fags)])
-        if g == WHOLE_CLASS:
-            assert len(ln_lists) == 1, "WHOLE_CLASS *and* group lessons???"
-            return [("", l)]
-        result.append((str(fags2g[frozenset(fags)]), l))
-    result.sort()
-    return result
+            ln_lists[l] = {ag}
+    results = []
+    for l, agset in ln_lists.items():
+        for g, ags in g2ags.items():
+            if set(ags) == agset:
+                results.append((g, l))
+                break
+        else:
+            if set(class_groups.atomic_groups) == agset:
+                g = ""
+            else:
+                g = f"<{','.join(sorted(agset))}>"
+            results.append((g, l))
+    results.sort()
+    return results
 
 
-######### for new-course-element dialog #########
+######### for dialog_block_name #########
 
 def courses_in_block(bsid, btag):
     """Find all courses which are members of the given block.

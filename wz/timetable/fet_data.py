@@ -1,5 +1,5 @@
 """
-timetable/fet_data.py - last updated 2023-05-19
+timetable/fet_data.py - last updated 2023-05-20
 
 Prepare fet-timetables input from the database ...
 
@@ -178,12 +178,11 @@ def get_classes_fet() -> list[tuple]:
         # The following is an attempt to reduce the "categories" to 0
         # or 1, all the minimal subgroups being the fet "divisions".
         divs = cg.divisions
-#TODO: Do I need tuples?
         g2ags = cg.group_atoms()
         atoms = cg.atomic_groups
-#        g2ags[""] = atoms
         # The groups are all the "primary" groups, unless they are atomic
         # groups already defined as subgroups.
+        # The "whole-class" entry is not included: g2ags[""] = atoms
         year_entry = {
             "Name": klass,
             "Number_of_Students": "0",
@@ -395,13 +394,9 @@ class TimetableCourses:
         # groups and their activity ids for each subject, divided by class:
         self.class2sid2ag2aids: dict[str, dict[str, dict[str, list[int]]]] = {}
 
-#        atoms2grouplist = {}
         self.timetable_classes = []
-#        for klass, year_entry, g2atoms, a2glist in fet_classes:
         for klass, year_entry in self.fet_classes:
             self.timetable_classes.append(year_entry)
-#            self.group2atoms[klass] = g2atoms
-#            atoms2grouplist[klass] = a2glist
 #TODO: This was <atoms2grouplist> (the value was a list, now it is a
 # single group). Has this a negative impact anywhere?
         atoms2group = self.fet_classes.a2g
@@ -623,11 +618,6 @@ class TimetableCourses:
             # Either simple room, or "virtual" room for multiple rooms
             r_c = "ConstraintActivityPreferredRoom"
             room = rooms[0]
-
-#TODO --
-#            if room != "rSp":
-#                return
-
             s_c = {
                 "Weight_Percentage": "100",
                 "Activity_Id": id_str,
@@ -703,6 +693,7 @@ class TimetableCourses:
             # "ConstraintStudentsSetMaxGapsPerWeek",
             # "ConstraintTwoActivitiesOrderedIfSameDay",
             # "ConstraintMinGapsBetweenActivities",
+            # "ConstraintActivityEndsStudentsDay",
         }
         for c in list(tc_dict):
             if c in tc_block:
@@ -1510,7 +1501,7 @@ class TimetableCourses:
                 ptags[tag] = [lid_w]
         for tag in sorted(ptags):
             awlist = ptags[tag]
-            print("§PARALLEL:", tag, awlist)
+            # print("§PARALLEL:", tag, awlist)
             if (l := len(awlist)) > 1:
                 aidlist = []
                 # fet doesn't support different weights on the individual
@@ -1622,168 +1613,6 @@ class TimetableCourses:
                         field_values.append(("ROOMS", room))
                 # print("§§§", lesson_id, field_values)
                 db_update_fields("LESSONS", field_values, id=int(lesson_id))
-
-
-# TODO --
-### Messages ... referred to in class Placements_fet
-# _NO_LESSON_WITH_TAG = (
-#    "Tabelle der festen Stunden: Kennung {tag} hat keine"
-#    " entsprechenden Unterrichtsstunden"
-# )
-# _TAG_TOO_MANY_TIMES = (
-#    "Tabelle der festen Stunden: Kennung {tag} gibt"
-#    " mehr Zeiten an, als es dafür Unterrichtsstunden gibt"
-# )
-
-# TODO: Do I still need some of this? It might be useful if there are
-# lessons-start-at-same-time constraints ... At present, the front end
-# provides no interface for such constraints.
-class Placements_fet:  # (TT_Placements):
-    def placements(self):
-        days = self.classes.daytags
-        ndays = str(len(days))
-        periods = self.classes.periodtags
-        nperiods = str(len(periods))
-        lid2aids: dict[int, list[str]] = self.classes.lid2aids
-        constraints_parallel = []
-        constraints_fixed = []
-        constraints_multi = []
-        constraints_l = []
-        # print("\n*** Parallel tags ***")
-        for tag, lids in self.classes.parallel_tags.items():
-            # for i in lids:
-            #    print(f"  {tag}: {i} --> {lid2aids[i]}")
-            #    print(f"    ... {self.get_info(tag)}")
-            weighting, places_list = self.get_info(tag)
-            # What exactly the weighting applies to is not clear.
-            # It could be the placement, or the parallel activities ...
-            # I assume the placement(s), if there are any, otherwise
-            # the parallel activities.
-            w = WEIGHTS[weighting]
-            # Collect tagged activities where there is no places list,
-            # also where there are not enough places:
-            excess = []
-            for lid in lids:
-                try:
-                    aids = lid2aids[lid]
-                except KeyError:
-                    REPORT("WARN", _NO_LESSON_WITH_TAG.format(tag=tag))
-                    continue
-                i = 0
-                for d, p in places_list:
-                    try:
-                        aid = aids[i]
-                    except IndexError:
-                        REPORT("ERROR", _TAG_TOO_MANY_TIMES.format(tag=tag))
-                        continue
-                    i += 1
-                    if p == LAST_LESSON:
-                        constraints_l.append(
-                            {
-                                "Weight_Percentage": "100",  # necessary!
-                                "Activity_Id": aid,
-                                "Active": "true",
-                                "Comments": None,
-                            }
-                        )
-                        if d < 0:
-                            # Any day, no further constraint is needed
-                            continue
-                        else:
-                            # A constraint to fix the day is needed
-                            p = -2
-                    if p < 0:
-                        # Fix the day (any period)
-                        xd = days[d]
-                        constraints_multi.append(
-                            {
-                                "Weight_Percentage": w,
-                                "Activity_Id": aid,
-                                "Number_of_Preferred_Starting_Times": nperiods,
-                                "Preferred_Starting_Time": [
-                                    {
-                                        "Preferred_Starting_Day": xd,
-                                        "Preferred_Starting_Hour": xp,
-                                    }
-                                    for xp in periods
-                                ],
-                                "Active": "true",
-                                "Comments": None,
-                            }
-                        )
-                    elif d < 0:
-                        # Fix the period (any day)
-                        xp = periods[p]
-                        constraints_multi.append(
-                            {
-                                "Weight_Percentage": w,
-                                "Activity_Id": aid,
-                                "Number_of_Preferred_Starting_Times": ndays,
-                                "Preferred_Starting_Time": [
-                                    {
-                                        "Preferred_Starting_Day": xd,
-                                        "Preferred_Starting_Hour": xp,
-                                    }
-                                    for xd in days
-                                ],
-                                "Active": "true",
-                                "Comments": None,
-                            }
-                        )
-                    else:
-                        # Fix day and period
-                        constraints_fixed.append(
-                            {
-                                "Weight_Percentage": w,
-                                "Activity_Id": aid,
-                                "Preferred_Day": days[d],
-                                "Preferred_Hour": periods[p],
-                                "Permanently_Locked": "true",
-                                "Active": "true",
-                                "Comments": None,
-                            }
-                        )
-                excess.append(aids[i:])
-            # Only those lists containing more than one list are
-            # interesting for parallel activities.
-            # Others may be used for special placement rules ...
-            if len(excess) > 1:
-                # Check that all lists are of equal length
-                l = len(excess[0])
-                for e in excess[1:]:
-                    if len(e) != l:
-                        raise Bug("Mismatch in parallel tag lists, tag = {tag}")
-                excess_n = str(len(excess))
-                for i in range(l):
-                    parallel = [e[i] for e in excess]
-                    constraints_parallel.append(
-                        {
-                            "Weight_Percentage": w,
-                            "Number_of_Activities": excess_n,
-                            "Activity_Id": parallel,
-                            "Active": "true",
-                            "Comments": None,
-                        }
-                    )
-        time_constraints = self.classes.time_constraints
-        add_constraints(
-            time_constraints,
-            "ConstraintActivityPreferredStartingTime",
-            constraints_fixed,
-        )
-        add_constraints(
-            time_constraints,
-            "ConstraintActivitiesSameStartingTime",
-            constraints_parallel,
-        )
-        add_constraints(
-            time_constraints,
-            "ConstraintActivityPreferredStartingTimes",
-            constraints_multi,
-        )
-        add_constraints(
-            time_constraints, "ConstraintActivityEndsStudentsDay", constraints_l
-        )
 
 
 def add_constraint(constraints, ctype, constraint):

@@ -187,12 +187,12 @@ def get_groups_aSc():
     classes = get_classes()
     k2g2g_asc = {}
     for klass, _ in classes.get_class_list():
-        g = WHOLE_CLASS
+        ascg = asc_group(klass, WHOLE_CLASS)
         group_list.append(
             {
-                "@id": asc_group(klass, g),
+                "@id": ascg,
                 "@classid": klass,
-                "@name": g,
+                "@name": WHOLE_CLASS,
                 "@entireclass": "1",
                 "@divisiontag": "0",
             }
@@ -200,8 +200,7 @@ def get_groups_aSc():
         cdata = classes[klass]
         cg = cdata.divisions
         divs = cg.divisions
-#?
-        g2g_asc = {'*': [idsub(klass)]}
+        g2g_asc = {'*': [ascg]}
         for dix, div in enumerate(divs, start=1):
             for g, sgl in div:
                 if sgl is None:
@@ -544,8 +543,6 @@ if __name__ == "__main__":
         print("\n*** CLASS-GROUPS ***")
         for gdata in groups:
             print("   ", gdata)
-
-    # quit(0)
 
     courses = TimetableCourses()
     courses.read_lessons(asc_class_groups)

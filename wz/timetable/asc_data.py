@@ -1,5 +1,5 @@
 """
-timetable/asc_data.py - last updated 2023-05-20
+timetable/asc_data.py - last updated 2023-05-22
 
 Prepare aSc-timetables input from the database ...
 
@@ -64,7 +64,6 @@ from core.basic_data import (
     get_teachers,
     get_subjects,
     get_rooms,
-    sublessons,
     timeslot2index,
 )
 from timetable.fet_data import collect_activity_groups

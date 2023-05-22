@@ -1,7 +1,7 @@
 """
 core/db_access.py
 
-Last updated:  2023-05-10
+Last updated:  2023-05-22
 
 Helper functions for accessing the database.
 
@@ -94,12 +94,10 @@ def open_database():
     # Open the connection
     con = QSqlDatabase.addDatabase("QSQLITE")
     con.setDatabaseName(dbpath)
-    if not con.open():
-        raise Bug(f"Cannot open database at {dbpath}")
+    assert con.open(), f"Cannot open database at {dbpath}"
     # print("TABLES:", con.tables())
     foreign_keys_on = "PRAGMA foreign_keys = ON"
-    if not QSqlQuery(foreign_keys_on).isActive():
-        raise Bug(f"Failed: {foreign_keys_on}")
+    assert QSqlQuery(foreign_keys_on).isActive(), f"Failed: {foreign_keys_on}"
     return con
 
 
@@ -118,11 +116,11 @@ class DatabaseShortAccess:
         # Enter the context manager
         self.con = QSqlDatabase.addDatabase("QSQLITE", self.tag)
         self.con.setDatabaseName(self.dbpath)
-        if not self.con.open():
-            raise Bug(f"Cannot open database at {self.dbpath}")
+        assert self.con.open(), f"Cannot open database at {self.dbpath}"
         foreign_keys_on = "PRAGMA foreign_keys = ON"
-        if not QSqlQuery(foreign_keys_on, self.con).isActive():
-            raise Bug(f"Failed: {foreign_keys_on}")
+        assert QSqlQuery(foreign_keys_on, self.con).isActive(), (
+            f"Failed: {foreign_keys_on}"
+        )
 
     def __exit__(self, *args):
         # Exit the context manager
@@ -145,7 +143,7 @@ class DatabaseShortAccess:
                     REPORT(
                         "ERROR", f"SQL query failed: {error.text()}\n  {cmd}"
                     )
-                    raise Bug("Failed: create table")
+                    assert False, "Failed: create table"
 
 
 def db_backup(name=""):
@@ -200,8 +198,9 @@ class KeyValueList(list):
     def __init__(self, iterable, check=None):
         """Build a list which also has key -> index and key -> value methods.
         iterable:   Lists (key, value) pairs
-        check:      If supplied, it takes a (key, value) pair and checks
-                    its validity. If invalid it returns <None>. If valid,
+        check:      A function taking one argument, a (key, value) pair.
+                    The function checks the validity of the pair.
+                    If invalid it returns <None>. If valid,
                     it returns the value, which may be transformed.
         """
         super().__init__()
@@ -211,8 +210,9 @@ class KeyValueList(list):
             self.append(item)
 
     def append(self, item):
-        if not len(item) == 2:
-            raise Bug(f"KeyValueList – new item is not a pair: {repr(item)}")
+        assert len(item) == 2, (
+            f"KeyValueList – new item is not a pair: {repr(item)}"
+        )
         if self.__check is not None:
             i2 = self.__check(item)
             if i2 is None:
@@ -259,7 +259,9 @@ def db_read_table(
             )
             where_cond.append(f'"{k}" IN ( {instring} )')
         else:
-            raise Bug(f"Unexpected comparison value: '{repr(v)}' for '{k}'")
+            assert False, (
+                f"Unexpected comparison value: '{repr(v)}' for '{k}'"
+            )
     if where_cond:
         where_clause = f" WHERE {' AND '.join(where_cond)}"
     else:
@@ -280,8 +282,9 @@ def db_read_table(
     while query.next():
         value_list.append([query.value(i) for i in range(nfields)])
     if fields:
-        if value_list and len(fields) != nfields:
-            raise Bug(f"Wrong number of fields in record: {nfields} ≠ {len(fields)}")
+        assert (not value_list) or len(fields) == nfields, (
+            f"Wrong number of fields in record: {nfields} ≠ {len(fields)}"
+        )
         return fields, value_list
     else:
         return [rec.fieldName(i) for i in range(nfields)], value_list
@@ -306,8 +309,7 @@ def db_read_fields(table, fields, *wheres, **keys):
     """Read a list of fields from all records from the given table,
     the normal selection parameters (see <db_read_table>) are available.
     """
-    if not fields:
-        raise Bug(f"no fields passed to db_read_fields on table {table}")
+    assert fields, f"No fields passed to db_read_fields on table {table}"
     return db_read_table(table, fields, *wheres, **keys)[1]
 
 
@@ -315,30 +317,27 @@ def db_read_unique(table, fields, **keys):
     flist, rlist = db_read_table(table, fields, **keys)
     if len(rlist) == 1:
         return rlist[0]
-    if not rlist:
-        raise NoRecord
-    raise Bug(
+    assert not rlist, (
         f"Table {table}, query for {repr(keys)}:\n"
         f"  {len(rlist)} records (1 expected)"
     )
+    raise NoRecord
 
 
 def db_read_unique_field(table, field, *wheres, **keys):
     flist, rlist = db_read_table(table, [field], *wheres, **keys)
     if len(rlist) == 1:
         return rlist[0][0]
-    if not rlist:
-        raise NoRecord
-    raise Bug("Record not unique")
+    assert not rlist, "Record not unique"
+    raise NoRecord
 
 
 def db_read_unique_entry(table, *wheres, **keys):
     flist, rlist = db_read_table(table, None, *wheres, **keys)
     if len(rlist) == 1:
         return flist, rlist[0]
-    if not rlist:
-        raise NoRecord
-    raise Bug("Record not unique")
+    assert not rlist, "Record not unique"
+    raise NoRecord
 
 
 def db_check_unique_entry(table, *wheres, **keys):
@@ -383,7 +382,7 @@ def db_update_fields(table, field_values, *wheres, **keys):
             )
             where_cond.append(f'"{k}" IN ( {instring} )')
         else:
-            raise Bug("Unexpected comparison value: '{repr({v})'")
+            assert False, f"Unexpected comparison value: '{repr(v)}'"
     if where_cond:
         where_clause = f" WHERE {' AND '.join(where_cond)}"
     else:
@@ -399,7 +398,7 @@ def db_update_fields(table, field_values, *wheres, **keys):
         elif isinstance(v, int):
             fields.append(f'"{f}" = {v}')
         else:
-            raise Bug(f"Unexpected field value: '{repr(v)}' for '{f}'")
+            assert False, f"Unexpected field value: '{repr(v)}' for '{f}'"
 
     f = ", ".join(fields)
     qtext = f"UPDATE {table} SET {f}{where_clause}"
@@ -409,11 +408,10 @@ def db_update_fields(table, field_values, *wheres, **keys):
         n = query.numRowsAffected()
         if n == 1:
             return True
-        if n > 1:
-            raise Bug(f"DB error : {n} rows updated ...\n  {qtext}")
+        assert n < 1, f"DB error : {n} rows updated ...\n  {qtext}"
         # No row to update
         return False
-    raise Bug(f"DB error: {query.lastError()} ...\n  {qtext}")
+    assert False, f"DB error: {query.lastError()} ...\n  {qtext}"
 
 
 def db_update_field(table, field, value, *wheres, **keys):
@@ -429,8 +427,11 @@ def sql_insert_from_dict(table, field_dict):
         elif isinstance(v, int):
             vlist.append(f"{v}")
         else:
-            raise Bug(f"Unexpected field value: '{repr(v)}' for '{f}'")
-    return f"INSERT INTO {table} ({', '.join(flist)}) VALUES ({', '.join(vlist)})"
+            assert False, f"Unexpected field value: '{repr(v)}' for '{f}'"
+    return (
+        f"INSERT INTO {table} ({', '.join(flist)})"
+        f" VALUES ({', '.join(vlist)})"
+    )
 
 
 def db_new_row(table, **values):
@@ -459,7 +460,7 @@ def db_delete_rows(table, *wheres, **keys):
             )
             where_cond.append(f'"{k}" IN ( {instring} )')
         else:
-            raise Bug("Unexpected comparison value: '{repr({v})'")
+            assert False, "Unexpected comparison value: '{repr({v})'"
     if where_cond:
         where_clause = f" WHERE {' AND '.join(where_cond)}"
     else:
@@ -578,7 +579,7 @@ def migrate_db(path:str, sql_extra: list[str]):
             if not query.exec(cmd):
                 error = query.lastError()
                 REPORT("ERROR", f"SQL query failed: {error.text()}\n  {cmd}")
-                raise Bug("Failed: extend table")
+                assert False, "Failed: extend table"
 
 
 # -+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-

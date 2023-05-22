@@ -1,5 +1,5 @@
 """
-timetable/fet_data.py - last updated 2023-05-20
+timetable/fet_data.py - last updated 2023-05-22
 
 Prepare fet-timetables input from the database ...
 
@@ -70,7 +70,6 @@ from core.basic_data import (
     get_teachers,
     get_subjects,
     get_rooms,
-    sublessons,
     timeslot2index,
     BlockTag,
 )

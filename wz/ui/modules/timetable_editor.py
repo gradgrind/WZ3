@@ -54,6 +54,7 @@ from core.basic_data import (
     timeslot2index
 )
 from core.activities_data import collect_activity_groups
+from core.classes import GROUP_ALL
 from ui.ui_base import (
     ### QtWidgets:
     QListWidgetItem,
@@ -162,10 +163,23 @@ class Activity(NamedTuple):
         )
 
 
+def class2group2atoms():
+    c2g2ags = {}
+    classes = get_classes()
+    for klass, name in classes.get_class_list():
+        cdata = classes[klass]
+        cg = cdata.divisions
+        divs = cg.divisions
+        g2ags = cg.group_atoms()
+        g2ags[GROUP_ALL] = cg.atomic_groups
+        c2g2ags[klass] = g2ags
+    return c2g2ags
+
 
 class Timetable:
     def __init__(self, gui):
         self.gui = gui
+        self.class_group_atoms = class2group2atoms()
         # <KeyValueList>s of basic elements
         self.sid_list = get_subjects()
         teachers = get_teachers()
@@ -187,10 +201,10 @@ class Timetable:
 #?
 #        atoms2group = self.fet_classes.a2g
 
-
+#TODO
         ### Collect data for each lesson-group
         lg_map = collect_activity_groups()
-        ### Add fet activities
+        ### Add activities
         for lg, act in lg_map.items():
             class_set = set()
             group_sets = {} # {klass -> set of atomic groups}
@@ -198,11 +212,9 @@ class Timetable:
             for klass, g, sid, tid in act.course_list:
                 class_set.add(klass)
                 if g and klass != "--":
-                    # Only add a group "Students" entry if there is a
+                    # Only add a group entry if there is a
                     # group and a (real) class
-                    if g == "*":
-                        g = ""
-                    gatoms = self.group2atoms[klass][g]
+                    gatoms = self.class_group_atoms[klass][g]
                     try:
                         group_sets[klass].update(gatoms)
                     except KeyError:

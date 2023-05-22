@@ -47,22 +47,9 @@ from ui.ui_base import (
     Qt,
     # QtGui
     QIcon,
-    QFont,
-    QPen,
-    QBrush,
-    QColor,
     QPainter,
-    QTransform
+    QTransform,
 )
-
-from core.basic_data import (
-    get_sublessons,
-    get_subjects,
-    get_classes,
-    timeslot2index
-)
-#from core.classes import atomic_maps
-#from timetable.activities import Courses
 from ui.grid_support import StyleCache
 
 ### +++++
@@ -92,10 +79,6 @@ _TITLEWIDTH = 82
 _SUBTEXTGAP = 10    # minimum horizontal space between tile "subtexts"
 
 # Fonts
-FONT_DEFAULT = "Droid Sans"
-#FONT_DEFAULT = "Sans"
-FONT_SIZE_DEFAULT = 12
-FONT_COLOUR = "442222"  # rrggbb
 FONT_HEADER_SIZE = 14
 FONT_CENTRE_SIZE = 18
 FONT_CORNER_SIZE = 11
@@ -105,8 +88,7 @@ BORDER_COLOUR = '12c6f8'
 HEADER_COLOUR = 'f0f0f0'
 MARGIN_LINE_COLOUR = '000000'
 BREAK_COLOUR = '6060d0'
-CELL_HIGHLIGHT_COLOUR = 'a0a0ff'
-#FONT_COLOUR = '442222'
+#CELL_HIGHLIGHT_COLOUR = 'a0a0ff'
 SELECT_COLOUR = 'ff0000'
 
 # Tile corner enum
@@ -128,8 +110,8 @@ class GridView(QGraphicsView):
     """This is the "view" widget for the grid.
     The actual grid is implemented as a "scene".
     """
-    def __init__(self):
-        super().__init__()
+    def __init__(self, parent=None):
+        super().__init__(parent=parent)
         # Change update mode: The default, MinimalViewportUpdate, seems
         # to cause artefacts to be left, i.e. it updates too little.
         # Also BoundingRectViewportUpdate seems not to be 100% effective.
@@ -194,8 +176,8 @@ class GridViewRescaling(GridView):
     """An QGraphicsView that automatically adjusts the scaling of its
     scene to fill the viewing window.
     """
-    def __init__(self):
-        super().__init__()
+    def __init__(self, parent=None):
+        super().__init__(parent=parent)
         # Disable the scrollbars when using this resizing scheme. They
         # should not appear anyway, but this might avoid problems.
         self.setHorizontalScrollBarPolicy(
@@ -313,6 +295,8 @@ class GridPeriodsDays(QGraphicsScene):
         line.setPen(StyleCache.getPen(SIZES["LINEWIDTH"], MARGIN_LINE_COLOUR))
         self.addItem(line)
         line.setZValue(1)
+
+# Not using the selection rectangle from grid_support?
         # Make a rectangle for the "selected" marking
         self.select = QGraphicsRectItem(0, 0, SIZES["BOXWIDTH"], SIZES["BOXHEIGHT"])
         self.select.setPen(StyleCache.getPen(SIZES["LINEWIDTH"]*2, SELECT_COLOUR))

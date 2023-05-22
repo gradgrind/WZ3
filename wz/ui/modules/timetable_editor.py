@@ -1,7 +1,7 @@
 """
 ui/modules/timetable_editor.py
 
-Last updated:  2023-05-21
+Last updated:  2023-05-22
 
 Show a timetable grid and allow placement of lesson tiles.
 
@@ -51,6 +51,7 @@ from typing import NamedTuple
 from ui.timetable_grid import GridViewRescaling, GridPeriodsDays
 from core.db_access import open_database
 from core.basic_data import (
+    clear_cache,
     get_days,
     get_periods,
     get_classes,
@@ -58,20 +59,30 @@ from core.basic_data import (
     get_subjects,
     timeslot2index
 )
-from core.classes import class_divisions
-from timetable.activities import Courses, filter_roomlists
+#from core.classes import class_divisions
+#from timetable.activities import Courses, filter_roomlists
 from ui.ui_base import (
-    QHBoxLayout,
-    QVBoxLayout,
-    HLine,
-    QLabel,
-    QListWidget,
+    ### QtWidgets:
     QListWidgetItem,
-    QAbstractItemView,
-    QTableWidget,
-    QTableWidgetItem,
-    QTableView,
     QMenu,
+    ### QtGui:
+    ### QtCore:
+#    Qt,
+#    QEvent,
+#    Slot,
+    ### uic
+    uic,
+
+
+#    QHBoxLayout,
+#    QVBoxLayout,
+#    HLine,
+#    QLabel,
+#    QListWidget,
+#    QAbstractItemView,
+#    QTableWidget,
+#    QTableWidgetItem,
+#    QTableView,
 )
 
 ### -----
@@ -81,78 +92,36 @@ def init():
 
 
 class TimetableEditor(Page):
-    name = T["MODULE_NAME"]
-    title = T["MODULE_TITLE"]
-
     def __init__(self):
         super().__init__()
-        self.grid_view = GridViewRescaling()
-        hbox = QHBoxLayout(self)
-        hbox.setContentsMargins(1, 1, 1, 1)
-        hbox.addWidget(self.grid_view)
-        vbox = QVBoxLayout()
-        vbox.setContentsMargins(0, 5, 0, 0)
-        hbox.addLayout(vbox)
-#TODO: T ...
-        vbox.addWidget(QLabel("Klasse:"))
-        self.list1 = QListWidget()
-        # self.list1.setMinimumWidth(30)
-        self.list1.setSelectionMode(
-            QAbstractItemView.SelectionMode.SingleSelection
-        )
-        vbox.addWidget(self.list1)
-        vbox.addWidget(HLine())
-#TODO: T ...
-        vbox.addWidget(QLabel("Unterrichtseinheiten:"))
-        self.list1.currentTextChanged.connect(self.change_class)
-        self.tile_list = QTableWidget()
-        self.tile_list.setSelectionMode(QTableView.SelectionMode.SingleSelection)
-        self.tile_list.setSelectionBehavior(QTableView.SelectionBehavior.SelectRows)
-        self.tile_list.setEditTriggers(
-            QAbstractItemView.NoEditTriggers
-        )  # non-editable
-        self.tile_list.verticalHeader().hide()
-        self.tile_list.horizontalHeader().hide()
-        self.tile_list.setShowGrid(False)
-        self.tile_list.setColumnCount(4) # sid, duration, groups, teachers
-# Do I keep the references to the tiles separately? Does indexing work
-# properly if rows are hidden? Yes!
-#TODO: T ...
-#        self.tile_list.setHorizontalHeaderLabels(("Fach", "Dauer", "Grp", "Lehrer"))
-#
-# can hide "placed" rows
-        self.tile_list.currentCellChanged.connect(self.selected_tile)
-        vbox.addWidget(self.tile_list)
-
-#TODO: Use splitter?
-        self.list1.setFixedWidth(200)
-        self.tile_list.setFixedWidth(200)
+        uic.loadUi(APPDATAPATH("ui/timetable_class_view.ui"), self)
 
     def enter(self):
 #TODO
         open_database()
-
+        clear_cache()
         self.TT_CONFIG = MINION(DATAPATH("CONFIG/TIMETABLE"))
         days = get_days().key_list()
         periods = get_periods().key_list()
         breaks = self.TT_CONFIG["BREAKS_BEFORE_PERIODS"]
         self.grid = WeekGrid(days, periods, breaks)
-        self.grid_view.setScene(self.grid)
-
-        self.timetable = Timetable(self)
-
+        self.table_view.setScene(self.grid)
         self.init_data()
+        self.timetable = Timetable(self)
+        self.class_list.setCurrentRow(0)
 
     def init_data(self):
+        self.all_classes = []
         for k, name in get_classes().get_class_list():
-            _item = QListWidgetItem(k)
-            _item.setToolTip(name)
-            self.list1.addItem(_item)
+            self.all_classes.append(k)
+            item = QListWidgetItem(f"{k} – {name}")
+            self.class_list.addItem(item)
 
-    def change_class(self, klass):
+    def on_class_list_currentRowChanged(self, row):
+        klass = self.all_classes[row]
+        self.grid.remove_tiles()
 #TODO
         print("§§§ SELECT CLASS:", klass)
-        self.grid.remove_tiles()
         self.timetable.show_class(klass)
 
     def selected_tile(self, row, col, row0, col0):
@@ -764,7 +733,7 @@ if __name__ == '__main__':
     widget.enter()
 
 #TODO --
-    widget.timetable.gather_info()
+#    widget.timetable.gather_info()
 #    quit(0)
 
     widget.resize(1000, 550)

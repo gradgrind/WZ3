@@ -66,7 +66,7 @@ from core.basic_data import (
     get_rooms,
     timeslot2index,
 )
-from timetable.fet_data import collect_activity_groups
+from core.activities_data import collect_activity_groups
 
 def idsub(tag):
     """In aSc, "id" fields may only contain ASCII alphanumeric characters,

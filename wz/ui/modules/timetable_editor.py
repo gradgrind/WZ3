@@ -24,12 +24,6 @@ Copyright 2023 Michael Towers
 =-LICENCE========================================
 """
 
-#TODO --
-### Labels, etc.
-_TITLE = "WZ – Stundenplanung"
-
-#####################################################
-
 if __name__ == "__main__":
     import sys, os
     this = sys.path[0]
@@ -49,18 +43,17 @@ T = TRANSLATIONS("ui.modules.timetable_editor")
 from typing import NamedTuple
 
 from ui.timetable_grid import GridViewRescaling, GridPeriodsDays
-from core.db_access import open_database
+from core.db_access import open_database, KeyValueList
 from core.basic_data import (
     clear_cache,
     get_days,
     get_periods,
     get_classes,
-    get_sublessons,
+    get_teachers,
     get_subjects,
     timeslot2index
 )
-#from core.classes import class_divisions
-#from timetable.activities import Courses, filter_roomlists
+from core.activities_data import collect_activity_groups
 from ui.ui_base import (
     ### QtWidgets:
     QListWidgetItem,
@@ -69,20 +62,9 @@ from ui.ui_base import (
     ### QtCore:
 #    Qt,
 #    QEvent,
-#    Slot,
+    Slot,
     ### uic
     uic,
-
-
-#    QHBoxLayout,
-#    QVBoxLayout,
-#    HLine,
-#    QLabel,
-#    QListWidget,
-#    QAbstractItemView,
-#    QTableWidget,
-#    QTableWidgetItem,
-#    QTableView,
 )
 
 ### -----
@@ -97,7 +79,6 @@ class TimetableEditor(Page):
         uic.loadUi(APPDATAPATH("ui/timetable_class_view.ui"), self)
 
     def enter(self):
-#TODO
         open_database()
         clear_cache()
         self.TT_CONFIG = MINION(DATAPATH("CONFIG/TIMETABLE"))
@@ -117,6 +98,7 @@ class TimetableEditor(Page):
             item = QListWidgetItem(f"{k} – {name}")
             self.class_list.addItem(item)
 
+    @Slot(int)
     def on_class_list_currentRowChanged(self, row):
         klass = self.all_classes[row]
         self.grid.remove_tiles()
@@ -153,6 +135,7 @@ class TimetableEditor(Page):
 #    TIME: str
 #    ROOMS: str
 
+
 class Activity(NamedTuple):
     sid: str
     subject: str
@@ -179,16 +162,201 @@ class Activity(NamedTuple):
         )
 
 
+
 class Timetable:
     def __init__(self, gui):
         self.gui = gui
+        # <KeyValueList>s of basic elements
+        self.sid_list = get_subjects()
+        teachers = get_teachers()
+        self.tid_list = KeyValueList(
+            (tid, teachers.name(tid)) for tid in teachers
+        )
+        self.class_list = KeyValueList(
+            get_classes().get_class_list(skip_null=False)
+        )
+        # List of <Activity> items
+        self.activities = []
+
+        # For constraints concerning relative placement of individual
+        # lessons in the various subjects, collect the "atomic" pupil
+        # groups and their activity ids for each subject, divided by class:
+#TODO: If I use this, it should probably use indexes as far as possible
+#        self.class2sid2ag2aids: dict[str, dict[str, dict[str, list[int]]]] = {}
+
+#?
+#        atoms2group = self.fet_classes.a2g
+
+
+        ### Collect data for each lesson-group
+        lg_map = collect_activity_groups()
+        ### Add fet activities
+        for lg, act in lg_map.items():
+            class_set = set()
+            group_sets = {} # {klass -> set of atomic groups}
+            teacher_set = set()
+            for klass, g, sid, tid in act.course_list:
+                class_set.add(klass)
+                if g and klass != "--":
+                    # Only add a group "Students" entry if there is a
+                    # group and a (real) class
+                    if g == "*":
+                        g = ""
+                    gatoms = self.group2atoms[klass][g]
+                    try:
+                        group_sets[klass].update(gatoms)
+                    except KeyError:
+                        group_sets[klass] = set(gatoms)
+                if tid != "--":
+                    teacher_set.add(tid)
+            # Get "usable" groups
+            groups = []
+            for klass, aset in group_sets.items():
+                a2g = atoms2group[klass]
+                try:
+                    key = tuple(sorted(aset))
+                    g = a2g[key]
+                    groups.append(f"{klass}.{g}" if g else klass)
+                except KeyError:
+                    REPORT(
+                        "ERROR",
+                        T["INVALID_GROUP_LIST"].format(
+                            lg=lg, groups=",".join(key)
+                        ),
+                    )
+            # Get the subject-id from the block-tag, if it has a
+            # subject, otherwise from the course (of which there
+            # should be only one!)
+            if (bt := act.block_tag):
+                sid = bt.sid
+            ## Handle rooms
+            # Simplify room lists, check for room conflicts.
+            # Collect room allocations which must remain open (containing
+            # '+') and multiple room allocations for possible later
+            # manual handling.
+            singles = []
+            roomlists0 = []
+            classes_str = ",".join(sorted(class_set))
+            # Collect open allocations (with '+') and multiple room
+            # activities. Eliminate open room choices from further
+            # consideration here.
+            roomlists = []
+            for r in act.room_list:
+                rs = r.rstrip('+')
+                rl = rs.split('/') if rs else [] 
+                if r[-1] == '+':
+                    rl.append('+')
+                roomlists.append(rl)
+            if len(roomlists) > 1:
+                self.fancy_rooms.append((classes_str, lg, roomlists))
+                for rl in roomlists:
+                    if rl[-1] != '+':
+                        if len(rl) == 1:
+                            singles.append(rl[0])
+                        else:
+                            roomlists0.append(rl)
+            elif len(roomlists) == 1:
+                rl = roomlists[0]
+                if rl[-1] == '+':
+                    self.fancy_rooms.append((classes_str, lg, roomlists))
+                elif len(rl) == 1:
+                    singles.append(rl[0])
+                else:
+                    roomlists0.append(rl)
+            # Remove redundant entries
+            roomlists1 = []
+            for rl in roomlists0:
+                _rl = rl.copy()
+                for sl in singles:
+                    try:
+                        _rl.remove(sl)
+                    except ValueError:
+                        pass
+                if _rl:
+                    roomlists1.append(_rl)
+                else:
+                    REPORT(
+                        "ERROR",
+                        T["ROOM_BLOCK_CONFLICT"].format(
+                            classes=classes_str,
+                            tag=tag,
+                            rooms=repr(roomlists),
+                        ),
+                    )
+            for sl in singles:
+                roomlists1.append([sl])
+            if len(roomlists1) == 1:
+                rooms = roomlists1[0]
+            elif len(roomlists1) > 1:
+                vroom = self.virtual_room(roomlists1)
+                rooms = [vroom]
+            else:
+                rooms = []
+            #            print("§§§", tag, class_set)
+            #            print("   +++", teacher_set, groups)
+            #            print("   ---", rooms)
+            #            if len(roomlists1) > 1:
+            #                print(roomlists1)
+            #                print(self.__virtual_rooms[rooms[0]])
+
+            ## Add to "used" teachers and subjects
+            self.timetable_teachers.update(teacher_set)
+            self.timetable_subjects.add(sid)
+            ## Generate the activity or activities
+            if teacher_set:
+                if len(teacher_set) == 1:
+                    activity0 = {"Teacher": teacher_set.pop()}
+                else:
+                    activity0 = {"Teacher": sorted(teacher_set)}
+            else:
+                activity0 = {}
+            if groups:
+                activity0["Students"] = (
+                    groups[0] if len(groups) == 1 else groups
+                )
+            activity0["Subject"] = sid
+            activity0["Active"] = "true"
+            ## Divide lessons up according to duration
+            durations = {}
+            total_duration = 0
+            # Need the LESSONS data: id, length, time
+            for ldata in act.lessons:
+                lid, l, t = ldata[:3]
+                total_duration += l
+                lt = (lid, t)
+                try:
+                    durations[l].append(lt)
+                except KeyError:
+                    durations[l] = [lt]
+            activity0["Total_Duration"] = str(total_duration)
+            id0 = self.next_activity_id()
+            activity0["Activity_Group_Id"] = str(
+                id0 if len(act.lessons) > 1 else 0
+            )
+            for l in sorted(durations):
+                dstr = str(l)
+                for lid, time in durations[l]:
+                    id_str = str(id0)
+                    self.lid_aid[lid] = id_str
+                    activity = activity0.copy()
+                    activity["Id"] = id_str
+                    activity["Duration"] = dstr
+                    activity["Comments"] = str(lid)
+                    self.add_placement(id_str, lid, time, rooms)
+                    self.activities.append(activity)
+                    # print("$$$$$", sid, groups, id_str)
+                    self.subject_group_activity(sid, groups, id_str)
+                    id0 += 1
+
+
+
 
 # Do these structures really need to be retained? Couldn't they be
 # temporarily fetched at the point of use?
-        self.courses = Courses()
+#        self.courses = Courses()
         # {block-tag -> [Sublesson, ... ]}
-        self.tag2lessons = get_sublessons()     # not resetting cache
-        self.subjects = get_subjects()
+#        self.tag2lessons = get_sublessons()     # not resetting cache
+#        self.subjects = get_subjects()
 
     def gather_info(self):
         activity_list = []

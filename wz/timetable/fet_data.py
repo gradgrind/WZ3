@@ -28,8 +28,6 @@ _SUBJECTS_AND_TEACHERS = False
 
 FET_VERSION = "6.9.0"
 
-LESSONS_FIELDS = ("id", "LENGTH", "TIME", "PLACEMENT", "ROOMS")
-
 WEIGHTMAP = { '-': None,
     '1': "50", '2': "67", '3': "80", '4': "88", '5': "93",
     '6': "95", '7': "97", '8': "98", '9': "99", '+': "100"
@@ -83,7 +81,7 @@ from core.db_access import (
     read_pairs,
     db_read_mappings,
 )
-from core.list_activities import read_db
+from core.activities_data import collect_activity_groups
 
 LUNCH_BREAK = '^'
 
@@ -294,52 +292,6 @@ def timeoff_fet(available: str) -> tuple[list[dict[str, str]], set[str]]:
                 except KeyError:
                     possible_breaks[d] = {p}
     return blocked_periods, possible_breaks
-
-
-class ActivityGroup(NamedTuple):
-    course_list: list[tuple]    # (class, group, subject, teacher)
-    block_tag:  Optional[BlockTag]
-    lessons: list[tuple]        # (id, length, time)
-    room_list: set[str]
-
-
-def collect_activity_groups() -> dict[int, ActivityGroup]:
-    """Read all activities with lessons from database. Gather the
-    information needed for the timetable for each lesson-group.
-    """
-    # Get activities from database
-    cl_lists, t_lists, lg_2_c = read_db()
-    # <cl_lists> is a mapping { class -> [activity, ... ] }
-    lg_data = {}    # { lesson-group -> ActivityGroup }
-    w_set = set()   # with same workload only need to add course data
-    for klass in sorted(cl_lists):
-        classroom = db_read_unique_field("CLASSES", "CLASSROOM", CLASS=klass)
-        for ai in cl_lists[klass]:
-            if not ai.lessons:
-                continue
-            try:
-                data = lg_data[(lg := ai.lesson_group)]
-                data.course_list.append(ai.course_data)
-                if ai.workload in w_set:
-                    continue
-                w_set.add(ai.workload)
-                if ai.room:
-                    data.room_list.add(ai.room.replace('$', classroom))
-                continue
-            except KeyError:
-                pass
-            lessons = [
-                row for row in db_read_fields(
-                    "LESSONS", LESSONS_FIELDS, lesson_group=lg
-                )
-            ]
-            lg_data[lg] = ActivityGroup(
-                [ai.course_data],
-                ai.blocktag,
-                lessons,
-                {ai.room.replace('$', classroom)} if ai.room else set()
-            )
-    return lg_data
 
 
 class TimetableCourses:

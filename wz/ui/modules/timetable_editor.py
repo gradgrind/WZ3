@@ -41,6 +41,7 @@ T = TRANSLATIONS("ui.modules.timetable_editor")
 ### +++++
 
 from typing import NamedTuple
+from itertools import combinations
 
 from ui.timetable_grid import GridViewRescaling, GridPeriodsDays
 from core.db_access import open_database, KeyValueList
@@ -193,9 +194,28 @@ class Timetable:
         self.tid_list = KeyValueList(
             (tid, teachers.name(tid)) for tid in teachers
         )
+        classes = get_classes()
         self.class_list = KeyValueList(
-            get_classes().get_class_list(skip_null=False)
+            classes.get_class_list(skip_null=False)
         )
+        # group-division map for each class
+        self.group_division = {}
+        for klass, cdata in classes.items():
+            divs = cdata.divisions.divisions
+            g2div = {GROUP_ALL: (-1, GROUP_ALL)}
+            self.group_division[klass] = g2div
+            for i, div in enumerate(divs):
+                dgas = []
+                for d, v in div:
+                    if v is None:
+                        dgas.append(d)
+                        g2div[d] = (i, [d])
+                    else:
+                        g2div[d] = (i, v)
+                g2div[f"%{i}"] = dgas
+#TODO--
+#            print("\n%DIV%", klass, self.group_division[klass])
+
         # List of <Activity> items
         self.activities = []
 
@@ -268,7 +288,7 @@ class Timetable:
                 )
                 a_index = len(self.activities)
 #TODO--
-                print(" +++", a_index, a)
+#                print(" +++", a_index, a)
                 self.activities.append(a)
                 for k in group_sets:
                     try:
@@ -276,6 +296,52 @@ class Timetable:
                     except KeyError:
                         self.class_activities[k] = [a_index]
 
+
+#TODO xxxxxxxxxxxxx
+    def tile_division(self, klass, groups):
+        g2div = self.group_division[klass]
+        tiles = []
+#???
+        divi = -1
+        
+        for g in groups:
+            i, dgs = g2div[g]
+            if i < 0:
+                # whole class
+                return (GROUP_ALL, [(0, 1, 1)])
+            if divi != i:
+                if divi >= 0:
+                    # groups from multiple divisions, assume whole class
+                    return (GROUP_ALL, [(0, 1, 1)])
+                else:
+                    divi = i
+                    dgset = set(dgs)
+            else:
+                dgset.update(dgs)
+        div_groups = g2div[f"%{divi}"]
+        n = len(div_groups)     
+
+#TODO
+        gaps = 0
+        l = 0
+        i = 0
+        for g, v in div.items():
+            if v is not None:
+                continue
+            if g in dgs:
+                if l == 0:
+                    p = i
+                    l = 1
+                else:
+                    l += 1
+            elif l:
+                tiles.append((p, l))
+                l = 0
+            i += 1
+        if l:
+            tiles.append((p, l))
+        return ([t + (i,) for t in tiles])
+        
 
 
 
@@ -294,7 +360,7 @@ class Timetable:
             group_index += 1
 #? How will the structures be used???
             i = 0
-            group2division = {'*': i}
+            group2division = {GROUP_ALL: i}
             self.class2group2division[klass] = group2division
             for div in divisions:
                 i += 1
@@ -329,10 +395,12 @@ class Timetable:
         tiledata = []
         tiles = []
         tile_list_hidden = []
-        print("\nCLASS", klass)
+#TODO--
+#        print("\nCLASS", klass)
         for row, a_index in enumerate(class_activities):
             activity = self.activities[a_index]
-            print("  --", activity)
+#TODO--
+#            print("  --", activity)
             lesson_data = activity[3]
             fixed_time = lesson_data[2]
 
@@ -710,10 +778,63 @@ class ChipData(NamedTuple):
     den: int                # total number of "parts"
 
 
+#?xxxxxxxxxxxxx
+def tile_division(klass, groups):
+    divs = get_classes()[klass].divisions.divisions
+    print("\n%DIV%", 13)
+    divi = -1
+    dgs = {}
+    for i, div in enumerate(divs):
+        for g in groups:
+            try:
+                dg = div[g]
+            except KeyError:
+                break
+                continue
+            
+            for d, v in div.items():
+                pass
+
+
+            if divi < 0:
+                divi = i
+                if dg is None:
+                    dgs.add(g)
+                else:
+                    dgs.update(dg) 
+            else:
+                # whole class
+                return (GROUP_ALL, [(0, 1, 1)])
+    if divi >= 0:
+        div = divs[divi]
+        tiles = []
+#???
+        
+        gaps = 0
+        l = 0
+        i = 0
+        for g, v in div.items():
+            if v is not None:
+                continue
+            if g in dgs:
+                if l == 0:
+                    p = i
+                    l = 1
+                else:
+                    l += 1
+            elif l:
+                tiles.append((p, l))
+                l = 0
+            i += 1
+        if l:
+            tiles.append((p, l))
+        return ([t + (i,) for t in tiles])
+
 #?
 def tile_dimensions(klass):
     divs = get_classes()[klass].divisions.divisions
     print("\n%DIV%", 13)
+    g2pos = {}
     for i, div in enumerate(divs):
         n = 0
         ag = []
@@ -725,7 +846,33 @@ def tile_dimensions(klass):
             else:
                 g2ag[g] = ags
         print(" ===", n, ag, g2ag)
-        
+
+        for i, g in enumerate(ag):
+            g2pos[g] = (i, 1, n)    # start index, "size", total
+
+        for c in range(2, n):
+            for gg in combinations(ag, c):
+                print(gg)
+                tiles = []
+                gaps = 0
+                l = 0
+                for i, g in enumerate(ag):
+                    if g in gg:
+                        if l == 0:
+                            p = i
+                            l = 1
+                        else:
+                            l += 1
+                    elif l:
+                        tiles.append((p, l, n))
+                        l = 0
+                if l:
+                    tiles.append((p, l, n))
+                g2pos[','.join(gg)] = tiles
+
+
+    print("\n+++", g2pos)
+
 
 def class_divisions(groups, group_map, idivs):
     """Determine the size – as a fraction of the whole class – and an
@@ -741,7 +888,7 @@ def class_divisions(groups, group_map, idivs):
     for graphical display purposes.
     The return value is a <ChipData> instance.
     """
-    if '*' not in groups:
+    if GROUP_ALL not in groups:
         group_sets = eliminate_subsets(groups, group_map)
         # print("\n&&&&&&1 ->", group_sets)
         group_divs, group_set = independent_divisions(idivs, group_sets)
@@ -755,7 +902,7 @@ def class_divisions(groups, group_map, idivs):
             return ChipData(glist, group_set, restset, offset, num, den)
     # print("  ... whole class")
 #TODO?
-    return ChipData(['*'], {'*'}, set(), 0, 1, 1)
+    return ChipData([GROUP_ALL], {GROUP_ALL}, set(), 0, 1, 1)
 
 
 

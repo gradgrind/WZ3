@@ -1,10 +1,7 @@
 """
-TODO: This should be replaced by the module "activities" – which will
-require modifications in the affected modules.
+core/activities.py
 
-core/activities_data.py
-
-Last updated:  2023-05-22
+Last updated:  2023-05-28
 
 Collect basic information on "activities".
 
@@ -55,13 +52,41 @@ LESSONS_FIELDS = ("id", "LENGTH", "TIME", "PLACEMENT", "ROOMS")
 
 
 class ActivityItem(NamedTuple):
-    course_data: tuple[str, str, str, str] # class, group, subject, teacher
+    klass: str
+    group: str
+    subject: str
+    teacher: str
     workload: int
     lesson_group: int
     blocktag: Optional[BlockTag]
     lessons: list[int]
     paytag: Optional[Workload]
     room: str
+
+
+class CourseWithRoom(NamedTuple):
+    """This structure contains the info from the COURSES entry
+    and the room wish from a WORKLOAD entry which is associated with it.
+    """
+    klass: str
+    group: str
+    subject: str
+    teacher: str
+    room: str
+
+
+class LessonInfo(NamedTuple):
+    id: str
+    length: int
+    time: str
+    placement: str
+    rooms: str
+
+
+class ActivityGroup(NamedTuple):
+    course_list: list[CourseWithRoom]
+    block_tag:  Optional[BlockTag]
+    lessons: list[LessonInfo]
 
 
 def read_db():
@@ -119,7 +144,7 @@ def read_db():
             bt, ll = None, []
         cl = cdata[0]
         t = cdata[3]
-        data = ActivityItem(cdata, w, lg, bt, ll, p, r)
+        data = ActivityItem(*cdata, w, lg, bt, ll, p, r)
         try:
             t_lists[t].append(data)
         except KeyError:
@@ -135,13 +160,6 @@ def read_db():
     return (cl_lists, t_lists, lg_2_c)
 
 
-class ActivityGroup(NamedTuple):
-    course_list: list[tuple]    # (class, group, subject, teacher)
-    block_tag:  Optional[BlockTag]
-    lessons: list[tuple]        # (id, length, time)
-    room_list: set[str]
-
-
 def collect_activity_groups() -> dict[int, ActivityGroup]:
     """Read all activities with lessons from database. Gather the
     information needed for the timetable for each lesson-group.
@@ -150,7 +168,6 @@ def collect_activity_groups() -> dict[int, ActivityGroup]:
     cl_lists, t_lists, lg_2_c = read_db()
     # <cl_lists> is a mapping { class -> [activity, ... ] }
     lg_data = {}    # { lesson-group -> ActivityGroup }
-    w_set = set()   # with same workload only need to add course data
     for klass in sorted(cl_lists):
         classroom = db_read_unique_field("CLASSES", "CLASSROOM", CLASS=klass)
         for ai in cl_lists[klass]:
@@ -158,26 +175,27 @@ def collect_activity_groups() -> dict[int, ActivityGroup]:
                 continue
             try:
                 data = lg_data[(lg := ai.lesson_group)]
-                data.course_list.append(ai.course_data)
-                if ai.workload in w_set:
-                    continue
-                w_set.add(ai.workload)
-                if ai.room:
-                    data.room_list.add(ai.room.replace('$', classroom))
-                continue
             except KeyError:
-                pass
-            lessons = [
-                row for row in db_read_fields(
-                    "LESSONS", LESSONS_FIELDS, lesson_group=lg
+                lessons = [
+                    LessonInfo(*row)
+                    for row in db_read_fields(
+                        "LESSONS", LESSONS_FIELDS, lesson_group=lg
+                    )
+                ]
+                lg_data[lg] = ActivityGroup(
+                    [
+                        CourseWithRoom(
+                            *ai[:4],
+                            ai.room.replace('$', classroom)
+                        )
+                    ],
+                    ai.blocktag,
+                    lessons,
                 )
-            ]
-            lg_data[lg] = ActivityGroup(
-                [ai.course_data],
-                ai.blocktag,
-                lessons,
-                {ai.room.replace('$', classroom)} if ai.room else set()
-            )
+            else:
+                data.course_list.append(
+                    CourseWithRoom(*ai[:4], ai.room.replace('$', classroom))
+                )
     return lg_data
 
 
@@ -188,3 +206,6 @@ if __name__ == "__main__":
     open_database()
     cl_lists, t_lists, lg_2_c = read_db()
 
+    lg_map = collect_activity_groups()
+    for lg, ag in lg_map.items():
+        print(" ***", ag)

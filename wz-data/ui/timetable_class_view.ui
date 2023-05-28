@@ -147,7 +147,7 @@
            <enum>QAbstractItemView::SelectRows</enum>
           </property>
           <property name="showGrid">
-           <bool>false</bool>
+           <bool>true</bool>
           </property>
           <attribute name="horizontalHeaderVisible">
            <bool>true</bool>
@@ -158,27 +158,30 @@
           <attribute name="horizontalHeaderDefaultSectionSize">
            <number>40</number>
           </attribute>
+          <attribute name="horizontalHeaderStretchLastSection">
+           <bool>true</bool>
+          </attribute>
           <attribute name="verticalHeaderVisible">
            <bool>false</bool>
           </attribute>
           <column>
            <property name="text">
-            <string>sid</string>
+            <string>Fach</string>
            </property>
           </column>
           <column>
            <property name="text">
-            <string>ln</string>
+            <string>Dauer</string>
            </property>
           </column>
           <column>
            <property name="text">
-            <string>groups</string>
+            <string>Gruppe(n)</string>
            </property>
           </column>
           <column>
            <property name="text">
-            <string>teachers</string>
+            <string>Lehrer</string>
            </property>
           </column>
          </widget>

@@ -1,7 +1,7 @@
 """
 ui/modules/timetable_editor.py
 
-Last updated:  2023-05-27
+Last updated:  2023-05-28
 
 Show a timetable grid and allow placement of lesson tiles.
 
@@ -58,10 +58,11 @@ from core.classes import GROUP_ALL
 from ui.ui_base import (
     ### QtWidgets:
     QListWidgetItem,
+    QTableWidgetItem,
     QMenu,
     ### QtGui:
     ### QtCore:
-#    Qt,
+    Qt,
 #    QEvent,
     Slot,
     ### uic
@@ -99,13 +100,21 @@ class TimetableEditor(Page):
             item = QListWidgetItem(f"{k} – {name}")
             self.class_list.addItem(item)
 
+    @Slot(int, int, int, int)
+    def on_lessons_currentCellChanged(self, r, c, r0, c0):
+        print("&&&>>>", r)
+
+
+
+
     @Slot(int)
     def on_class_list_currentRowChanged(self, row):
         klass = self.all_classes[row]
         self.grid.remove_tiles()
 #TODO
         print("§§§ SELECT CLASS:", klass)
-        self.timetable.show_class(klass)
+#        self.timetable.show_class(klass)
+        self.timetable.enter_class(klass)
 
     def selected_tile(self, row, col, row0, col0):
         if row >= 0 and row != row0:
@@ -180,7 +189,7 @@ class Timetable:
     def __init__(self, gui):
         self.gui = gui
         self.class_group_atoms = class2group2atoms()
-
+        self.class_activities: dict[str, list[int]] = {}
 #?
         self.timetable_teachers = set()
         self.timetable_subjects = set()
@@ -226,7 +235,6 @@ class Timetable:
                         group_sets[klass] = set(gatoms)
                 if tid != "--":
                     teacher_set.add(tid)
-# Might want to keep <lg> and <act.course_list> for later reference?
 
             # Get the subject-id from the block-tag, if it has a
             # subject, otherwise from the course (of which there
@@ -272,8 +280,15 @@ class Timetable:
                     lg,
                     act.course_list,
                 ]
-                print(" +++", len(self.activities), a)
+                a_index = len(self.activities)
+#TODO--
+                print(" +++", a_index, a)
                 self.activities.append(a)
+                for k in group_sets:
+                    try:
+                        self.class_activities[k].append(a_index)
+                    except KeyError:
+                        self.class_activities[k] = [a_index]
 
 
 # Do these structures really need to be retained? Couldn't they be
@@ -410,17 +425,87 @@ class Timetable:
 #TODO: A replacement for show_class?
     def enter_class(self, klass):
         grid = self.gui.grid
-        tile_list = self.gui.tile_list
+        tile_list = self.gui.lessons
         tile_list.clearContents()
+        # Sort activities on subject
+        class_activities = sorted(
+            self.class_activities[klass],
+            key=lambda x: self.activities[x][4]
+        )
+        tile_list.setRowCount(len(class_activities))
 #?
         tiledata = []
         tiles = []
         tile_list_hidden = []
-        for a_index in self.klass2activities[klass]:
-            activity = self.activity_list[a_index]
+        print("\nCLASS", klass)
+        for row, a_index in enumerate(class_activities):
+            activity = self.activities[a_index]
+            print("  --", activity)
+            lesson_data = activity[3]
+            fixed_time = lesson_data[2]
+
+#TODO: Keep non-fixed times separate from the database? When would they
+# be saved, then?
+            if fixed_time:
+                d, p = timeslot2index(fixed_time)
+                print("   @", d, p)
+
+            else:
+                slot_time = lesson_data[3]
+                if slot_time:
+                    d, p = timeslot2index(slot_time)
+                    print("   (@)", d, p)
+
+#TODO: display data
+
+#TODO: rooms? Shouldn't the rooms per group be available????
+# Via the workload entry ... this can, however, be '$', potentially
+# leading to multiple rooms.
+            x = False
+            groups = set()
+            tids = set()
+            sid = activity[4]
+            for c in activity[-1]:  # course list
+                if c[0] == klass:
+                    groups.add(c[1])
+                    tids.add(c[3])
+                else:
+                    x = True
+#TODO: tool-tip (or whatever) to show parallel courses?
+            t_rooms = lesson_data[4]
+            t_tids = ','.join(sorted(tids)) or '–'
+            t_groups = ','.join(sorted(groups))
+            print("  ...", t_tids, t_groups, t_rooms)
+            
+            
+            tile_list.setItem(row, 0, QTableWidgetItem(sid))
+            twi = QTableWidgetItem(str(lesson_data[1]))
+            twi.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            tile_list.setItem(row, 1, twi)
+            twi = QTableWidgetItem(t_groups)
+            twi.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            tile_list.setItem(row, 2, twi)
+            tile_list.setItem(row, 3, QTableWidgetItem(t_tids))
+
+# Just testing!!! It should actually be based on existing placement
+#            if fixed_time:
+#                tile_list.hideRow(row)
+#            else:
+#                tile_list.showRow(row)
+
+# Perhaps placements should be done "normally", i.e. with all checks,
+# in case the fixed times have changed (or there is an error in the
+# database).
+
+            row += 1
+            continue
+        tile_list.resizeColumnsToContents()
+        return
+
 
 # ... I might want lesson placement info (time and rooms) from a
 # temporary store here, rather than directly from the database.
+        if True:
             lessons = self.tag2lessons.get(activity.tag)
             if lessons:
                 for l in lessons:
@@ -491,8 +576,6 @@ class Timetable:
         hh = tile_list.horizontalHeader()
         hh.setStretchLastSection(False)
         hh.setStretchLastSection(True)
-
-
 
 
 
@@ -724,6 +807,50 @@ def make_tile(
     if bl:
         tile.set_corner(3, bl)
     return tile
+
+
+class ChipData(NamedTuple):
+    groups: list[str]       # should be ordered
+    basic_groups: set[str]
+    rest_groups: set[str]   # the remaining groups in the division
+    offset: int             # lowest possible start index
+    num: int                # number of "parts"
+    den: int                # total number of "parts"
+
+
+def class_divisions(groups, group_map, idivs):
+    """Determine the size – as a fraction of the whole class – and an
+    offset, for the given <groups>.
+    Trim the groups a bit first, removing subsets, so that the list of
+    groups doesn't get too long.
+    <groups> is a list or other iterable providing the initial groups.
+    <group_map> is the "GROUP_MAP" value of the class's group info.
+    <idivs> is the "INDEPENDENT_DIVISIONS" value of the class's group info.
+    Return the trimmed groups (ordered list) and the corresponding set
+    of "basic" groups.
+    Also return the information concerning the tile size and placement
+    for graphical display purposes.
+    The return value is a <ChipData> instance.
+    """
+    if '*' not in groups:
+        group_sets = eliminate_subsets(groups, group_map)
+        # print("\n&&&&&&1 ->", group_sets)
+        group_divs, group_set = independent_divisions(idivs, group_sets)
+        # print("\n&&&&&&2", idivs, "||", group_divs, "-----", group_set)
+        if not group_divs:
+            raise Bug(f"No groups ... {groups}")
+        if len(group_divs) == 1:
+            num, offset, den, restset = group_divs[0]
+            glist = [gs[0] for gs in group_sets]
+            # print(f"GROUPS: {glist}, MIN-OFFSET: {offset} @ {num}/{den}")
+            return ChipData(glist, group_set, restset, offset, num, den)
+    # print("  ... whole class")
+#TODO?
+    return ChipData(['*'], {'*'}, set(), 0, 1, 1)
+
+
+
+
 
 
 def simplify_room_lists(roomlists):

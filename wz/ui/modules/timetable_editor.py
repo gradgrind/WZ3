@@ -60,6 +60,7 @@ from core.activities import (
     CourseWithRoom,
 )
 from core.classes import GROUP_ALL
+from timetable.placement_engine import PlacementEngine
 from ui.ui_base import (
     ### QtWidgets:
     QListWidgetItem,
@@ -91,19 +92,28 @@ class TimetableEditor(Page):
         self.TT_CONFIG = MINION(DATAPATH("CONFIG/TIMETABLE"))
         days = get_days().key_list()
         periods = get_periods().key_list()
+        self.engine = PlacementEngine(days, periods)
         breaks = self.TT_CONFIG["BREAKS_BEFORE_PERIODS"]
         self.grid = WeekGrid(days, periods, breaks)
         self.table_view.setScene(self.grid)
-        self.init_data()
-        self.timetable = Timetable(self)
-        self.class_list.setCurrentRow(0)
-
-    def init_data(self):
+        self.timetable = (tt := Timetable(self))
+        self.engine.setup_structures(
+            classes={
+                k: gmap[GROUP_ALL]
+                for k, gmap in tt.class_group_atoms.items()
+                if tt.class_activities[k]
+            },
+            subjects=tt.subject_activities,
+            teachers=tt.teacher_activities,
+        )
+        cmap = self.timetable.class_activities
         self.all_classes = []
         for k, name in get_classes().get_class_list():
-            self.all_classes.append(k)
-            item = QListWidgetItem(f"{k} – {name}")
-            self.class_list.addItem(item)
+            if cmap[k]:
+                self.all_classes.append(k)
+                item = QListWidgetItem(f"{k} – {name}")
+                self.class_list.addItem(item)
+        self.class_list.setCurrentRow(0)
 
     @Slot(int, int, int, int)
     def on_lessons_currentCellChanged(self, r, c, r0, c0):
@@ -122,6 +132,7 @@ class TimetableEditor(Page):
             get_classes()[klass].divisions.divisions
         )
 
+#TODO
     def selected_tile(self, row, col, row0, col0):
         if row >= 0 and row != row0:
             print("§SELECT", row, row0)
@@ -142,7 +153,6 @@ class TimetableActivity(NamedTuple):
     group_sets: dict[str, set[str]] # {class: {group. ... }}
     roomlists: list[list[str]]
     lesson_info: LessonInfo
-#?
     sid: str
     lesson_group: int
     course_list: list[CourseWithRoom]
@@ -165,24 +175,22 @@ class Timetable:
     def __init__(self, gui):
         self.gui = gui
         self.class_group_atoms = class2group2atoms()
+        # Collect <Activity> items, they are then referenced by index
+        self.activities = []
+        # (Ordered dict) Collect activity indexes on a class basis
         self.class_activities: dict[str, list[int]] = {}
-#?
-        self.timetable_teachers = set()
-        self.timetable_subjects = set()
-
-        # <KeyValueList>s of basic elements
-        self.sid_list = get_subjects()
-        teachers = get_teachers()
-        self.tid_list = KeyValueList(
-            (tid, teachers.name(tid)) for tid in teachers
-        )
-        classes = get_classes()
-        self.class_list = KeyValueList(
-            classes.get_class_list(skip_null=False)
-        )
+        # (Ordered dict) Collect activity indexes on a teacher basis
+        self.teacher_activities = {
+            t: [] for t in get_teachers()
+        }
+        # (Ordered dict) Collect activity indexes on a subject basis
+        self.subject_activities = {
+            s: [] for s in get_subjects().key_list()
+        }
         # group-division map for each class
         self.group_division = {}
-        for klass, cdata in classes.items():
+        for klass, cdata in get_classes().items():
+            self.class_activities[klass] = []
             divs = cdata.divisions.divisions
             g2div = {GROUP_ALL: (-1, GROUP_ALL)}
             self.group_division[klass] = g2div
@@ -197,9 +205,6 @@ class Timetable:
                 g2div[f"%{i}"] = dgas
 #TODO--
 #            print("\n%DIV%", klass, self.group_division[klass])
-
-        # List of <Activity> items
-        self.activities = []
 
         # For constraints concerning relative placement of individual
         # lessons in the various subjects, collect the "atomic" pupil
@@ -256,9 +261,6 @@ class Timetable:
                     rl.append('+')
                 roomlists.append(rl)
 
-            ## Add to "used" teachers and subjects
-            self.timetable_teachers.update(teacher_set)
-            self.timetable_subjects.add(sid)
             ## Generate the activity or activities
             for ldata in act.lessons:
 #TODO: Perhaps split it up into different lists with a common index?
@@ -277,10 +279,10 @@ class Timetable:
 #                print(" +++", a_index, a)
                 self.activities.append(a)
                 for k in group_sets:
-                    try:
-                        self.class_activities[k].append(a_index)
-                    except KeyError:
-                        self.class_activities[k] = [a_index]
+                    self.class_activities[k].append(a_index)
+                for t in teacher_set:
+                    self.teacher_activities[t].append(a_index)
+                self.subject_activities[sid].append(a_index)
 
     def tile_division(self, klass, groups):
         # Gather division components
@@ -325,6 +327,7 @@ class Timetable:
 
     def enter_class(self, klass):
         grid = self.gui.grid
+        self.gui.table_header.setText(get_classes()[klass].name)
         tile_list = self.gui.lessons
         tile_list.clearContents()
         # Sort activities on subject

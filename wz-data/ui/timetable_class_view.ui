@@ -47,6 +47,7 @@
       <widget class="QLabel" name="table_header">
        <property name="font">
         <font>
+         <pointsize>11</pointsize>
          <bold>true</bold>
         </font>
        </property>

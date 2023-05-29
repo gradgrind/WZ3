@@ -75,6 +75,16 @@ from ui.ui_base import (
     uic,
 )
 
+class TimetableActivity(NamedTuple):
+    teacher_set: set[str]
+    # division_groups: set[str]
+    group_sets: dict[str, set[str]] # {class: {group. ... }}
+    roomlists: list[list[str]]
+    lesson_info: LessonInfo
+    sid: str
+    lesson_group: int
+    course_list: list[CourseWithRoom]
+
 ### -----
 
 def init():
@@ -106,10 +116,12 @@ class TimetableEditor(Page):
             subjects=tt.subject_activities,
             teachers=tt.teacher_activities,
         )
-        cmap = self.timetable.class_activities
+        self.engine.set_activities(tt.activities)
+
+        ## Set up class list
         self.all_classes = []
         for k, name in get_classes().get_class_list():
-            if cmap[k]:
+            if tt.class_activities[k]:
                 self.all_classes.append(k)
                 item = QListWidgetItem(f"{k} – {name}")
                 self.class_list.addItem(item)
@@ -146,17 +158,6 @@ class TimetableEditor(Page):
 # Various colours for various degrees of possibility? E.g. absolute no-go
 # if a tile in another class must be moved? Only vie direct, conscious
 # removal?
-
-class TimetableActivity(NamedTuple):
-    teacher_set: set[str]
-    # division_groups: set[str]
-    group_sets: dict[str, set[str]] # {class: {group. ... }}
-    roomlists: list[list[str]]
-    lesson_info: LessonInfo
-    sid: str
-    lesson_group: int
-    course_list: list[CourseWithRoom]
-
 
 def class2group2atoms():
     c2g2ags = {}
@@ -345,7 +346,7 @@ class Timetable:
         for row, a_index in enumerate(class_activities):
             activity = self.activities[a_index]
 #TODO--
-            print("  --", activity)
+#            print("  --", activity)
             lesson_data = activity.lesson_info
             fixed_time = lesson_data.time
 
@@ -353,13 +354,13 @@ class Timetable:
 # be saved, then?
             if fixed_time:
                 d, p = timeslot2index(fixed_time)
-                print("   @", d, p)
+#                print("   @", d, p)
 
             else:
                 slot_time = lesson_data.placement
                 if slot_time:
                     d, p = timeslot2index(slot_time)
-                    print("   (@)", d, p)
+#                    print("   (@)", d, p)
 
 #TODO: display data
 
@@ -384,8 +385,7 @@ class Timetable:
             if x:
                 t_groups += ",+"
 #TODO--
-            print("  ...", sid, t_tids, t_groups, t_rooms, tile_divisions)
-            
+#            print("  ...", sid, t_tids, t_groups, t_rooms, tile_divisions)
             
             tile_list.setItem(row, 0, QTableWidgetItem(sid))
             twi = QTableWidgetItem(str(lesson_data.length))
@@ -430,86 +430,8 @@ class Timetable:
                     tile_list_hidden.append(False)
 
         tile_list.resizeColumnsToContents()
-        return
 
 
-# ... I might want lesson placement info (time and rooms) from a
-# temporary store here, rather than directly from the database.
-        if True:
-            lessons = self.tag2lessons.get(activity.tag)
-            if lessons:
-                for l in lessons:
-                    print("  +++", l)
-
-                    d, p = timeslot2index(l.TIME)
-                    print("   ---", activity.sid, d, p)
-
-                    t_tids = ','.join(activity.tids)
-                    t_groups = '/'.join(activity.groups)
-                    t_rooms = l.ROOMS
-                    tiledata.append( # for the list of tiles, etc.
-                        (
-                            activity.sid,
-                            str(l.LENGTH),
-                            t_groups,
-                            t_tids,
-                            l.id,
-# The room list is probably needed as a list or set ...
-                            t_rooms.split(','),
-
-#?
-                            chipdata.groups,
-                            chipdata.basic_groups,
-                        )
-                    )
-
-                    tile_index = len(tiles)
-                    tile = make_tile(
-                        grid,
-                        tile_index,
-                        duration=l.LENGTH,
-#?
-                        n_parts=chipdata.num,
-                        n_all=chipdata.den,
-                        offset=chipdata.offset,
-
-                        text=activity.sid,
-# Might want to handle the placing of the corners in the configuration?
-# Rooms can perhaps only be added when placed, and even then not always ...
-                        tl=t_tids,
-                        tr=t_groups,
-                        br=t_rooms,
-                    )
-                    tiles.append(tile)
-                    if d >= 0:
-                        grid.place_tile(tile_index, (d, p))
-                        tile_list_hidden.append(True)
-                    else:
-                        tile_list_hidden.append(False)
-            else:
-                print("\nNO LESSONS:", a.tag)
-
-        tile_list.setRowCount(len(tiledata))
-        row = 0
-        for tdata in tiledata:
-            for col in range(4):
-                twi = QTableWidgetItem(tdata[col])
-                tile_list.setItem(row, col, twi)
-            if tile_list_hidden[row]:
-                tile_list.hideRow(row)
-            row += 1
-        tile_list.resizeColumnsToContents()
-        tile_list.resizeRowsToContents()
-        # Toggle the stretch on the last section here because of a
-        # possible bug in Qt, where the stretch can be lost when
-        # repopulating.
-        hh = tile_list.horizontalHeader()
-        hh.setStretchLastSection(False)
-        hh.setStretchLastSection(True)
-
-
-
-#TODO
 def make_tile(
     grid,
     tag,

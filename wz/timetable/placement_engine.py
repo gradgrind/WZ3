@@ -47,6 +47,7 @@ from core.basic_data import (
     get_classes,
     get_teachers,
     get_subjects,
+    timeslot2index,
 )
 #T = TRANSLATIONS("timetable.placement_engine")
 
@@ -160,8 +161,56 @@ class PlacementEngine:
         #print("\n§rooms", self.room_list)
         #print("\n§rooms map", self.room_map)
 
+#TODO
     def set_activities(self, activities):
         print("TODO: activities")
+
+        for activity in activities:
+#TODO--
+            print("  --", activity)
+
+        #return
+        #if True:
+
+
+            lesson_data = activity.lesson_info
+            fixed_time = lesson_data.time
+
+#TODO: Keep non-fixed times separate from the database? When would they
+# be saved, then?
+            if fixed_time:
+                d, p = timeslot2index(fixed_time)
+                print("   @", d, p)
+
+            else:
+                slot_time = lesson_data.placement
+                if slot_time:
+                    d, p = timeslot2index(slot_time)
+                    print("   (@)", d, p)
+
+#TODO: rooms? Shouldn't the rooms per group be available????
+# Via the workload entry ... this can, however, be '$', potentially
+# leading to multiple rooms.
+
+            groups = activity.group_sets
+            roomlists = activity.roomlists
+            tids = activity.teacher_set
+
+#            sid = activity.sid
+
+
+            return
+
+
+#TODO: tool-tip (or whatever) to show parallel courses?
+            t_rooms = lesson_data.rooms
+            t_tids = ','.join(sorted(tids)) or '–'
+            t_groups, tile_divisions = self.tile_division(klass, groups)
+            #t_groups = ','.join(sorted(groups))
+            if x:
+                t_groups += ",+"
+#TODO--
+            print("  ...", sid, t_tids, t_groups, t_rooms, tile_divisions)
 
 
 # --#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#

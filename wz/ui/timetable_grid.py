@@ -1,7 +1,7 @@
 """
 ui/timetable_grid.py
 
-Last updated:  2023-05-21
+Last updated:  2023-05-29
 
 A grid widget for the timetable displays.
 
@@ -84,10 +84,10 @@ FONT_CENTRE_SIZE = 18
 FONT_CORNER_SIZE = 11
 
 # Colours (rrggbb)
-BORDER_COLOUR = '12c6f8'
+BORDER_COLOUR = 'b0b0b0' # '12c6f8'
 HEADER_COLOUR = 'f0f0f0'
 MARGIN_LINE_COLOUR = '000000'
-BREAK_COLOUR = '6060d0'
+BREAK_COLOUR = '606060' # '6060d0'
 #CELL_HIGHLIGHT_COLOUR = 'a0a0ff'
 SELECT_COLOUR = 'ff0000'
 
@@ -96,11 +96,6 @@ TILE_TOP_LEFT = 0
 TILE_TOP_RIGHT = 1
 TILE_BOTTOM_RIGHT = 2
 TILE_BOTTOM_LEFT = 3
-
-#TODO: these should be in a config file or database ...:
-DAYS = ('Mo', 'Di', 'Mi', 'Do', 'Fr')
-PERIODS = ('A', 'B', '1', '2', '3', '4', '5', '6', '7')
-BREAKS = ('1', '3', '5')
 
 SIZES = {}
 
@@ -206,9 +201,13 @@ class GridViewHFit(GridView):
     """
     def __init__(self):
         super().__init__()
-        self.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.setHorizontalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAlwaysOff
+        )
         # Avoid problems at on/off transition:
-        self.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
+        self.setVerticalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAlwaysOn
+        )
 
     def resizeEvent(self, event):
         self.rescale()
@@ -229,7 +228,7 @@ class GridViewHFit(GridView):
         scale = w / qrect.width()
         t = QTransform().scale(scale, scale)
         self.setTransform(t)
-#        self.fitInView(qrect, Qt.KeepAspectRatio)
+#        self.fitInView(qrect, Qt.AspectRatioMode.KeepAspectRatio)
 
 
 class GridPeriodsDays(QGraphicsScene):
@@ -286,15 +285,17 @@ class GridPeriodsDays(QGraphicsScene):
             irow += 1
             y += SIZES["BOXHEIGHT"]
         self.grid_height = y
-        # Set colour of header margin lines
-        line = QGraphicsLineItem(0, SIZES["TITLEHEIGHT"], self.grid_width, SIZES["TITLEHEIGHT"])
-        line.setPen(StyleCache.getPen(SIZES["LINEWIDTH"], MARGIN_LINE_COLOUR))
-        self.addItem(line)
-        line.setZValue(1)
-        line = QGraphicsLineItem(SIZES["TITLEWIDTH"], 0, SIZES["TITLEWIDTH"], self.grid_height)
-        line.setPen(StyleCache.getPen(SIZES["LINEWIDTH"], MARGIN_LINE_COLOUR))
-        self.addItem(line)
-        line.setZValue(1)
+        # Set colour of main border lines
+        for y in 0, SIZES["TITLEHEIGHT"], self.grid_height:
+            line = QGraphicsLineItem(0, y, self.grid_width, y)
+            line.setPen(StyleCache.getPen(SIZES["LINEWIDTH"], MARGIN_LINE_COLOUR))
+            self.addItem(line)
+            line.setZValue(10)
+        for x in *self.xslots, self.grid_width:
+            line = QGraphicsLineItem(x, 0, x, self.grid_height)
+            line.setPen(StyleCache.getPen(SIZES["LINEWIDTH"], MARGIN_LINE_COLOUR))
+            self.addItem(line)
+            line.setZValue(10)
 
 # Not using the selection rectangle from grid_support?
         # Make a rectangle for the "selected" marking
@@ -318,12 +319,24 @@ class GridPeriodsDays(QGraphicsScene):
         point = event.scenePos()
         items = self.items(point)
         if items:
-            if event.button() == Qt.LeftButton:
+            if event.button() == Qt.MouseButton.LeftButton:
 #TODO ...
                 kbdmods = APP.keyboardModifiers()
-                shift = " + SHIFT" if kbdmods & Qt.ShiftModifier else ""
-                alt = " + ALT" if kbdmods & Qt.AltModifier else ""
-                ctrl = " + CTRL" if kbdmods & Qt.ControlModifier else ""
+                shift = (
+                    " + SHIFT"
+                    if kbdmods & Qt.KeyboardModifier.ShiftModifier
+                    else ""
+                )
+                alt = (
+                    " + ALT"
+                    if kbdmods & Qt.KeyboardModifier.AltModifier
+                    else ""
+                )
+                ctrl = (
+                    " + CTRL"
+                    if kbdmods & Qt.KeyboardModifier.ControlModifier
+                    else ""
+                )
                 cell = None
                 tiles = []
                 item0 = None
@@ -688,6 +701,10 @@ def main(args):
 if __name__ == '__main__':
     from core.db_access import open_database
     open_database()
+
+    DAYS = ('Mo', 'Di', 'Mi', 'Do', 'Fr')
+    PERIODS = ('A', 'B', '1', '2', '3', '4', '5', '6', '7')
+    BREAKS = ('1', '3', '5')
 
     WINDOW = main(set(sys.path[1:]))
     grid = WINDOW.scene()

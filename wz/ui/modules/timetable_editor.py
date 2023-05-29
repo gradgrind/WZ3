@@ -1,7 +1,7 @@
 """
 ui/modules/timetable_editor.py
 
-Last updated:  2023-05-28
+Last updated:  2023-05-29
 
 Show a timetable grid and allow placement of lesson tiles.
 
@@ -136,25 +136,9 @@ class TimetableEditor(Page):
 # if a tile in another class must be moved? Only vie direct, conscious
 # removal?
 
-
-#class BlockInfo(NamedTuple):
-#    course: CourseData
-#    block: BlockTag
-#    rooms: list[str]
-#    payment_data: PaymentData
-#    notes: str
-#
-#class Sublesson(NamedTuple):
-#    id: int
-#    TAG: str
-#    LENGTH: int
-#    TIME: str
-#    ROOMS: str
-
-
-
 class TimetableActivity(NamedTuple):
     teacher_set: set[str]
+    # division_groups: set[str]
     group_sets: dict[str, set[str]] # {class: {group. ... }}
     roomlists: list[list[str]]
     lesson_info: LessonInfo
@@ -162,8 +146,6 @@ class TimetableActivity(NamedTuple):
     sid: str
     lesson_group: int
     course_list: list[CourseWithRoom]
-
-
 
 
 def class2group2atoms():
@@ -230,6 +212,7 @@ class Timetable:
         lg_map = collect_activity_groups()
         ### Add activities
         for lg, act in lg_map.items():
+            # pg_sets = {}    #  {klass -> set of division groups}
             group_sets = {} # {klass -> set of atomic groups}
             teacher_set = set()
             room_set = set()
@@ -241,8 +224,10 @@ class Timetable:
                     gatoms = self.class_group_atoms[klass][cwr.group]
                     try:
                         group_sets[klass].update(gatoms)
+                        # pg_sets[klass].add(cwr.group)
                     except KeyError:
                         group_sets[klass] = set(gatoms)
+                        # pg_sets[klass] = {cwr.group}
                 if cwr.teacher != "--":
                     teacher_set.add(cwr.teacher)
                 if cwr.room:
@@ -279,6 +264,7 @@ class Timetable:
 #TODO: Perhaps split it up into different lists with a common index?
                 a = TimetableActivity(
                     teacher_set,
+                    # pg_sets,
                     group_sets,
                     roomlists,
                     ldata,
@@ -296,14 +282,10 @@ class Timetable:
                     except KeyError:
                         self.class_activities[k] = [a_index]
 
-
-#TODO xxxxxxxxxxxxx
     def tile_division(self, klass, groups):
+        # Gather division components
         g2div = self.group_division[klass]
-        tiles = []
-#???
         divi = -1
-        
         for g in groups:
             i, dgs = g2div[g]
             if i < 0:
@@ -318,69 +300,29 @@ class Timetable:
                     dgset = set(dgs)
             else:
                 dgset.update(dgs)
+        # Construct tile divisions
         div_groups = g2div[f"%{divi}"]
-        n = len(div_groups)     
-
-#TODO
-        gaps = 0
+        n = len(div_groups)
+        if len(dgset) == n:
+            return (GROUP_ALL, [(0, 1, 1)])
         l = 0
         i = 0
-        for g, v in div.items():
-            if v is not None:
-                continue
-            if g in dgs:
+        tiles = []
+        for g in div_groups:
+            if g in dgset:
                 if l == 0:
                     p = i
                     l = 1
                 else:
                     l += 1
             elif l:
-                tiles.append((p, l))
+                tiles.append((p, l, n))
                 l = 0
             i += 1
         if l:
-            tiles.append((p, l))
-        return ([t + (i,) for t in tiles])
-        
+            tiles.append((p, l, n))
+        return (','.join(sorted(groups)), tiles)
 
-
-
-#TODO: At the moment this is just a collection of sketches ...
-    def sort_groups(self):
-
-        self.fullgroup2index = {}
-        self.class2group2division = {}
-        # Build group/division mappings for some class
-        classes = get_classes()
-        group_index = 0
-        for klass, kname in classes.get_class_list():
-            group_info = classes.group_info(klass)
-            divisions = group_info["INDEPENDENT_DIVISIONS"]
-            self.fullgroup2index[klass] = group_index
-            group_index += 1
-#? How will the structures be used???
-            i = 0
-            group2division = {GROUP_ALL: i}
-            self.class2group2division[klass] = group2division
-            for div in divisions:
-                i += 1
-                for g in div:
-                    group2division[g] = i
-# Actually, I could give all groups (in all classes) a unique index
-# instead of the string. Would that help?
-
-# An activity has a set/list of groups, which can be the group-indexes.
-# To perform a placement check:
-#   for each group in the activity:
-#      pick up the class entry for the slot(s)
-#      if not empty, check that the new group is in the ok-list
-# (it is probably ok to assume that the groups in the activity are not
-# in conflict with each other – this should be enforced at construction
-# time)
-# Perhaps it would also be worth considering a bitmap – on a class or
-# division basis.
-
-#TODO: A replacement for show_class?
     def enter_class(self, klass):
         grid = self.gui.grid
         tile_list = self.gui.lessons
@@ -388,7 +330,7 @@ class Timetable:
         # Sort activities on subject
         class_activities = sorted(
             self.class_activities[klass],
-            key=lambda x: self.activities[x][4]
+            key=lambda x: self.activities[x].sid
         )
         tile_list.setRowCount(len(class_activities))
 #?
@@ -400,9 +342,9 @@ class Timetable:
         for row, a_index in enumerate(class_activities):
             activity = self.activities[a_index]
 #TODO--
-#            print("  --", activity)
-            lesson_data = activity[3]
-            fixed_time = lesson_data[2]
+            print("  --", activity)
+            lesson_data = activity.lesson_info
+            fixed_time = lesson_data.time
 
 #TODO: Keep non-fixed times separate from the database? When would they
 # be saved, then?
@@ -411,7 +353,7 @@ class Timetable:
                 print("   @", d, p)
 
             else:
-                slot_time = lesson_data[3]
+                slot_time = lesson_data.placement
                 if slot_time:
                     d, p = timeslot2index(slot_time)
                     print("   (@)", d, p)
@@ -424,22 +366,26 @@ class Timetable:
             x = False
             groups = set()
             tids = set()
-            sid = activity[4]
-            for c in activity[-1]:  # course list
-                if c[0] == klass:
-                    groups.add(c[1])
-                    tids.add(c[3])
+            sid = activity.sid
+            for c in activity.course_list:
+                if c.klass == klass:
+                    groups.add(c.group)
+                    tids.add(c.teacher)
                 else:
                     x = True
 #TODO: tool-tip (or whatever) to show parallel courses?
-            t_rooms = lesson_data[4]
+            t_rooms = lesson_data.rooms
             t_tids = ','.join(sorted(tids)) or '–'
-            t_groups = ','.join(sorted(groups))
-            print("  ...", t_tids, t_groups, t_rooms)
+            t_groups, tile_divisions = self.tile_division(klass, groups)
+            #t_groups = ','.join(sorted(groups))
+            if x:
+                t_groups += ",+"
+#TODO--
+            print("  ...", sid, t_tids, t_groups, t_rooms, tile_divisions)
             
             
             tile_list.setItem(row, 0, QTableWidgetItem(sid))
-            twi = QTableWidgetItem(str(lesson_data[1]))
+            twi = QTableWidgetItem(str(lesson_data.length))
             twi.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
             tile_list.setItem(row, 1, twi)
             twi = QTableWidgetItem(t_groups)
@@ -457,8 +403,29 @@ class Timetable:
 # in case the fixed times have changed (or there is an error in the
 # database).
 
-            row += 1
-            continue
+            for i, l, n in tile_divisions:
+                tile_index = len(tiles)
+                tile = make_tile(
+                    grid=grid,
+                    tag=tile_index,
+                    duration=lesson_data.length,
+                    n_parts=l,
+                    n_all=n,
+                    offset=i,
+                    text=sid,
+#TODO: Might want to handle the placing of the corners in the configuration?
+# Rooms can perhaps only be added when placed, and even then not always ...
+                    tl=t_tids,
+                    tr=t_groups,
+                    br=t_rooms,
+                )
+                tiles.append(tile)
+                if d >= 0:
+                    grid.place_tile(tile_index, (d, p))
+                    tile_list_hidden.append(True)
+                else:
+                    tile_list_hidden.append(False)
+
         tile_list.resizeColumnsToContents()
         return
 
@@ -539,204 +506,7 @@ class Timetable:
 
 
 
-    def show_class(self, klass):
-        grid = self.gui.grid
-        tile_list = self.gui.tile_list
-        tile_list.clearContents()
-        classes = get_classes()
-        group_info = classes.group_info(klass)
-        divisions = group_info["INDEPENDENT_DIVISIONS"]
-        # atoms = group_info["MINIMAL_SUBGROUPS"]
-        group_map = group_info["GROUP_MAP"]
-        # group2atoms = atomic_maps(atoms, list(group_map))
-#TODO: How to calculate tile offsets ... maybe using independent-divisions?
-
-        # {block-tag -> [BlockInfo, ... ]}
-        tag2infolist = self.courses.klass2tags[klass]
-
-        alist = []
-        for tag, infolist in tag2infolist.items():
-            info_ = infolist[0]
-            sid = info_.block.sid or info_.course.sid
-            name = self.subjects.map(sid)
-            activity = Activity_(sid, name, tag)
-
-            # Get tids and room lists (from which to choose)
-            tids_ = set()       # tids for just this class
-            groups_ = set()     # groups for just this class
-            allgroups = set()   # groups for the activity as a whole
-            alltids = set()     # tids for the activity as a whole
-            allroomlists_ = []  # rooms for the activity as a whole
-            # Room info for just this class is not really useful, it is
-            # possible that the actual rooms used for this class cannot
-            # be determined accurately.
-
-            for info_ in infolist:
-                tid_ = info_.course.tid
-                if tid_ != "--":
-                    tids_.add(tid_)
-                if info_.course.group:
-                    groups_.add(info_.course.group)
-            activity.set_tids(sorted(tids_))
-            activity.set_groups(sorted(groups_))
-
-            # For the other stuff, info from all classes is needed
-            for info_ in self.courses.tag2entries[tag]:
-                tid_ = info_.course.tid
-                if tid_ != "--":
-                    alltids.add(tid_)
-                cg = info_.course.class_group()
-                if cg:
-                    allgroups.add(cg)
-                if info_.rooms:
-                    allroomlists_.append(info_.rooms)
-            activity.set_all_tids(alltids)
-            activity.set_all_groups(allgroups)
-#TODO: This was already done for the Activity!
-            activity.set_all_rooms(
-                simplify_room_lists_(allroomlists_, klass, tag)
-            )
-            alist.append(activity)
-# Sort lesson names?
-        alist.sort(key=lambda a: a.subject)
-
-        tiledata = []
-        tiles = []
-        tile_list_hidden = []
-        for a in alist:
-            print("\n§§§", a.groups, a.allgroups, a.tag, a.sid, a.subject, a.tids, a.alltids)
-# a.allgroups is a – possibly unoptimized – set of all groups, with class,
-# and is needed for clash checking. However, if group clash checking is
-# done on a class-by-class basis, I will probably need the groups as in
-# chipdata.basic_groups below, but for each involved class.
-# Perhaps as an ordered list of (class, group-set) pairs.
-
-
-# Shouldn't some of this Activity stuff be done just once for all classes?
-
-            chipdata = class_divisions(
-                    a.groups,
-                    group_map,
-                    divisions
-                )
-# The chipdata stuff covers only the current class
-            print("    GROUPS:", chipdata.groups)
-            print("    SET:", chipdata.basic_groups)
-            print(f"    {chipdata.num}/{chipdata.den} @ {chipdata.offset}")
-
-
-
-# a.alltids is a set of all tids and is needed for clash checking
-
-            print("    ALL ROOMS:", a.roomlists)
-# a.roomlists will be needed for allocating and reallocating rooms
-
-            lessons = self.tag2lessons.get(a.tag)
-            if lessons:
-                for l in lessons:
-                    print("  +++", l)
-
-                    d, p = timeslot2index(l.TIME)
-                    print("   ---", a.sid, d, p)
-
-                    t_tids = ','.join(a.tids)
-                    t_groups = '/'.join(a.groups)
-                    t_rooms = l.ROOMS
-                    tiledata.append( # for the list of tiles, etc.
-                        (
-                            a.sid,
-                            str(l.LENGTH),
-                            t_groups,
-                            t_tids,
-                            l.id,
-# The room list is probably needed as a list or set ...
-                            t_rooms.split(','),
-                            chipdata.groups,
-                            chipdata.basic_groups,
-                        )
-                    )
-
-                    tile_index = len(tiles)
-                    tile = make_tile(
-                        grid,
-                        tile_index,
-                        duration=l.LENGTH,
-                        n_parts=chipdata.num,
-                        n_all=chipdata.den,
-                        offset=chipdata.offset,
-                        text=a.sid,
-# Might want to handle the placing of the corners in the configuration?
-# Rooms can perhaps only be added when placed, and even then not always ...
-                        tl=t_tids,
-                        tr=t_groups,
-                        br=t_rooms,
-                    )
-                    tiles.append(tile)
-                    if d >= 0:
-                        grid.place_tile(tile_index, (d, p))
-                        tile_list_hidden.append(True)
-                    else:
-                        tile_list_hidden.append(False)
-            else:
-                print("\nNO LESSONS:", a.tag)
-
-        tile_list.setRowCount(len(tiledata))
-        row = 0
-        for tdata in tiledata:
-            for col in range(4):
-                twi = QTableWidgetItem(tdata[col])
-                tile_list.setItem(row, col, twi)
-            if tile_list_hidden[row]:
-                tile_list.hideRow(row)
-            row += 1
-        tile_list.resizeColumnsToContents()
-        tile_list.resizeRowsToContents()
-        # Toggle the stretch on the last section here because of a
-        # possible bug in Qt, where the stretch can be lost when
-        # repopulating.
-        hh = tile_list.horizontalHeader()
-        hh.setStretchLastSection(False)
-        hh.setStretchLastSection(True)
-
-#TODO: Will need to consider activities which cover more than one class!
-# Actually, there is one per tag ... or perhaps those details can be
-# left to the lessons/chips?
-# Maybe a subclass ClassActivity for class-specific data?
-class Activity_:
-    __slots__ = (
-        "sid",
-        "subject",
-        "tag",
-        "tids",
-        "groups",
-        "allgroups",
-        "roomlists",
-        "alltids",
-    )
-
-    def __init__(self, sid, subject, tag):
-        self.sid = sid
-        self.subject = subject
-        self.tag = tag
-
-#?
-    def set_tids(self, tids):
-        self.tids = tids
-
-#?
-    def set_groups(self, groups):
-        self.groups = groups
-
-    def set_all_groups(self, groups):
-        self.allgroups = groups
-
-    def set_all_rooms(self, roomlists):
-        self.roomlists = roomlists
-
-    def set_all_tids(self, tids):
-        self.alltids = tids
-
-
+#TODO
 def make_tile(
     grid,
     tag,
@@ -769,6 +539,7 @@ def make_tile(
     return tile
 
 
+#TODO--?
 class ChipData(NamedTuple):
     groups: list[str]       # should be ordered
     basic_groups: set[str]
@@ -778,137 +549,10 @@ class ChipData(NamedTuple):
     den: int                # total number of "parts"
 
 
-#?xxxxxxxxxxxxx
-def tile_division(klass, groups):
-    divs = get_classes()[klass].divisions.divisions
-    print("\n%DIV%", 13)
-    divi = -1
-    dgs = {}
-    for i, div in enumerate(divs):
-        for g in groups:
-            try:
-                dg = div[g]
-            except KeyError:
-                break
-                continue
-            
-            for d, v in div.items():
-                pass
-
-
-            if divi < 0:
-                divi = i
-                if dg is None:
-                    dgs.add(g)
-                else:
-                    dgs.update(dg) 
-            else:
-                # whole class
-                return (GROUP_ALL, [(0, 1, 1)])
-    if divi >= 0:
-        div = divs[divi]
-        tiles = []
-#???
-        
-        gaps = 0
-        l = 0
-        i = 0
-        for g, v in div.items():
-            if v is not None:
-                continue
-            if g in dgs:
-                if l == 0:
-                    p = i
-                    l = 1
-                else:
-                    l += 1
-            elif l:
-                tiles.append((p, l))
-                l = 0
-            i += 1
-        if l:
-            tiles.append((p, l))
-        return ([t + (i,) for t in tiles])
-
-#?
-def tile_dimensions(klass):
-    divs = get_classes()[klass].divisions.divisions
-    print("\n%DIV%", 13)
-    g2pos = {}
-    for i, div in enumerate(divs):
-        n = 0
-        ag = []
-        g2ag = {}
-        for g, ags in div:
-            if ags is None:
-                n += 1
-                ag.append(g)
-            else:
-                g2ag[g] = ags
-        print(" ===", n, ag, g2ag)
-
-        for i, g in enumerate(ag):
-            g2pos[g] = (i, 1, n)    # start index, "size", total
-
-        for c in range(2, n):
-            for gg in combinations(ag, c):
-                print(gg)
-                tiles = []
-                gaps = 0
-                l = 0
-                for i, g in enumerate(ag):
-                    if g in gg:
-                        if l == 0:
-                            p = i
-                            l = 1
-                        else:
-                            l += 1
-                    elif l:
-                        tiles.append((p, l, n))
-                        l = 0
-                if l:
-                    tiles.append((p, l, n))
-                g2pos[','.join(gg)] = tiles
-
-
-    print("\n+++", g2pos)
-
-
-def class_divisions(groups, group_map, idivs):
-    """Determine the size – as a fraction of the whole class – and an
-    offset, for the given <groups>.
-    Trim the groups a bit first, removing subsets, so that the list of
-    groups doesn't get too long.
-    <groups> is a list or other iterable providing the initial groups.
-    <group_map> is the "GROUP_MAP" value of the class's group info.
-    <idivs> is the "INDEPENDENT_DIVISIONS" value of the class's group info.
-    Return the trimmed groups (ordered list) and the corresponding set
-    of "basic" groups.
-    Also return the information concerning the tile size and placement
-    for graphical display purposes.
-    The return value is a <ChipData> instance.
-    """
-    if GROUP_ALL not in groups:
-        group_sets = eliminate_subsets(groups, group_map)
-        # print("\n&&&&&&1 ->", group_sets)
-        group_divs, group_set = independent_divisions(idivs, group_sets)
-        # print("\n&&&&&&2", idivs, "||", group_divs, "-----", group_set)
-        if not group_divs:
-            raise Bug(f"No groups ... {groups}")
-        if len(group_divs) == 1:
-            num, offset, den, restset = group_divs[0]
-            glist = [gs[0] for gs in group_sets]
-            # print(f"GROUPS: {glist}, MIN-OFFSET: {offset} @ {num}/{den}")
-            return ChipData(glist, group_set, restset, offset, num, den)
-    # print("  ... whole class")
-#TODO?
-    return ChipData([GROUP_ALL], {GROUP_ALL}, set(), 0, 1, 1)
 
 
 
-
-
-
+#TODO--?
 def simplify_room_lists(roomlists):
     """Simplify room lists, check for room conflicts."""
     # Collect single room "choices" and remove redundant entries
@@ -937,6 +581,7 @@ def simplify_room_lists(roomlists):
         roomlists = roomlists1
 
 
+#TODO--?
 def simplify_room_lists_(roomlists, klass, tag):
     """Simplify room lists, check for room conflicts."""
     # Collect single room "choices" and remove redundant entries
@@ -1008,9 +653,6 @@ if __name__ == '__main__':
     widget = TimetableEditor()
     widget.enter()
 
-#TODO--
-    tile_dimensions("13")
-    
     widget.resize(1000, 550)
     run(widget)
 

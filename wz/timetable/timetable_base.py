@@ -56,7 +56,7 @@ from core.activities import (
     CourseWithRoom,
 )
 from core.classes import GROUP_ALL
-from timetable.placement_engine import PlacementEngine
+from timetable.tt_engine import PlacementEngine
 
 
 class TimetableActivity(NamedTuple):
@@ -140,12 +140,11 @@ class Timetable:
 # Maybe I should defer all of this to the presentation code. The
 # course items are passed to that, so it should be possible, and it
 # is not relevant for placement, etc.
-            class_data = {}     # {class: [{d-groups}, {tids}, {rids}]}
-            teacher_data = {}   # {tid: [{cd-groups}, {rids}]}
+#            teacher_data = {}   # {tid: [{cd-groups}, {rids}]}
             # As the room specification can be a choice rather than a
             # particular room, this can only be used to eliminate certain
             # rooms from consideration ...
-            room_data = {}      # {rid: [{cd-groups}, {tids}]}
+#            room_data = {}      # {rid: [{cd-groups}, {tids}]}
 # The (c)d-groups were previously built later, I think (when showing a
 # class?). Is there a problem with building them here?
 
@@ -158,7 +157,9 @@ class Timetable:
 # would be different! Would it make sense to collect them all in
 # one place, or would there be completely separate handlers?
 
-            teacher_sets = set()
+            ## Collect the data needed for timtable placements, etc.
+            class_data = {}     # {class: [{d-groups}, {tids}, {rids}]}
+            teacher_set = set()
             room_set = set()
             for cwr in act.course_list:
                 klass = cwr.klass
@@ -222,152 +223,6 @@ class Timetable:
                 for t in teacher_set:
                     self.teacher_activities[t].append(a_index)
                 self.subject_activities[sid].append(a_index)
-
-    def tile_division(self, klass, groups):
-        # Gather division components
-        g2div = self.group_division[klass]
-        divi = -1
-        for g in groups:
-            i, dgs = g2div[g]
-            if i < 0:
-                # whole class
-                return (GROUP_ALL, [(0, 1, 1)])
-            if divi != i:
-                if divi >= 0:
-                    # groups from multiple divisions, assume whole class
-                    return (GROUP_ALL, [(0, 1, 1)])
-                else:
-                    divi = i
-                    dgset = set(dgs)
-            else:
-                dgset.update(dgs)
-        # Construct tile divisions
-        div_groups = g2div[f"%{divi}"]
-        n = len(div_groups)
-        if len(dgset) == n:
-            return (GROUP_ALL, [(0, 1, 1)])
-        l = 0
-        i = 0
-        tiles = []
-        for g in div_groups:
-            if g in dgset:
-                if l == 0:
-                    p = i
-                    l = 1
-                else:
-                    l += 1
-            elif l:
-                tiles.append((p, l, n))
-                l = 0
-            i += 1
-        if l:
-            tiles.append((p, l, n))
-        return (','.join(sorted(groups)), tiles)
-
-    def enter_class(self, klass):
-        grid = self.gui.grid
-        self.gui.table_header.setText(get_classes()[klass].name)
-        tile_list = self.gui.lessons
-        tile_list.clearContents()
-        # Sort activities on subject
-        class_activities = sorted(
-            self.class_activities[klass],
-            key=lambda x: self.activities[x].sid
-        )
-        tile_list.setRowCount(len(class_activities))
-#?
-        tiledata = []
-        tiles = []
-        tile_list_hidden = []
-#TODO--
-#        print("\nCLASS", klass)
-        for row, a_index in enumerate(class_activities):
-            activity = self.activities[a_index]
-#TODO--
-#            print("  --", activity)
-            lesson_data = activity.lesson_info
-            fixed_time = lesson_data.time
-
-#TODO: Keep non-fixed times separate from the database? When would they
-# be saved, then?
-            if fixed_time:
-                d, p = timeslot2index(fixed_time)
-#                print("   @", d, p)
-
-            else:
-                slot_time = lesson_data.placement
-                if slot_time:
-                    d, p = timeslot2index(slot_time)
-#                    print("   (@)", d, p)
-
-#TODO: display data
-
-#TODO: rooms? Shouldn't the rooms per group be available????
-# Via the workload entry ... this can, however, be '$', potentially
-# leading to multiple rooms.
-            x = False
-            groups = set()
-            tids = set()
-            sid = activity.sid
-            for c in activity.course_list:
-                if c.klass == klass:
-                    groups.add(c.group)
-                    tids.add(c.teacher)
-                else:
-                    x = True
-#TODO: tool-tip (or whatever) to show parallel courses?
-            t_rooms = lesson_data.rooms
-            t_tids = ','.join(sorted(tids)) or '–'
-            t_groups, tile_divisions = self.tile_division(klass, groups)
-            #t_groups = ','.join(sorted(groups))
-            if x:
-                t_groups += ",+"
-#TODO--
-#            print("  ...", sid, t_tids, t_groups, t_rooms, tile_divisions)
-            
-            tile_list.setItem(row, 0, QTableWidgetItem(sid))
-            twi = QTableWidgetItem(str(lesson_data.length))
-            twi.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-            tile_list.setItem(row, 1, twi)
-            twi = QTableWidgetItem(t_groups)
-            twi.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-            tile_list.setItem(row, 2, twi)
-            tile_list.setItem(row, 3, QTableWidgetItem(t_tids))
-
-# Just testing!!! It should actually be based on existing placement
-#            if fixed_time:
-#                tile_list.hideRow(row)
-#            else:
-#                tile_list.showRow(row)
-
-# Perhaps placements should be done "normally", i.e. with all checks,
-# in case the fixed times have changed (or there is an error in the
-# database).
-
-            for i, l, n in tile_divisions:
-                tile_index = len(tiles)
-                tile = make_tile(
-                    grid=grid,
-                    tag=tile_index,
-                    duration=lesson_data.length,
-                    n_parts=l,
-                    n_all=n,
-                    offset=i,
-                    text=sid,
-#TODO: Might want to handle the placing of the corners in the configuration?
-# Rooms can perhaps only be added when placed, and even then not always ...
-                    tl=t_tids,
-                    tr=t_groups,
-                    br=t_rooms,
-                )
-                tiles.append(tile)
-                if d >= 0:
-                    grid.place_tile(tile_index, (d, p))
-                    tile_list_hidden.append(True)
-                else:
-                    tile_list_hidden.append(False)
-
-        tile_list.resizeColumnsToContents()
 
 
 #TODO--?

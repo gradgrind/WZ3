@@ -38,7 +38,7 @@ if __name__ == "__main__":
     start.setup(os.path.join(basedir, 'TESTDATA'))
 
 #from typing import Optional
-from array import array
+#from array import array
 
 from core.basic_data import (
     get_days,
@@ -75,6 +75,7 @@ class PlacementEngine:
         self.set_rooms(rooms)
 
     def week_array(self, n):
+        return [0]*(n*self.week_size)
         return array('i', (0,)*(n*self.week_size))
 
     def set_classes(self, classes):
@@ -164,10 +165,40 @@ class PlacementEngine:
 #TODO
     def set_activities(self, activities):
         print("TODO: activities")
+        # An activitiy has a time – which can be fixed – and a length.
+        # It also has 0 or more rooms, which can be selected from
+        # a list of possibilities or a "joker" ('+'). A joker room
+        # should not be selected automatically – rather flag the
+        # activity as having an unresolved room requirement.
+        # If a fixed time cannot be allocated because of a clash, this
+        # should be reported as an error. To ensure this works correctly,
+        # all fixed allocations should be done first.
+        # Perhaps an unresolvable room should be reported as an error too.
 
+        ## Time: fixed, allocated, length
+        # Rooms are more complicated because of the variable lists.
+        # Should I handle that using python lists or devise a low-level
+        # approach (linked lists?)?
+        # One possibility would be to allocate a bunch of nodes which can be
+        # expanded if necessary (that would require copying the existing nodes).
+        # Shrinking would not then be trivial, but perhaps not a problem. If
+        # I started with a fairly large block (using 32-bit indexes?), I could
+        # start testing without expansion code ... I suppose free nodes would
+        # need to be linked initially.
+        # Linked lists are quite straightforward to implement, especially
+        # using indexes to link (all nodes in a single vector), variable length
+        # lists could be trickier.
+        # Actually array-module arrays can be extended ... I could even do
+        # linear lists with special termination.
+        
+        #self.placements = array('i', (0,)*(n*self.week_size))
+        #self.placements = [0]*(n*self.week_size)
+        self.activities = []
         for activity in activities:
 #TODO--
             print("  --", activity)
+
+            self.activities.append([])
 
         #return
         #if True:

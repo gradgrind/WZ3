@@ -216,6 +216,10 @@ template_engine.template_sub: {
     BAD_FIELD_INFO: "Ungültige Feld-Info ({error}) in:\n  {path}"
 }
 
+timetable.timetable_base: {
+    BLOCK_ROOMS_INCOMPATIBLE: "Raumangaben für den Block „{sid}“ in Klasse(n) {classes} sind nicht umsetzbar:\n  {rooms}"
+}
+
 ui.dialogs.dialog_block_name: {
     NEW_ITEM:       "Neu: Unterricht, Block oder Deputat"
     UPDATE_ITEM:    "Blockfach oder -kennzeichen ändern"

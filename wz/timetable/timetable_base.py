@@ -33,22 +33,17 @@ if __name__ == "__main__":
     from core.base import start
     start.setup(os.path.join(basedir, 'TESTDATA'))
 
-#T = TRANSLATIONS("timetable.timetable_base")
+T = TRANSLATIONS("timetable.timetable_base")
 
 ### +++++
 
-from typing import NamedTuple
-from itertools import combinations
+from typing import NamedTuple, Optional
 
-from core.db_access import open_database, KeyValueList
 from core.basic_data import (
-    get_days,
-    get_periods,
     get_classes,
     get_teachers,
     get_subjects,
     get_rooms,
-    timeslot2index
 )
 from core.activities import (
     collect_activity_groups,
@@ -56,7 +51,6 @@ from core.activities import (
     CourseWithRoom,
 )
 from core.classes import GROUP_ALL
-from timetable.tt_engine import PlacementEngine
 
 
 class TimetableActivity(NamedTuple):
@@ -147,21 +141,6 @@ class Timetable:
         for lg, act in lg_map.items():
             class_atoms = {}    # {class: {atomic groups}}
 
-
-#NEW: info for the timetable views ...
-# Maybe I should defer all of this to the presentation code. The
-# course items are passed to that, so it should be possible, and it
-# is not relevant for placement, etc.
-#            teacher_data = {}   # {tid: [{cd-groups}, {rids}]}
-            # As the room specification can be a choice rather than a
-            # particular room, this can only be used to eliminate certain
-            # rooms from consideration ...
-#            room_data = {}      # {rid: [{cd-groups}, {tids}]}
-# The (c)d-groups were previously built later, I think (when showing a
-# class?). Is there a problem with building them here?
-
-#            # pg_sets = {}    #  {klass -> set of division groups}
-
 # Collect groups, teachers and rooms on a class basis, so that the
 # lesson tiles don't try to show too much. A ',+' on the group can
 # indicate that other classes are parallel.
@@ -169,8 +148,7 @@ class Timetable:
 # would be different! Would it make sense to collect them all in
 # one place, or would there be completely separate handlers?
 
-            ## Collect the data needed for timtable placements, etc.
-            class_data = {}     # {class: [{d-groups}, {tids}, {rids}]}
+            ## Collect the data needed for timetable placements, etc.
             teacher_set = set()
             room_set = set()
             for cwr in act.course_list:
@@ -198,14 +176,31 @@ class Timetable:
             ## Handle rooms
             # Room allocations containing '+' should not block anything.
             # It could possibly imply that manual selection is necessary.
+            # The room specification can be a choice rather than a
+            # particular room. In this case the choice list can only be
+            # used to eliminate certain rooms from consideration ...
 #TODO
             # A more sophisticated approach might include a check that at
             # least one of a list of reasonable candidates (based on what?)
             # is available.
+
             # As there can be multi-room requirements, the data structure is
             # a list of lists (a single requirement potentially being a
             # choice – assumed to be ordered).
-            roomlists = [room_split(r) for r in room_set]
+            # A '+' entry should always be the last in a choice list.
+            
+            roomlists = simplify_room_lists_(room_set)
+            if roomlists is None:
+                REPORT(
+                    "ERROR",
+                    T["BLOCK_ROOMS_INCOMPATIBLE"].format(
+                        classes=",".join(class_atoms),
+                        sid=sid,
+                        rooms=" & ".join(room_set)
+                    )
+                )
+                roomlists=[]
+
             # print("???", roomlists)
 
             ## Generate the activity or activities
@@ -232,69 +227,69 @@ class Timetable:
                 self.subject_activities[sid].append(a_index)
 
 
-#TODO--?
-def simplify_room_lists(roomlists):
-    """Simplify room lists, check for room conflicts."""
-    # Collect single room "choices" and remove redundant entries
-    singles = set()
-    while True:
-        extra = False
-        singles1 = set()
-        roomlists1 = []
-        for rl in roomlists:
-            rl1 = [r for r in rl if r not in singles]
-            if rl1:
-                if len(rl1) == 1:
-                    if rl1[0] == '+':
-                        if not extra:
-                            roomlists1.append(rl1)
-                            extra = True
-                    else:
-                        singles1.add(rl1[0])
-                else:
-                    roomlists1.append(rl1)
+def simplify_room_lists_(room_set: set[str]) -> Optional[list[list[str]]]:
+    """Simplify room lists, where possible, and check for room conflicts.
+    
+    The room specifications for the individual courses (via the
+    "WORKLOAD" entries) are collected as a set – thus eliminating
+    textual duplicates.
+    The number of entries in <room_set> is taken to be the number of
+    distinct rooms needed.
+    This approach is in some respects not ideal, but given the
+    difficulties of specifying concisely the room requirements for
+    blocks containing multiple courses, it seemed a reasonable compromise.
+    """
+    ## Collect single room "choices" and remove redundant entries
+    srooms = [] # (single) fixed room
+    rooms = []  # "normal" room choice list
+    xrooms = [] # "flexible" room choice list (with '+')
+    for r in room_set:
+        rlist = room_split(r)
+        if rlist[-1] == '+':
+            xrooms.append(rlist)
+        elif len(rlist) == 1:
+            if r in srooms:
+                return None
+            srooms.append(r)
+        else:
+            rooms.append(rlist)
+    i = 0
+    while i < len(srooms):
+        # Filter already claimed rooms from the choice lists
+        r = srooms[i]
+        i += 1
+        rooms_1 = []    # temporary buffer for rebuilding <rooms>
+        for rlist in rooms:
+            try:
+                rlist.remove(r)
+            except ValueError:
+                rooms_1.append(rlist)
             else:
-                raise ValueError
-        if roomlists1 == roomlists:
-            return [[s] for s in sorted(singles)] + roomlists
-        singles.update(singles1)
-        roomlists = roomlists1
-
-
-#TODO--?
-def simplify_room_lists_(roomlists, klass, tag):
-    """Simplify room lists, check for room conflicts."""
-    # Collect single room "choices" and remove redundant entries
-    singles = set()
-    while True:
-        extra = False
-        singles1 = set()
-        roomlists1 = []
-        for rl in roomlists:
-            rl1 = [r for r in rl if r not in singles]
-            if rl1:
-                if len(rl1) == 1:
-                    if rl1[0] == '+':
-                        if not extra:
-                            roomlists1.append(rl1)
-                            extra = True
-                    else:
-                        singles1.add(rl1[0])
+                if len(rlist) == 1:
+                    rx = rlist[0]
+                    if rx in srooms:
+                        return None
+                    # Add to list of single rooms
+                    srooms.append(rx)
                 else:
-                    roomlists1.append(rl1)
-            else:
-                SHOW_ERROR(
-                    T["BLOCK_ROOM_CONFLICT"].format(
-                        klass=klass,
-                        sid=sid,
-                        tag=tag,
-                        rooms=repr(roomlists),
-                    ),
-                )
-        if roomlists1 == roomlists:
-            return [[s] for s in sorted(singles)] + roomlists
-        singles.update(singles1)
-        roomlists = roomlists1
+                    rooms_1.append(rlist)       
+        rooms = rooms_1
+        # Filter already claimed rooms from the flexible choices
+        for rlist in xrooms:
+            try:
+                rlist.remove(r)
+            except ValueError:
+                continue
+    # Sort according to list length
+    rl1 = [(len(rl), rl) for rl in rooms]
+    rl2 = [(len(rl), rl) for rl in xrooms]
+    rl1.sort()
+    rl2.sort()
+    return [
+        *([r] for r in srooms),
+        *(rl[1] for rl in rl1),
+        *(rl[1] for rl in rl2)
+    ]
 
 
 # --#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#
@@ -304,3 +299,7 @@ if __name__ == '__main__':
     open_database()
 
     tt = Timetable()
+
+    rset = {   "R1", "R2/R3", "R1/R5", "R1+", "R2/R5+" }
+    print("Room set:", rset)
+    print("  -->", simplify_room_lists_(rset))

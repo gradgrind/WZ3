@@ -1,7 +1,7 @@
 """
 core/activities.py
 
-Last updated:  2023-05-28
+Last updated:  2023-05-30
 
 Collect basic information on "activities".
 
@@ -34,7 +34,7 @@ if __name__ == "__main__":
     from core.base import start
     start.setup(os.path.join(basedir, "TESTDATA"))
 
-#T = TRANSLATIONS("core.activities_data")
+#T = TRANSLATIONS("core.activities")
 
 ### +++++
 

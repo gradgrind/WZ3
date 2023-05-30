@@ -1,5 +1,5 @@
 """
-timetable/asc_data.py - last updated 2023-05-22
+timetable/asc_data.py - last updated 2023-05-30
 
 Prepare aSc-timetables input from the database ...
 
@@ -66,7 +66,7 @@ from core.basic_data import (
     get_rooms,
     timeslot2index,
 )
-from core.activities_data import collect_activity_groups
+from core.activities import collect_activity_groups
 
 def idsub(tag):
     """In aSc, "id" fields may only contain ASCII alphanumeric characters,
@@ -304,12 +304,15 @@ class TimetableCourses:
             teacher_set = set()
             room_list = []
             extra_room = False
-            for klass, g, sid, tid in act.course_list:
+            room_set = set()
+            for klass, g, sid, tid, room in act.course_list:
                 class_set.add(klass)
                 if g and klass != "--":
                     # Only add a group "Students" entry if there is a
                     # group and a (real) class
                     group_set.update(asc_class_groups[klass][g])
+                if room:
+                    room_set.add(room)
                 if tid != "--":
                     teacher_set.add(tid)
 
@@ -322,7 +325,7 @@ class TimetableCourses:
             ## Handle rooms
             ## aSc doesn't support xml-input of complex room info, so
             ## just make a simple list.
-            for r in act.room_list:
+            for r in room_set:
                 if (rs := r.rstrip('+')):
                     for rl in rs.split('/'):
                         room_list.append(rl)

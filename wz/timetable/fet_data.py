@@ -1,5 +1,5 @@
 """
-timetable/fet_data.py - last updated 2023-05-22
+timetable/fet_data.py - last updated 2023-05-30
 
 Prepare fet-timetables input from the database ...
 
@@ -81,7 +81,7 @@ from core.db_access import (
     read_pairs,
     db_read_mappings,
 )
-from core.activities_data import collect_activity_groups
+from core.activities import collect_activity_groups
 
 LUNCH_BREAK = '^'
 
@@ -360,7 +360,8 @@ class TimetableCourses:
             class_set = set()
             group_sets = {} # {klass -> set of atomic groups}
             teacher_set = set()
-            for klass, g, sid, tid in act.course_list:
+            room_set = set()
+            for klass, g, sid, tid, room in act.course_list:
                 class_set.add(klass)
                 if g and klass != "--":
                     # Only add a group "Students" entry if there is a
@@ -372,6 +373,8 @@ class TimetableCourses:
                         group_sets[klass].update(gatoms)
                     except KeyError:
                         group_sets[klass] = set(gatoms)
+                if room:
+                    room_set.add(room)
                 if tid != "--":
                     teacher_set.add(tid)
             # Get "usable" groups
@@ -406,7 +409,7 @@ class TimetableCourses:
             # activities. Eliminate open room choices from further
             # consideration here.
             roomlists = []
-            for r in act.room_list:
+            for r in room_set:
                 rs = r.rstrip('+')
                 rl = rs.split('/') if rs else [] 
                 if r[-1] == '+':
@@ -1677,7 +1680,7 @@ if __name__ == "__main__":
 
         xml_fet = xmltodict.unparse(courses.gen_fetdata(), pretty=True)
 
-        outpath = os.path.join(outdir, "tt_out.fet")
+        outpath = os.path.join(outdir, "tt_out_2.fet")
         with open(outpath, "w", encoding="utf-8") as fh:
             fh.write(xml_fet.replace("\t", "   "))
         print("\nTIMETABLE XML ->", outpath)

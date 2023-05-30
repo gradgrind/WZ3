@@ -1,7 +1,7 @@
 """
 core/list_activities.py
 
-Last updated:  2023-05-20
+Last updated:  2023-05-30
 
 Present information on activities for teachers and classes/groups.
 The information is formatted in pdf documents using the reportlab
@@ -44,7 +44,7 @@ from typing import NamedTuple, Optional
 from io import BytesIO
 
 from core.base import class_group_join
-from core.classes import GROUP_ALL#, Subgroup
+from core.classes import GROUP_ALL
 from core.basic_data import (
     Workload,
     BlockTag,
@@ -53,7 +53,7 @@ from core.basic_data import (
     get_classes,
 )
 from core.db_access import db_read_fields
-#from core.course_data import WHOLE_CLASS, WHOLE_CLASS_SG
+from core.activities import read_db, ActivityItem
 import lib.pylightxl as xl
 from tables.pdf_table import TablePages
 
@@ -67,16 +67,6 @@ def PAY_FORMAT(pay):
         return f"{pay:.3f}".replace(".", DECIMAL_SEP)
     else:
         return pay
-
-
-class ActivityItem(NamedTuple):
-    course_data: tuple[str, str, str, str] # class, group, subject, teacher
-    workload: int
-    lesson_group: int
-    blocktag: Optional[BlockTag]
-    lessons: list[int]
-    paytag: Optional[Workload]
-    room: str
 
 
 class TeacherData(NamedTuple):
@@ -109,77 +99,6 @@ class ClassData(NamedTuple):
     paystr: str         #TODO: not reliable for pay if combined groups!
 
 
-def read_db():
-    """Read all the relevant data from the database tables concerning
-    the workload of classes and teachers.
-    """
-    cl_lists = {}
-    t_lists = {}
-
-    c_2_cl_g_s_t = {}
-    w_2_lg_p_r = {}
-    lg_2_ll = {}
-    lg_2_bt_ll = {}
-    lg_2_c = {}
-
-    for c, cl, g, s, t in db_read_fields(
-        "COURSES",
-        ("course", "CLASS", "GRP", "SUBJECT", "TEACHER")
-    ):
-        c_2_cl_g_s_t[c] = (cl, g, s, t)
-
-    for w, lg, paytag, room in db_read_fields(
-        "WORKLOAD",
-        ("workload", "lesson_group", "PAY_TAG", "ROOM")
-    ):
-        w_2_lg_p_r[w] = (lg, Workload.build(paytag), room)
-
-    for lg, l in db_read_fields(
-        "LESSONS",
-        ("lesson_group", "LENGTH")
-    ):
-        try:
-            lg_2_ll[lg].append(l)
-        except KeyError:
-            lg_2_ll[lg] = [l]
-
-    for lg, bsid, btag in db_read_fields(
-        "LESSON_GROUPS",
-        ("lesson_group", "BLOCK_SID", "BLOCK_TAG")
-    ):
-        lg_2_bt_ll[lg] = (
-            BlockTag.build(bsid, btag) if bsid else None,
-            lg_2_ll[lg]     # assumes each lg has lessons!
-        )
-
-    for c, w in db_read_fields(
-        "COURSE_WORKLOAD",
-        ("course", "workload")
-    ):
-        cdata = c_2_cl_g_s_t[c]
-        lg, p, r = w_2_lg_p_r[w]
-        if lg:
-            bt, ll = lg_2_bt_ll[lg]
-        else:
-            bt, ll = None, []
-        cl = cdata[0]
-        t = cdata[3]
-        data = ActivityItem(cdata, w, lg, bt, ll, p, r)
-        try:
-            t_lists[t].append(data)
-        except KeyError:
-            t_lists[t] = [data]
-        try:
-            cl_lists[cl].append(data)
-        except KeyError:
-            cl_lists[cl] = [data]
-        try:
-            lg_2_c[lg].append(cdata)
-        except KeyError:
-            lg_2_c[lg] = [cdata]
-    return (cl_lists, t_lists, lg_2_c)
-
-
 def pay_data(paytag, nlessons):
     """Process the workload/payment data into a display form.
     """
@@ -203,7 +122,6 @@ def teacher_list(tlist: list[ActivityItem]):
     courses = []
     subjects = get_subjects()
     for data in tlist:
-        klass, group, sid, tid = data.course_data
         lessons = data.lessons
         t_lessons = ','.join(str(l) for l in lessons)
         pdata = pay_data(data.paytag, (nlessons := sum(lessons)))
@@ -213,11 +131,11 @@ def teacher_list(tlist: list[ActivityItem]):
         else:
             bs, bt = "", ""
         tdata = TeacherData(
-            klass,
+            data.klass,
             bs,
             bt,
-            subjects.map(sid),
-            group,
+            subjects.map(data.subject),
+            data.group,
             data.room,
             t_lessons,
             nlessons,
@@ -251,7 +169,6 @@ def class_list(clist: list[ActivityItem]):
     subjects = get_subjects()
     courses = []
     for data in clist:
-        klass, group, sid, tid = data.course_data
         lessons = data.lessons
         nlessons = sum(lessons)
         t_lessons = ','.join(str(l) for l in lessons)
@@ -261,9 +178,9 @@ def class_list(clist: list[ActivityItem]):
         else:
             bs, bt = "", ""
         cdata = ClassData(
-            subjects.map(sid),
-            group,
-            tid,
+            subjects.map(data.subject),
+            data.group,
+            data.teacher,
             bs,
             bt,
             data.workload,

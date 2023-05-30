@@ -27,7 +27,7 @@ Copyright 2023 Michael Towers
 if __name__ == "__main__":
     import sys, os
     this = sys.path[0]
-    appdir = os.path.dirname(os.path.dirname(this))
+    appdir = os.path.dirname(this)
     sys.path[0] = appdir
     basedir = os.path.dirname(appdir)
     from core.base import start
@@ -83,6 +83,18 @@ def class2group2atoms():
         g2ags[GROUP_ALL] = cg.atomic_groups
         c2g2ags[klass] = g2ags
     return c2g2ags
+
+
+def room_split(room_choice: str) -> list[str]:
+    """Split a room (choice) string into components.
+    If there is a '+', it must be the last character, not preceded
+    by a '/'.
+    """
+    rs = room_choice.rstrip('+')
+    rl = rs.split('/') if rs else []
+    if room_choice and room_choice[-1] == '+':
+        rl.append('+')
+    return rl
 
 
 class Timetable:
@@ -193,13 +205,8 @@ class Timetable:
             # As there can be multi-room requirements, the data structure is
             # a list of lists (a single requirement potentially being a
             # choice – assumed to be ordered).
-            roomlists = []
-            for r in room_set:
-                rs = r.rstrip('+')
-                rl = rs.split('/') if rs else []
-                if r[-1] == '+':
-                    rl.append('+')
-                roomlists.append(rl)
+            roomlists = [room_split(r) for r in room_set]
+            # print("???", roomlists)
 
             ## Generate the activity or activities
             for ldata in act.lessons:

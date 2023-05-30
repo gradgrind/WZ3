@@ -60,7 +60,7 @@ from core.activities import (
     CourseWithRoom,
 )
 from core.classes import GROUP_ALL
-from timetable.timetable_base import Timetable
+from timetable.timetable_base import Timetable, room_split
 from timetable.tt_engine import PlacementEngine
 from ui.ui_base import (
     ### QtWidgets:
@@ -199,16 +199,25 @@ class TimetableManager(Timetable):
             x = False
             groups = set()
             tids = set()
+            rooms = set()
             sid = activity.sid
             for c in activity.course_list:
                 if c.klass == klass:
                     groups.add(c.group)
                     tids.add(c.teacher)
-                    print("???", c.room)
+                    # The rooms are the acceptable ones!
+                    rooms.update(room_split(c.room))
                 else:
                     x = True
 #TODO: tool-tip (or whatever) to show parallel courses?
+#TODO: The rooms are part of the allocation data and should be checked!
             t_rooms = lesson_data.rooms
+# It could be that not all required rooms have been allocated?
+# I would need to compare this with the "roomlists" lists, 
+# <activity.roomlists>.
+            alloc_rooms = t_rooms.split(',') if t_rooms else []
+            print("???", len(activity.roomlists), rooms, alloc_rooms)
+
             t_tids = ','.join(sorted(tids)) or '–'
             t_groups, tile_divisions = self.tile_division(klass, groups)
             #t_groups = ','.join(sorted(groups))

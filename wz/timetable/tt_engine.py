@@ -1,5 +1,5 @@
 """
-timetable/placement_engine.py - last updated 2023-05-29
+timetable/placement_engine.py - last updated 2023-05-31
 
 Manage placement of "activities" within the week, including,
 where appropriate, room allocation.
@@ -19,10 +19,6 @@ Copyright 2023 Michael Towers
    See the License for the specific language governing permissions and
    limitations under the License.
 """
-
-ACTIVITIES_ENDING = "_activities.xml"
-
-########################################################################
 
 import sys, os
 
@@ -56,12 +52,13 @@ from core.basic_data import (
 ### -----
 
 class PlacementEngine:
-    def __init__(self, days, periods):
-        self.day_list = days
-        #print("§days", days)
-        self.period_list = periods
-        #print("§periods", periods)
-        self.week_size = len(days) * len(periods)
+    def __init__(self):
+        self.day_list = get_days().key_list()
+        #print("§days", self.day_list)
+        self.period_list = get_periods().key_list()
+        self.PERIODS_PER_DAY = len(self.period_list)
+        #print("§periods", self.period_list)
+        self.week_size = len(self.day_list) * self.PERIODS_PER_DAY
 
     def setup_structures(self,
         classes=None,
@@ -244,11 +241,58 @@ class PlacementEngine:
             print("  ...", sid, t_tids, t_groups, t_rooms, tile_divisions)
 
 
+
+
+
+
+def place_activity(places, activity, index):
+    """Try to place the given activity. Check time slot and rooms.
+    """
+
+#TODO--
+#            print("  --", activity)
+    lesson_data = activity.lesson_info
+    fixed_time = lesson_data.time
+
+#TODO: Keep non-fixed times separate from the database? When would they
+# be saved, then?
+    if fixed_time:
+        d, p = timeslot2index(fixed_time)
+#                print("   @", d, p)
+
+    else:
+        slot_time = lesson_data.placement
+        if slot_time:
+            d, p = timeslot2index(slot_time)
+#                    print("   (@)", d, p)
+        else:
+            return None
+
+
+    
+    t_i = d * places.PERIODS_PER_DAY + p
+#TODO: check atomic groups and teachers
+    print("?groups:", activity.class_atoms)
+    print("?tids:", activity.teacher_set)
+
+#TODO: The rooms are part of the allocation data and should be checked!
+    t_rooms = lesson_data.rooms
+# It could be that not all required rooms have been allocated?
+# I would need to compare this with the "roomlists" lists, 
+# <activity.roomlists>.
+    alloc_rooms = t_rooms.split(',') if t_rooms else []
+    print("???rooms", len(activity.roomlists), alloc_rooms)
+
+
+
+
+
+
 # --#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#
 
 if __name__ == "__main__":
     from core.db_access import open_database
     open_database()
-    pe = PlacementEngine(get_days().key_list(), get_periods().key_list())
+    pe = PlacementEngine()
     pe.setup_structures()
 

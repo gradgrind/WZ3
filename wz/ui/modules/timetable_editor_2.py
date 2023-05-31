@@ -1,7 +1,7 @@
 """
 ui/modules/timetable_editor.py
 
-Last updated:  2023-05-30
+Last updated:  2023-05-31
 
 Show a timetable grid and allow placement of lesson tiles.
 
@@ -40,11 +40,7 @@ T = TRANSLATIONS("ui.modules.timetable_editor")
 
 ### +++++
 
-from typing import NamedTuple
-from itertools import combinations
-
 from ui.timetable_grid import GridViewRescaling, GridPeriodsDays
-from core.db_access import open_database, KeyValueList
 from core.basic_data import (
     clear_cache,
     get_days,
@@ -61,7 +57,6 @@ from core.activities import (
 )
 from core.classes import GROUP_ALL
 from timetable.timetable_base import Timetable, room_split
-from timetable.tt_engine import PlacementEngine
 from ui.ui_base import (
     ### QtWidgets:
     QListWidgetItem,
@@ -91,24 +86,11 @@ class TimetableEditor(Page):
         open_database()
         clear_cache()
         self.TT_CONFIG = MINION(DATAPATH("CONFIG/TIMETABLE"))
-        days = get_days().key_list()
-        periods = get_periods().key_list()
-        self.engine = PlacementEngine(days, periods)
-        breaks = self.TT_CONFIG["BREAKS_BEFORE_PERIODS"]
-        self.grid = WeekGrid(days, periods, breaks)
-        self.table_view.setScene(self.grid)
         self.timetable = (tt := TimetableManager())
-        self.engine.setup_structures(
-            classes={
-                k: gmap[GROUP_ALL]
-                for k, gmap in tt.class_group_atoms.items()
-                if tt.class_activities[k]
-            },
-            subjects=tt.subject_activities,
-            teachers=tt.teacher_activities,
-        )
-        self.engine.set_activities(tt.activities)
-        self.timetable.set_gui(self)
+        breaks = self.TT_CONFIG["BREAKS_BEFORE_PERIODS"]
+        self.grid = WeekGrid(breaks)
+        self.table_view.setScene(self.grid)
+        tt.set_gui(self)
 
         ## Set up class list
         self.all_classes = []
@@ -411,6 +393,13 @@ def simplify_room_lists_(roomlists, klass, tag):
 
 
 class WeekGrid(GridPeriodsDays):
+    def __init__(self, breaks):
+        super().__init__(
+            get_days().key_list(),
+            get_periods().key_list(),
+            breaks
+        )
+
     def make_context_menu(self):
         self.context_menu = QMenu()
 #TODO:
@@ -425,6 +414,7 @@ class WeekGrid(GridPeriodsDays):
 # --#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#
 
 if __name__ == '__main__':
+    from core.db_access import open_database
     from ui.ui_base import run
 
     widget = TimetableEditor()

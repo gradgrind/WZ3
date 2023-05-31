@@ -1,7 +1,7 @@
 """
 timetable/timetable_base.py
 
-Last updated:  2023-05-30
+Last updated:  2023-05-31
 
 Collect the basic information for timetable display and processing.
 
@@ -51,6 +51,7 @@ from core.activities import (
     CourseWithRoom,
 )
 from core.classes import GROUP_ALL
+from timetable.tt_engine import PlacementEngine
 
 
 class TimetableActivity(NamedTuple):
@@ -62,6 +63,11 @@ class TimetableActivity(NamedTuple):
     sid: str
     lesson_group: int
     course_list: list[CourseWithRoom]
+
+
+class Places(NamedTuple):
+    PERIODS_PER_DAY: int
+
 
 ### -----
 
@@ -93,6 +99,24 @@ def room_split(room_choice: str) -> list[str]:
 
 class Timetable:
     def __init__(self):
+        self.init()
+        ## Set up the placement data
+        self.engine = PlacementEngine()
+        self.engine.setup_structures(
+            classes={
+                k: gmap[GROUP_ALL]
+                for k, gmap in self.class_group_atoms.items()
+                if self.class_activities[k]
+            },
+            subjects=self.subject_activities,
+            teachers=self.teacher_activities,
+        )
+        self.engine.set_activities(self.activities)
+
+
+
+
+    def init(self):
         self.class_group_atoms = class2group2atoms()
         ### Collect <Activity> items, they are then referenced by index
         self.activities = []

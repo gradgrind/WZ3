@@ -195,50 +195,54 @@ class PlacementEngine:
 #TODO--
             print("  --", activity)
 
-            self.activities.append([])
-
-        #return
-        #if True:
-
-
             lesson_data = activity.lesson_info
+
+
+#TODO: The rooms are part of the allocation data and should be checked!
+            t_rooms = lesson_data.rooms
+# It could be that not all required rooms have been allocated?
+# I would need to compare this with the "roomlists" lists, 
+# <activity.roomlists>.
+            alloc_rooms = t_rooms.split(',') if t_rooms else []
+
+            room_a = [self.room_map[r] for r in alloc_rooms]
+
+            print("???rooms", len(activity.roomlists), alloc_rooms, room_a)
+
+            room_0 = []
+            for rl in activity.roomlists:
+                room_0.append( rr := [])
+                for r in rl:
+                    if r == '+':
+                        rr.append(-1)
+                    else:
+                        rr.append(self.room_map[r])
+            print("?roomlists:", room_0)
+
+#?            self.activities.append([])
+
             fixed_time = lesson_data.time
 
 #TODO: Keep non-fixed times separate from the database? When would they
 # be saved, then?
             if fixed_time:
                 d, p = timeslot2index(fixed_time)
-                print("   @", d, p)
+#                print("   @", d, p)
 
             else:
-                slot_time = lesson_data.placement
-                if slot_time:
-                    d, p = timeslot2index(slot_time)
-                    print("   (@)", d, p)
+                d, p = timeslot2index(lesson_data.placement)
+#                print("   (@)", d, p)
+                if d < 0:
+                    continue
+            t_i = d * self.PERIODS_PER_DAY + p
+#TODO: check atomic groups and teachers and rooms
+            print("?groups:", activity.class_atoms)
 
-#TODO: rooms? Shouldn't the rooms per group be available????
-# Via the workload entry ... this can, however, be '$', potentially
-# leading to multiple rooms.
+            print("?tids:", activity.teacher_set)
 
-            groups = activity.class_atoms
-            roomlists = activity.roomlists
-            tids = activity.teacher_set
-
-#            sid = activity.sid
+            sid = activity.sid
 
 
-            return
-
-
-#TODO: tool-tip (or whatever) to show parallel courses?
-            t_rooms = lesson_data.rooms
-            t_tids = ','.join(sorted(tids)) or '–'
-            t_groups, tile_divisions = self.tile_division(klass, groups)
-            #t_groups = ','.join(sorted(groups))
-            if x:
-                t_groups += ",+"
-#TODO--
-            print("  ...", sid, t_tids, t_groups, t_rooms, tile_divisions)
 
 
 
@@ -250,40 +254,7 @@ def place_activity(places, activity, index):
     """
 
 #TODO--
-#            print("  --", activity)
-    lesson_data = activity.lesson_info
-    fixed_time = lesson_data.time
-
-#TODO: Keep non-fixed times separate from the database? When would they
-# be saved, then?
-    if fixed_time:
-        d, p = timeslot2index(fixed_time)
-#                print("   @", d, p)
-
-    else:
-        slot_time = lesson_data.placement
-        if slot_time:
-            d, p = timeslot2index(slot_time)
-#                    print("   (@)", d, p)
-        else:
-            return None
-
-
-    
-    t_i = d * places.PERIODS_PER_DAY + p
-#TODO: check atomic groups and teachers
-    print("?groups:", activity.class_atoms)
-    print("?tids:", activity.teacher_set)
-
-#TODO: The rooms are part of the allocation data and should be checked!
-    t_rooms = lesson_data.rooms
-# It could be that not all required rooms have been allocated?
-# I would need to compare this with the "roomlists" lists, 
-# <activity.roomlists>.
-    alloc_rooms = t_rooms.split(',') if t_rooms else []
-    print("???rooms", len(activity.roomlists), alloc_rooms)
-
-
+#    print("  --", activity)
 
 
 

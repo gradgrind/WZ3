@@ -113,9 +113,6 @@ class Timetable:
         )
         self.engine.set_activities(self.activities)
 
-
-
-
     def init(self):
         self.class_group_atoms = class2group2atoms()
         ### Collect <Activity> items, they are then referenced by index
@@ -324,6 +321,6 @@ if __name__ == '__main__':
 
     tt = Timetable()
 
-    rset = {   "R1", "R2/R3", "R1/R5", "R1+", "R2/R5+" }
+    rset = {   "R1", "R2/R3", "R1/R5", "R1+", "R2/R5+", "R3" }
     print("Room set:", rset)
     print("  -->", simplify_room_lists_(rset))

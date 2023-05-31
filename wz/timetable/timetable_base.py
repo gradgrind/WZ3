@@ -221,8 +221,7 @@ class Timetable:
                     )
                 )
                 roomlists=[]
-
-            # print("???", roomlists)
+            # print("???r:", roomlists)
 
             ## Generate the activity or activities
             for ldata in act.lessons:
@@ -248,7 +247,12 @@ class Timetable:
                 self.subject_activities[sid].append(a_index)
 
 
-def simplify_room_lists_(room_set: set[str]) -> Optional[list[list[str]]]:
+def simplify_room_lists_(room_set: set[str]) -> Optional[
+    tuple[
+        list[str],          # required single rooms
+        list[list[str]],    # fixed room choices
+        list[list[str]]     # flexible room choices
+    ]]:
     """Simplify room lists, where possible, and check for room conflicts.
     
     The room specifications for the individual courses (via the
@@ -267,7 +271,7 @@ def simplify_room_lists_(room_set: set[str]) -> Optional[list[list[str]]]:
     for r in room_set:
         rlist = room_split(r)
         if rlist[-1] == '+':
-            xrooms.append(rlist)
+            xrooms.append(rlist[:-1])
         elif len(rlist) == 1:
             if r in srooms:
                 return None
@@ -306,11 +310,11 @@ def simplify_room_lists_(room_set: set[str]) -> Optional[list[list[str]]]:
     rl2 = [(len(rl), rl) for rl in xrooms]
     rl1.sort()
     rl2.sort()
-    return [
-        *([r] for r in srooms),
-        *(rl[1] for rl in rl1),
-        *(rl[1] for rl in rl2)
-    ]
+    return (
+        srooms,
+        [rl[1] for rl in rl1],
+        [rl[1] for rl in rl2]
+    )
 
 
 # --#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#

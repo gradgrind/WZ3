@@ -193,7 +193,7 @@ class PlacementEngine:
         self.activities = []
         for activity in activities:
 #TODO--
-            print("  --", activity)
+#            print("  --", activity)
 
             lesson_data = activity.lesson_info
 
@@ -204,22 +204,42 @@ class PlacementEngine:
 # I would need to compare this with the "roomlists" lists, 
 # <activity.roomlists>.
             alloc_rooms = t_rooms.split(',') if t_rooms else []
-
             room_a = [self.room_map[r] for r in alloc_rooms]
 
-            print("???rooms", len(activity.roomlists), alloc_rooms, room_a)
+            rs, rc, rx = activity.roomlists
+            rs1 = [self.room_map[r] for r in rs]
+            rc1 = [
+                [self.room_map[r] for r in r_]
+                for r_ in rc
+            ]
+            rx1 = [
+                [self.room_map[r] for r in r_]
+                for r_ in rx
+            ]
 
-            room_0 = []
-            for rl in activity.roomlists:
-                room_0.append( rr := [])
-                for r in rl:
-                    if r == '+':
-                        rr.append(-1)
-                    else:
-                        rr.append(self.room_map[r])
-            print("?roomlists:", room_0)
+            n = len(rs1) + len(rc1) + len(rx1)
 
-#?            self.activities.append([])
+            if len(rx1) > 0:
+                print("???rooms", n, alloc_rooms, room_a)
+                print("   -->", rs1, "**", rc1, "**", rx1)
+
+            groups = []
+            for k, gset in activity.class_atoms.items():
+                km = self.group_map[k]
+                if gset:
+                    for g in gset:
+                        groups.append(km[g])
+                else:
+                    groups.append(km[''])
+            
+            # print("§groups***", groups)
+
+            teachers = [self.teacher_map[t] for t in activity.teacher_set]
+
+            # print("§teachers***", teachers)
+
+#TODO: Do I actually need the subject here???
+            subject = self.subject_map[activity.sid]
 
             fixed_time = lesson_data.time
 
@@ -232,15 +252,21 @@ class PlacementEngine:
             else:
                 d, p = timeslot2index(lesson_data.placement)
 #                print("   (@)", d, p)
-                if d < 0:
-                    continue
-            t_i = d * self.PERIODS_PER_DAY + p
+#                if d < 0:
+#                    continue
+
+#            t_i = d * self.PERIODS_PER_DAY + p
+
+            self.activities.append([
+                d, p, lesson_data.length,
+                n, room_a, rs1, rc1, rx1,
+                groups, teachers  # , subject
+            ])
+            print(" +++", *self.activities[-1])
+
+            if d < 0:
+                continue
 #TODO: check atomic groups and teachers and rooms
-            print("?groups:", activity.class_atoms)
-
-            print("?tids:", activity.teacher_set)
-
-            sid = activity.sid
 
 
 

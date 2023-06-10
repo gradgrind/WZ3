@@ -1,7 +1,7 @@
 """
 core/course_data.py
 
-Last updated:  2023-05-19
+Last updated:  2023-06-10
 
 Support functions dealing with courses, lessons, etc.
 
@@ -42,13 +42,13 @@ from typing import Optional
 from core.db_access import (
     db_select,
     db_sqlrecord,
-    db_record_add_field,
     db_read_full_table,
     db_read_unique_entry,
     db_read_fields,
     db_read_unique,
     db_read_unique_field,
     db_values,
+    Record,
     NoRecord,
 )
 from core.basic_data import BlockTag, Workload, get_classes, get_subjects
@@ -71,6 +71,91 @@ def filtered_courses(filter:str, value:str) -> list[dict]:
         rdict = {fields[i]: val for i, val in enumerate(rec)}
         courses.append(rdict)
     return courses
+
+
+#TODO: experimental
+def filter_activities(filter:str, value:str) -> dict[str, list[Record]]:
+    """Seek COURSES and lessons/workload/payment info for the given
+    course filter (CLASS, TEACHER or SUBJECT).
+    
+    Return: {course-id: [records]}
+
+    NOTE how the parameters are set in various tables. The room-wish
+    and pay details apply to all lesson components as they are set in
+    WORKLOAD. Only the time-wish is set in the lesson component.
+    This may be a bit restrictive, but is perhaps reasonable for most
+    cases. Normally only single simple or pay-only elements would be
+    expected.
+
+    There is also the possibility that multiple courses share a WORKLOAD
+    entry, which means that room and pay-data values are shared by all
+    the courses. The main idea behind this option is to facilitate
+    combining groups (especially from different classes – within one
+    class it is probably better to have a single group for this). It
+    could also be used for joint teaching as long as the room is shared
+    and the pay-data identical. Otherwise a block might be better.
+    """
+    q = f"""select
+            Course,
+            CLASS,
+            GRP,
+            SUBJECT,
+            TEACHER,
+            coalesce(REPORT, '') REPORT,
+            coalesce(GRADES, '') GRADES,
+            coalesce(REPORT_SUBJECT, '') REPORT_SUBJECT,
+            coalesce(AUTHORS, '') AUTHORS,
+            coalesce(INFO, '') INFO,
+            coalesce(Cw, 0) Cw,
+            coalesce(Workload, 0) Workload,
+            coalesce(Lesson_group, 0) Lesson_group,
+            coalesce(ROOM, '') ROOM,
+            coalesce(PAY_TAG, '') PAY_TAG,
+            coalesce(BLOCK_SID, '') BLOCK_SID,
+            coalesce(BLOCK_TAG, '') BLOCK_TAG,
+            coalesce(NOTES, '') NOTES,
+            coalesce(Lid, 0) Lid,
+            coalesce(LENGTH, '') LENGTH,
+            coalesce(TIME, '') TIME,
+            coalesce(PLACEMENT, '') PLACEMENT,
+            coalesce(ROOMS, '') ROOMS
+            from COURSE_WORKLOAD
+            full join WORKLOAD -- inner join avoids spurious entries in WORKLOAD/LESSON_GROUPS!
+            using (workload)
+            
+            full join LESSON_GROUPS -- includes null lesson_groups in WORKLOAD
+            -- inner join LESSON_GROUPS -- excludes null lesson_groups in WORKLOAD
+            using (lesson_group)
+            
+            full join LESSONS using (lesson_group)
+            right join COURSES using (Course)
+            where {filter} = '{value}'
+            --where lesson_group NOT NULL -- alternative way to filter out null lesson_groups
+    """
+    # The uniqueness of a COURSES/WORKLOAD connection
+    # should be enforced by the UNIQUE constraint on the
+    # COURSE_WORKLOAD table ("course" + "workload" fields).
+    records = db_select(q)
+    # Sort according to type
+    subjects = get_subjects()
+    course_map = {}
+    for rec in records:
+        c = rec["Course"]
+        try:
+            cml = course_map[c].append(rec)
+        except KeyError:
+            course_map[c] = [rec]
+        #TODO: Something like this would separate the three types:
+        #lg = rec["Lesson_group"]
+        #if lg:
+        #    if (sid := rec["BLOCK_SID"]): # block
+        #        rec["block_subject"] = subjects.map(sid)
+        #        cml[2].append(rec)
+        #    else: # simple
+        #        cml[1].append(rec)
+        #else: # pay-only
+        #    cml[0].append(rec)
+    return course_map
 
 
 def course_activities(course_id:int
@@ -159,7 +244,9 @@ def course_activities(course_id:int
 #!!! Maybe the deprecations aren't that clever. The new code seems to
 # be rather slow! But the new code might be useful as a basis for an
 # implementation in another language? Perhaps the use of QSqlRecord
-# objects in python is a problem? I could try using dicts instead ... 
+# objects in python is a problem? I could try using dicts instead ...
+# No, it is also slow with dicts.
+# Profiling suggests I might be calling db_select too often!
 
 # 1) The field names are somewhat changed.
 # 2) The "lessons" entry is now all LESSONS fields, so multiple entries!
@@ -232,10 +319,10 @@ def activities_for_course(course_id:int
     # Sort according to type
     subjects = get_subjects()
     for rec in records:
-        lg = rec.value("Lesson_group")
+        lg = rec["Lesson_group"]
         if lg:
-            if (sid := rec.value("BLOCK_SID")):
-                db_record_add_field(rec, "block_subject", subjects.map(sid))
+            if (sid := rec["BLOCK_SID"]):
+                rec["block_subject"] = subjects.map(sid)
                 block_elements.append(rec)
             else:
                 simple_elements.append(rec)
@@ -256,15 +343,15 @@ def workload_teacher(activity_list: list[db_sqlrecord]
     total = 0.0
     nlessons = 0
     for data in activity_list:
-        w = data.value("Workload")
-        lid = data.value("Lid")
+        w = data["Workload"]
+        lid = data["Lid"]
         if (wl := (w, lid)) in w_lid: continue
         w_lid.add(wl)
-        lessons = data.value("LENGTH")
+        lessons = data["LENGTH"]
         if (lid) not in lidset:
-            lidset.add(lg)
+            lidset.add(lid)
             nlessons += lessons
-        pay = Workload.build(data.value("PAY_TAG")).payment(lessons)
+        pay = Workload.build(data["PAY_TAG"]).payment(lessons)
         total += pay
     return (nlessons, total)
  
@@ -321,11 +408,11 @@ def workload_class(klass:str, activity_list: list[tuple[str, db_sqlrecord]]
     # Collect lessons per group
     for g, data in activity_list:
         assert g, "This function shouldn't receive activities with no group"
-        lg = data.value("Lesson_group")
+        lg = data["Lesson_group"]
         if not lg: continue # no lessons (payment-only entry)
-        lid = data.value("Lid")
+        lid = data["Lid"]
         lg_l = (lg, lid)
-        lessons = data.value("LENGTH")
+        lessons = data["LENGTH"]
         if lessons:
             if no_subgroups:
                 assert g == GROUP_ALL, "group in class without subgroups???"
@@ -530,3 +617,23 @@ def payonly_with_subject(sid):
                 continue
             matches.append(((cl, g, sid, t), w, 0, c))
     return matches
+
+
+# --#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#
+
+if __name__ == "__main__":
+    import time
+    from core.db_access import open_database
+    open_database()
+    
+    t0 = time.time()
+    cmap = filter_activities("CLASS", "01G")
+    t1 = time.time()
+    total = 0
+    for c in sorted(cmap):
+        for r in cmap[c]:
+            print(":::", r)
+            total += 1
+
+    print("\nNCOURSES:", len(cmap))
+    print(f"Activities: {total} in {t1-t0} ms")

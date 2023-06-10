@@ -50,6 +50,7 @@ T = TRANSLATIONS("core.db_access")
 
 ### +++++
 
+from typing import Union
 
 from datetime import datetime
 from shutil import copyfile
@@ -185,25 +186,48 @@ def table_extent(table):
 """
 
 
-def db_select(query_text: str) -> list[QSqlRecord]:
+#def db_select(query_text: str) -> list[QSqlRecord]:
+def db_select(query_text: str) -> list[dict[str, Union[str,int]]]:
     query = QSqlQuery(query_text)
     if not query.isActive():
         error = query.lastError()
         REPORT("ERROR", f"SQL query failed: {error.text()}\n  {query_text}")
     records = []
     while query.next():
-        records.append(query.record())
+        records.append(Record(query.record()))
+    return records
+
+    rec = query.record()
+    nfields = rec.count()
+    names = [rec.fieldName(i) for i in range(nfields)]
+    records = []
+    while query.next():
+        records.append(
+            {n: query.value(i) for i, n in enumerate(names)}
+        )
     return records
 
 
-def db_record_add_field(record, field, value):
-    record.append(f := QSqlField("block_subject"))#, QMetaType.Type.QString))
-    f.setValue(value)
-    return
+class Record:
+    def __getitem__(self, key):
+        return self._record.value(key)
 
-    f = QSqlField(field, type(value))
-    f.setValue(value)
-    
+    def __setitem__(self, key, value):
+        if (r := self._record).contains(key):
+            r.setValue(key, value)
+        else:
+            r.append(f := QSqlField(key))
+            f.setValue(value)
+
+    def __init__(self, record: QSqlRecord):
+        self._record = record
+
+    def items(self):
+        r = self._record
+        return ((r.fieldName(i), r.value(i)) for i in range(r.count()))
+
+    def __str__(self):
+        return "; ".join(f"{k}: {v}" for k, v in self.items())
 
 
 #TODO: Replace this by db_select?
@@ -670,13 +694,15 @@ if __name__ == "__main__":
     open_database()
 
     print("\nTEACHERS:")
-    for k, v in db_key_value_list("TEACHERS", "TID", "NAME", "SORTNAME"):
+    for k, v in db_key_value_list(
+        "TEACHERS", "TID", "FIRSTNAMES", "SORTNAME"
+    ):
         print(f"  {k:6}: {v}")
 
     print("\nCOURSES:")
     for r in db_read_fields(
         "COURSES", ("course", "CLASS", "GRP", "SUBJECT", "TEACHER")
-    ):
+    )[:10]:
         print("  ", r)
 
     _sid = "En"
@@ -693,7 +719,7 @@ if __name__ == "__main__":
     for row in db_read_fields(
         "SUBJECTS",
         ("SID", "NAME", "SORTING"),
-        "SORTING,NAME"
+        sort_field="SORTING,NAME"
     ):
         print("  ", row)
 

@@ -1,7 +1,7 @@
 """
 core/db_access.py
 
-Last updated:  2023-05-22
+Last updated:  2023-06-10
 
 Helper functions for accessing the database.
 
@@ -57,11 +57,15 @@ from glob import glob
 
 from core.base import Dates
 from ui.ui_base import (
+    ### QtCore:
+    QMetaType,
     ### QtSql:
     QSqlDatabase,
     QSqlQuery,
+    QSqlRecord,
+    QSqlField,
 )
-
+db_sqlrecord = QSqlRecord
 
 class NoRecord(Exception):
     pass
@@ -181,6 +185,28 @@ def table_extent(table):
 """
 
 
+def db_select(query_text: str) -> list[QSqlRecord]:
+    query = QSqlQuery(query_text)
+    if not query.isActive():
+        error = query.lastError()
+        REPORT("ERROR", f"SQL query failed: {error.text()}\n  {query_text}")
+    records = []
+    while query.next():
+        records.append(query.record())
+    return records
+
+
+def db_record_add_field(record, field, value):
+    record.append(f := QSqlField("block_subject"))#, QMetaType.Type.QString))
+    f.setValue(value)
+    return
+
+    f = QSqlField(field, type(value))
+    f.setValue(value)
+    
+
+
+#TODO: Replace this by db_select?
 def db_query(query_text):
     query = QSqlQuery(query_text)
     if not query.isActive():
@@ -672,5 +698,7 @@ if __name__ == "__main__":
         print("  ", row)
 
 # It seems that null entries are read as empty strings "automatically" ...
+
+    quit(0)
 
     migrate_db(start.year_data_path(Dates.next_year()), [])

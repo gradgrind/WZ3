@@ -1,7 +1,7 @@
 """
 ui/modules/course_editor.py
 
-Last updated:  2023-05-19
+Last updated:  2023-06-10
 
 Edit course and blocks+lessons data.
 
@@ -69,9 +69,9 @@ from core.basic_data import (
 )
 from core.course_data import (
     filtered_courses,
-    course_activities,
-    teacher_workload,
-    class_workload,
+    activities_for_course,
+    workload_teacher,
+    workload_class,
 )
 from ui.ui_base import (
     ### QtWidgets:
@@ -295,17 +295,14 @@ class CourseEditorPage(Page):
             self.pb_edit_course.setEnabled(True)
             self.course_dict = self.courses[row]
             self.last_course = self.course_dict     # for restoring views
-            self.set_course(self.course_dict["course"])
+            self.course_id = self.course_dict["course"]
+            self.display_lessons(-1)
             self.frame_r.setEnabled(True)
         else:
             # e.g. when entering an empty table
             self.lesson_table.setRowCount(0)
             self.course_dict = None
             self.course_id = None
-
-    def set_course(self, course: int):
-        self.course_id = course
-        self.display_lessons(-1)
 
     def display_lessons(self, lesson_select_id: int):
         """Fill the lesson table for the current course (<self.course_id>).
@@ -326,7 +323,7 @@ class CourseEditorPage(Page):
         (   pay_only_l,
             simple_lesson_l,
             block_lesson_l
-        ) = course_activities(self.course_id)
+        ) = activities_for_course(self.course_id)
         row = 0
         row_to_select = -1
         for pay_only in pay_only_l:
@@ -338,48 +335,52 @@ class CourseEditorPage(Page):
             self.lesson_table.setItem(row, 0, w)
             w = QTableWidgetItem("–")
             self.lesson_table.setItem(row, 1, w)
-            w = QTableWidgetItem(is_shared_workload(pay_only["workload"]))
+            w = QTableWidgetItem(
+                is_shared_workload(pay_only.value("Workload"))
+            )
             self.lesson_table.setItem(row, 2, w)
-            self.course_lessons.append((-1, pay_only, -1))
+            self.course_lessons.append((-1, pay_only))
             row += 1
         for simple_lesson in simple_lesson_l:
-            lessons = simple_lesson["lessons"]
-            simple_lesson["nLessons"] = len(lessons)
-            shared = is_shared_workload(simple_lesson["workload"])
-            # Add a line for each lesson
-            for i, ldata in enumerate(lessons):
-                self.lesson_table.insertRow(row)
-                w = QTableWidgetItem(self.icons["LESSON"], "")
-                self.lesson_table.setItem(row, 0, w)
-                ln = ldata["LENGTH"]
-                w = QTableWidgetItem(str(ln))
-                self.lesson_table.setItem(row, 1, w)
-                w = QTableWidgetItem(shared)
-                self.lesson_table.setItem(row, 2, w)
-                self.course_lessons.append((0, simple_lesson, i))
-                if ldata["lid"] == lesson_select_id:
-                    row_to_select = row
-                row += 1
+
+#TODO:???
+#            lessons = simple_lesson.value("LESSONS")
+#            simple_lesson["nLessons"] = len(lessons)
+            shared = is_shared_workload(simple_lesson.value("Workload"))
+            # Add a lesson line
+            self.lesson_table.insertRow(row)
+            w = QTableWidgetItem(self.icons["LESSON"], "")
+            self.lesson_table.setItem(row, 0, w)
+            ln = simple_lesson.value("LENGTH")
+            assert ln != 0
+            w = QTableWidgetItem(str(ln))
+            self.lesson_table.setItem(row, 1, w)
+            w = QTableWidgetItem(shared)
+            self.lesson_table.setItem(row, 2, w)
+            self.course_lessons.append((0, simple_lesson))
+            if simple_lesson.value("Lid") == lesson_select_id:
+                row_to_select = row
+            row += 1
         for bl in block_lesson_l:
             # Additional info used by the course editor
-            lessons = bl["lessons"]
-            bl["nLessons"] = len(lessons)
-            shared = is_shared_workload(bl["workload"])
-            # Add a line for each lesson
-            for i, ldata in enumerate(lessons):
-                self.lesson_table.insertRow(row)
-                w = QTableWidgetItem(self.icons["BLOCK"], "")
-                self.lesson_table.setItem(row, 0, w)
-                ln = ldata["LENGTH"]
-                w = QTableWidgetItem(str(ln))
-                self.lesson_table.setItem(row, 1, w)
-                w = QTableWidgetItem(f"{shared}{bl['blocktag'].subject}")
-                self.lesson_table.setItem(row, 2, w)
-                self.course_lessons.append((1, bl, i)
-                )
-                if ldata["lid"] == lesson_select_id:
-                    row_to_select = row
-                row += 1
+#TODO:???
+#            lessons = bl["lessons"]
+#            bl["nLessons"] = len(lessons)
+            shared = is_shared_workload(bl.value("Workload"))
+            # Add a lesson line
+            self.lesson_table.insertRow(row)
+            w = QTableWidgetItem(self.icons["BLOCK"], "")
+            self.lesson_table.setItem(row, 0, w)
+            ln = bl.value("LENGTH")
+            w = QTableWidgetItem(str(ln))
+            self.lesson_table.setItem(row, 1, w)
+            w = QTableWidgetItem(f"{shared}{bl.value('block_subject')}")
+            self.lesson_table.setItem(row, 2, w)
+            self.course_lessons.append((1, bl)
+            )
+            if bl.value("Lid") == lesson_select_id:
+                row_to_select = row
+            row += 1
         if row_to_select < 0 and row > 0:
             row_to_select = 0
         self.lesson_table.setCurrentCell(row_to_select, 0)
@@ -497,7 +498,7 @@ class CourseEditorPage(Page):
         self.lesson_sub.setEnabled(False)
         row = self.lesson_table.currentRow()
         if row < 0:
-            self.current_lesson = (-2, None, -1)
+            self.current_lesson = (-2, None)
             self.lesson_add.setEnabled(False)
             self.remove_element.setEnabled(False)
             self.payment.setEnabled(False)
@@ -509,9 +510,9 @@ class CourseEditorPage(Page):
             self.payment.setEnabled(True)
             self.current_lesson = self.course_lessons[row]
             data = self.current_lesson[1]
-            self.payment.setText(data["PAY_TAG"])
+            self.payment.setText(data.value("PAY_TAG"))
             self.block_name.setEnabled(True)
-            wl = f'[{data["workload"]}]'
+            wl = f'[{data.value("Workload")}]'
         if self.current_lesson[0] < 0:
             # payment entry or nothing selected
             self.lesson_length.setCurrentIndex(-1)
@@ -525,28 +526,31 @@ class CourseEditorPage(Page):
             self.notes.clear()
             self.notes.setEnabled(False)
         else:
-            llist = data["lessons"]
-            lthis = llist[self.current_lesson[2]]
+#TODO!
+#            llist = data["lessons"]
+#            lthis = llist[self.current_lesson[2]]
             if self.current_lesson[0] > 0:
-                wl = f'{wl} {str(data["blocktag"])}'
+                wl = f'{wl} {str(data.value("blocktag"))}'
             self.lesson_add.setEnabled(True)
-            if data["nLessons"] > 1:
-                self.lesson_sub.setEnabled(True)
+#TODO! How do I detect multiple lessons in this lesson_group?
+#            if data["nLessons"] > 1:
+#                self.lesson_sub.setEnabled(True)
+
             self.lesson_length.setCurrentText(
-                str(lthis["LENGTH"])
+                str(data.value("LENGTH"))
             )
             self.lesson_length.setEnabled(True)
             self.wish_room.setText(
-                data["ROOM"]
+                data.value("ROOM")
             )
             self.wish_room.setEnabled(True)
-            self.wish_time.setText(lthis["TIME"])
+            self.wish_time.setText(data.value("TIME"))
             self.wish_time.setEnabled(True)
             try:
                 t, w = db_read_unique(
                     "PARALLEL_LESSONS",
                     ["TAG", "WEIGHTING"],
-                    lesson_id=lthis["lid"]
+                    lesson_id=data.value("Lid")
                 )
             except NoRecord:
                 self.current_parallel_tag = ParallelTag.build("", 0)
@@ -555,7 +559,7 @@ class CourseEditorPage(Page):
                 self.current_parallel_tag = ParallelTag.build(t, w)
                 self.parallel.setText(str(self.current_parallel_tag))
             self.parallel.setEnabled(True)
-            self.notes.setText(data["NOTES"])
+            self.notes.setText(data.value("NOTES"))
             self.notes.setEnabled(True)
         self.block_name.setText(wl)
 
@@ -705,10 +709,10 @@ class CourseEditorPage(Page):
             for c in self.courses:
                 g = c["GRP"]
                 if not g: continue  # No pupils involved
-                for ctype in course_activities(c["course"]):
+                for ctype in activities_for_course(c["course"]):
                     for data in ctype:
                         activities.append((g, data))
-            totals = class_workload(self.filter_value, activities)
+            totals = workload_class(self.filter_value, activities)
             if len(totals) == 1:
                 g, n = totals[0]
                 assert not g, f"unexpected single group: {g}"
@@ -720,10 +724,10 @@ class CourseEditorPage(Page):
         elif self.filter_field == "TEACHER":
             activities = []
             for c in self.courses:
-                for ctype in course_activities(c["course"]):
+                for ctype in activities_for_course(c["course"]):
                     for data in ctype:
                         activities.append(data)
-            nlessons, total = teacher_workload(activities)
+            nlessons, total = workload_teacher(activities)
             self.total.setText(T["TEACHER_TOTAL"].format(
                 n=nlessons, total=f"{total:.2f}".replace('.', DECIMAL_SEP)
             ))
@@ -910,6 +914,14 @@ class CourseEditorPage(Page):
 
 if __name__ == "__main__":
     from ui.ui_base import run
+
+    open_database()
+    records = activities_for_course(693) # 680
+    for rl in records:
+        for r in rl:
+            print(" ---------")
+            for i in range(r.count()):
+                print(f"FIELD {i}:", r.fieldName(i), r.value(i))
 
     widget = CourseEditorPage()
     widget.enter()

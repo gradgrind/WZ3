@@ -40,6 +40,9 @@ if __name__ == "__main__":
 
 from typing import Optional
 from core.db_access import (
+    db_select,
+    db_sqlrecord,
+    db_record_add_field,
     db_read_full_table,
     db_read_unique_entry,
     db_read_fields,
@@ -48,7 +51,7 @@ from core.db_access import (
     db_values,
     NoRecord,
 )
-from core.basic_data import BlockTag, Workload, get_classes
+from core.basic_data import BlockTag, Workload, get_classes, get_subjects
 from core.classes import GROUP_ALL
 
 ### -----
@@ -96,6 +99,10 @@ def course_activities(course_id:int
     could also be used for joint teaching as long as the room is shared
     and the pay-data identical. Otherwise a block might be better.
     """
+    print("! TODO: core.course_data.course_activities is deprecated."
+        "Callers should be adapted to use activities_for_course instead."
+    )
+
     workload_elements = []
     simple_elements = []
     block_elements = []
@@ -148,10 +155,128 @@ def course_activities(course_id:int
     return (workload_elements, simple_elements, block_elements)
 
 
+#TODO:
+#!!! Maybe the deprecations aren't that clever. The new code seems to
+# be rather slow! But the new code might be useful as a basis for an
+# implementation in another language? Perhaps the use of QSqlRecord
+# objects in python is a problem? I could try using dicts instead ... 
+
+# 1) The field names are somewhat changed.
+# 2) The "lessons" entry is now all LESSONS fields, so multiple entries!
+# 3) This doesn't build BlockTag items.
+# 4) Try to eliminate the "coalesce" functions by eliminating NULL fields.
+def activities_for_course(course_id:int
+) -> tuple[Optional[dict], Optional[dict], list[dict]]:
+    """Seek lessons and workload/payment info for the given course
+    (<course_id>).
+    There can be pay-only entries.
+    There can be groups of simple lessons.
+    There can be named blocks – with distinct (non-empty)
+    BLOCK_SID/BLOCK_TAG values.
+
+    Return: (pay-only elements, simple elements, block elements)
+
+    NOTE how the parameters are set in various tables. The room-wish
+    and pay details apply to all lesson components as they are set in
+    WORKLOAD. Only the time-wish is set in the lesson component.
+    This may be a bit restrictive, but is perhaps reasonable for most
+    cases. Normally only single simple or pay-only elements would be
+    expected.
+
+    There is also the possibility that multiple courses share a WORKLOAD
+    entry, which means that room and pay-data values are shared by all
+    the courses. The main idea behind this option is to facilitate
+    combining groups (especially from different classes – within one
+    class it is probably better to have a single group for this). It
+    could also be used for joint teaching as long as the room is shared
+    and the pay-data identical. Otherwise a block might be better.
+    """
+    workload_elements = []
+    simple_elements = []
+    block_elements = []
+    q = f"""select
+            -- coalesce(Course, 0) Course,
+            Cw,
+            coalesce(Workload, 0) Workload,
+            coalesce(Lesson_group, 0) Lesson_group,
+            coalesce(ROOM, '') ROOM,
+            coalesce(PAY_TAG, '') PAY_TAG,
+            coalesce(BLOCK_SID, '') BLOCK_SID,
+            coalesce(BLOCK_TAG, '') BLOCK_TAG,
+            coalesce(NOTES, '') NOTES,
+            -- coalesce(CLASS, '') CLASS,
+            -- coalesce(GRP, '') GRP,
+            -- coalesce(SUBJECT, '') SUBJECT,
+            -- coalesce(TEACHER, '') TEACHER,
+            coalesce(Lid, 0) Lid,
+            coalesce(LENGTH, '') LENGTH,
+            coalesce(TIME, '') TIME,
+            coalesce(PLACEMENT, '') PLACEMENT,
+            coalesce(ROOMS, '') ROOMS
+            from COURSE_WORKLOAD
+            full join WORKLOAD -- inner join avoids spurious entries in WORKLOAD/LESSON_GROUPS!
+            using (workload)
+            
+            full join LESSON_GROUPS -- includes null lesson_groups in WORKLOAD
+            -- inner join LESSON_GROUPS -- excludes null lesson_groups in WORKLOAD
+            using (lesson_group)
+            
+            full join LESSONS using (lesson_group)
+            --where lesson_group NOT NULL -- alternative way to filter out null lesson_groups
+            where Course = {course_id}
+    """
+    # The uniqueness of a COURSES/WORKLOAD connection
+    # should be enforced by the UNIQUE constraint on the
+    # COURSE_WORKLOAD table ("course" + "workload" fields).
+    records = db_select(q)
+    # Sort according to type
+    subjects = get_subjects()
+    for rec in records:
+        lg = rec.value("Lesson_group")
+        if lg:
+            if (sid := rec.value("BLOCK_SID")):
+                db_record_add_field(rec, "block_subject", subjects.map(sid))
+                block_elements.append(rec)
+            else:
+                simple_elements.append(rec)
+        else:
+            workload_elements.append(rec)
+    return (workload_elements, simple_elements, block_elements)
+
+def workload_teacher(activity_list: list[db_sqlrecord]
+) -> tuple[int, float]:
+    """Calculate the total number of lessons and the pay-relevant
+    workload.
+    """
+    # Each WORKLOAD entry must be counted only once for each lesson,
+    # so keep track:
+    w_lid = set()
+    # Keep track of lessons: don't count blocks twice for plan time
+    lidset = set()
+    total = 0.0
+    nlessons = 0
+    for data in activity_list:
+        w = data.value("Workload")
+        lid = data.value("Lid")
+        if (wl := (w, lid)) in w_lid: continue
+        w_lid.add(wl)
+        lessons = data.value("LENGTH")
+        if (lid) not in lidset:
+            lidset.add(lg)
+            nlessons += lessons
+        pay = Workload.build(data.value("PAY_TAG")).payment(lessons)
+        total += pay
+    return (nlessons, total)
+ 
+
 def teacher_workload(activity_list: list[dict]) -> tuple[int, float]:
     """Calculate the total number of lessons and the pay-relevant
     workload.
     """
+    print("! TODO: core.course_data.teacher_workload is deprecated."
+        "Callers should be adapted to use workload_teacher instead."
+    )
+
     # Each WORKLOAD entry must be counted only once, so keep track:
     wset = set()
     # Keep track of lesson-groups: don't count blocks twice for plan time
@@ -173,11 +298,82 @@ def teacher_workload(activity_list: list[dict]) -> tuple[int, float]:
     return (nlessons, total)
 
 
+def workload_class(klass:str, activity_list: list[tuple[str, db_sqlrecord]]
+) -> list[tuple[str, int]]:
+    """Calculate the total number of lessons for the pupils.
+    The results should cover all (sub-)groups.
+    """
+    # Each LESSON in a LESSON_GROUP must be counted only once FOR EACH
+    # GROUP, so keep track:
+    lgsets = {}
+    ag2lessons = {}
+    class_groups = get_classes()[klass].divisions
+    g2ags = class_groups.group_atoms()
+    no_subgroups = not g2ags
+    if no_subgroups:
+        # Add whole-class target
+        ag2lessons[GROUP_ALL] = 0
+        lgsets[GROUP_ALL] = set()
+    else:
+        for ag in class_groups.atomic_groups:
+            ag2lessons[ag] = 0
+            lgsets[ag] = set()
+    # Collect lessons per group
+    for g, data in activity_list:
+        assert g, "This function shouldn't receive activities with no group"
+        lg = data.value("Lesson_group")
+        if not lg: continue # no lessons (payment-only entry)
+        lid = data.value("Lid")
+        lg_l = (lg, lid)
+        lessons = data.value("LENGTH")
+        if lessons:
+            if no_subgroups:
+                assert g == GROUP_ALL, "group in class without subgroups???"
+                if lg_l in lgsets[GROUP_ALL]: continue
+                lgsets[GROUP_ALL].add(lg_l)
+                ag2lessons[GROUP_ALL] += lessons
+            else:
+                ags = lgsets.keys() if g == GROUP_ALL else g2ags[g]
+                for ag in ags:
+                    if lg_l in lgsets[ag]: continue
+                    lgsets[ag].add(lg_l)
+                    ag2lessons[ag] += lessons
+    if no_subgroups:
+        return [("", ag2lessons[GROUP_ALL])]
+    # Simplify groups: seek primary groups which cover the various
+    # numeric results
+    # print("§ag2lessons:", ag2lessons)
+    ln_lists = {}
+    for ag, l in ag2lessons.items():
+        try:
+            ln_lists[l].add(ag)
+        except KeyError:
+            ln_lists[l] = {ag}
+    results = []
+    for l, agset in ln_lists.items():
+        for g, ags in g2ags.items():
+            if set(ags) == agset:
+                results.append((g, l))
+                break
+        else:
+            if set(class_groups.atomic_groups) == agset:
+                g = ""
+            else:
+                g = f"<{','.join(sorted(agset))}>"
+            results.append((g, l))
+    results.sort()
+    return results
+
+
 def class_workload(klass:str, activity_list: list[tuple[str, dict]]
 ) -> list[tuple[str, int]]:
     """Calculate the total number of lessons for the pupils.
     The results should cover all (sub-)groups.
     """
+    print("! TODO: core.course_data.class_workload is deprecated."
+        "Callers should be adapted to use workload_class instead."
+    )
+    
     # Each LESSON_GROUPS entry must be counted only once FOR EACH GROUP,
     # so keep track:
     lgsets = {}

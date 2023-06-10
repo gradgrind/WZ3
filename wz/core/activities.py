@@ -1,7 +1,7 @@
 """
 core/activities.py
 
-Last updated:  2023-05-30
+Last updated:  2023-06-10
 
 Collect basic information on "activities".
 
@@ -46,7 +46,7 @@ from core.basic_data import (
 )
 from core.db_access import db_read_fields, db_read_unique_field
 
-LESSONS_FIELDS = ("id", "LENGTH", "TIME", "PLACEMENT", "ROOMS")
+LESSONS_FIELDS = ("lid", "LENGTH", "TIME", "PLACEMENT", "ROOMS")
 
 ### -----
 
@@ -76,7 +76,7 @@ class CourseWithRoom(NamedTuple):
 
 
 class LessonInfo(NamedTuple):
-    id: str
+    lid: str
     length: int
     time: str
     placement: str

@@ -210,7 +210,9 @@ def db_select(query_text: str) -> list[dict[str, Union[str,int]]]:
 
 class Record:
     def __getitem__(self, key):
-        return self._record.value(key)
+        if (r := self._record).contains(key):
+            return r.value(key)
+        raise KeyError(f"Key {key} not in {{{self}}}")
 
     def __setitem__(self, key, value):
         if (r := self._record).contains(key):

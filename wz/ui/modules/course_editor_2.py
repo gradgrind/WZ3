@@ -240,8 +240,13 @@ class CourseEditorPage(Page):
         if self.suppress_handlers or i < 0: return
         self.load_course_table(i, 0)
 
-    def load_course_table(self, select_index, table_row):
-        self.filter_value = self.select_list[select_index][0]
+    def load_course_table(self, select_index=-1, table_row=-1, lesson_id=-1):
+        self.lesson_restore_id = lesson_id
+        if select_index >= 0:
+            self.filter_value = self.select_list[select_index][0]
+        if table_row < 0:
+            table_row = self.course_table.currentRow()
+            print("§course_table.currentRow:", table_row)
         self.course_activities = filter_activities(
             self.filter_field, self.filter_value
         )
@@ -290,17 +295,22 @@ class CourseEditorPage(Page):
             if table_row >= rn:
                 table_row = rn - 1
             self.course_table.setCurrentCell(table_row, 0)
+        self.lesson_restore_id = -1
         self.total_calc()
 
     def on_course_table_itemSelectionChanged(self):
         row = self.course_table.currentRow()
+        lesson_id = self.lesson_restore_id
+#TODO--
+        print("§COURSE ROW SELECT", row, lesson_id)
+
         if row >= 0:
             self.pb_delete_course.setEnabled(True)
             self.pb_edit_course.setEnabled(True)
             self.course_data = self.course_list[row][0]
             self.last_course = self.course_data     # for restoring views
             self.course_id = self.course_data["Course"]
-            self.display_lessons(-1)
+            self.display_lessons(lesson_id)
             self.frame_r.setEnabled(True)
         else:
             # e.g. when entering an empty table
@@ -573,14 +583,14 @@ class CourseEditorPage(Page):
             self.notes.setEnabled(True)
         self.block_name.setText(wl)
 
-#TODO: This must be updated!
     def field_editor(self, obj: QLineEdit):
         object_name = obj.objectName()
+        lthis = self.current_lesson[1] # the Record object
+        lid = lthis["Lid"]
         ### PAYMENT (COURSE_LESSONS)
         if object_name == "payment":
-            cl = self.current_lesson[1] # the Record object
             result = WorkloadDialog.popup(
-                start_value=cl["PAY_TAG"], parent=self
+                start_value=lthis["PAY_TAG"], parent=self
             )
             if result is not None:
                 # Update the db. No redisplay is necessary, but all loaded
@@ -589,22 +599,16 @@ class CourseEditorPage(Page):
                     "WORKLOAD",
                     "PAY_TAG",
                     result,
-                    workload=(w := cl["Workload"])
+                    workload=lthis["Workload"]
                 )
-                for crs_l in self.course_list:
-                    for a in crs_l:
-                        if a["Workload"] == w:
-                            a["PAY_TAG"] = result
-                obj.setText(result)
-                self.total_calc()
+                self.load_course_table(lesson_id=lid)
         ### ROOM (COURSE_LESSONS)
         elif object_name == "wish_room":
-            cl = self.current_lesson[1]
             classroom = get_classes().get_classroom(
                 self.course_data["CLASS"], null_ok=True
             )
             result = RoomDialog.popup(
-                start_value=cl["ROOM"],
+                start_value=lthis["ROOM"],
                 classroom=classroom,
                 parent=self
             )
@@ -613,13 +617,9 @@ class CourseEditorPage(Page):
                     "WORKLOAD",
                     "ROOM",
                     result,
-                    workload=cl["Workload"]
+                    workload=lthis["Workload"]
                 )
-                for crs_l in self.course_list:
-                    for a in crs_l:
-                        if a["Workload"] == w:
-                            a["ROOM"] = result
-                obj.setText(result)
+                self.load_course_table(lesson_id=lid)
         ### BLOCK (LESSON_GROUPS)
         elif object_name == "block_name":
             row = self.lesson_table.currentRow()
@@ -633,41 +633,30 @@ class CourseEditorPage(Page):
             )
             if result is not None:
                 assert(result["type"] == "CHANGE_BLOCK")
-                lthis = self.current_lesson[1]
                 bsid = result["BLOCK_SID"]
                 btag = result["BLOCK_TAG"]
                 db_update_fields(
                     "LESSON_GROUPS",
                     #[(r, result[r]) for r in ("BLOCK_SID", "BLOCK_TAG")],
                     [("BLOCK_SID", bsid), ("BLOCK_TAG", btag)],
-                    lesson_group=(lg := lthis["Lesson_group"])
+                    lesson_group=lthis["Lesson_group"]
                 )
-                # Redisplay lessons
-                for crs_l in self.course_list:
-                    for a in crs_l:
-                        if a["Lesson_group"] == lg:
-                            a["BLOCK_SID"] = bsid
-                            a["BLOCK_TAG"] = btag
-                self.display_lessons(lthis["Lid"])
+                # Redisplay
+                self.load_course_table(lesson_id=lid)
         ### NOTES (LESSON_GROUPS)
         elif object_name == "notes":
-            lg = self.current_lesson[1]
-            result = TextLineDialog.popup(lg["NOTES"], parent=self)
+            result = TextLineDialog.popup(lthis["NOTES"], parent=self)
             if result is not None:
                 db_update_field(
                     "LESSON_GROUPS",
                     "NOTES",
                     result,
-                    lesson_group=lg["lesson_group"]
+                    lesson_group=lthis["Lesson_group"]
                 )
-                lg["NOTES"] = result
-                obj.setText(result)
+                self.load_course_table(lesson_id=lid)
         ### LENGTH (LESSONS) --- own handler: on_lesson_length_ ...
         ### TIME (LESSONS)
         elif object_name == "wish_time":
-            lg = self.current_lesson[1]
-            llist = lg["lessons"]
-            lthis = llist[self.current_lesson[2]]
             result = DayPeriodDialog.popup(
                 start_value=lthis["TIME"],
                 parent=self
@@ -677,20 +666,18 @@ class CourseEditorPage(Page):
                     "LESSONS",
                     "TIME",
                     result,
-                    id=lthis["lid"]
+                    lid=lid
                 )
-                lthis["TIME"] = result
-            if result is not None:
-                obj.setText(result)
+                self.load_course_table(lesson_id=lid)
         ### PARALLEL (LESSONS)
-        elif object_name == "parallel":
+        else:
+            assert object_name == "parallel", (
+                f"Click event on object {object_name}"
+            )
             result = ParallelsDialog.popup(
                 self.current_parallel_tag, parent=self
             )
             if result is not None:
-                lg = self.current_lesson[1]
-                llist = lg["lessons"]
-                lthis = llist[self.current_lesson[2]]
                 if self.current_parallel_tag.TAG:
                     # There is already a parallel record
                     if result.TAG:
@@ -701,27 +688,25 @@ class CourseEditorPage(Page):
                                 ("TAG", result.TAG),
                                 ("WEIGHTING", result.WEIGHTING),
                             ],
-                            lesson_id = lthis["lid"],
+                            lesson_id = lid,
                         )
                     else:
                         # Remove the record
                         db_delete_rows(
                             "PARALLEL_LESSONS",
-                            lesson_id = lthis["lid"],
+                            lesson_id = lid,
                         )
                 else:
                     assert(result.TAG)
                     # Make a new parallel record
                     db_new_row(
                         "PARALLEL_LESSONS",
-                        lesson_id = lthis["lid"],
+                        lesson_id = lid,
                         TAG=result.TAG,
                         WEIGHTING=result.WEIGHTING,
                     )
-                obj.setText(str(result))
                 self.current_parallel_tag = result
-        else:
-            raise Bug(f"Click event on object {object_name}")
+                self.load_course_table(lesson_id=lid)
 
     def total_calc(self):
         """For teachers and classes determine the total workload.
@@ -761,19 +746,16 @@ class CourseEditorPage(Page):
     @Slot(str)
     def on_lesson_length_textActivated(self, i):
         ival = int(i)
-        lg = self.current_lesson[1]
-        llist = lg["lessons"]
-        lthis = llist[self.current_lesson[2]]
+        lthis = self.current_lesson[1]
         if lthis["LENGTH"] != ival:
-            lesson_select_id = lthis["lid"]
+            lid = lthis["Lid"]
             db_update_field(
                 "LESSONS",
                 "LENGTH", ival,
-                lid=lesson_select_id
+                lid=lid
             )
-            # Redisplay lessons
-            self.display_lessons(lesson_select_id)
-            self.total_calc()
+            # Redisplay
+            self.load_course_table(lesson_id=lid)
 
     @Slot()
     def on_new_element_clicked(self):
@@ -860,16 +842,13 @@ class CourseEditorPage(Page):
         If no element (or a workload element) is selected, this button
         should be disabled.
         """
-        lg = self.current_lesson[1]
-        llist = lg["lessons"]
-        lthis = llist[self.current_lesson[2]]
+        lthis = self.current_lesson[1]
         newid = db_new_row(
             "LESSONS",
-            lesson_group=lg["lesson_group"],
+            lesson_group=lthis["Lesson_group"],
             LENGTH=lthis["LENGTH"]
         )
-        self.display_lessons(newid)
-        self.total_calc()
+        self.load_course_table(lesson_id=newid)
 
     @Slot()
     def on_lesson_sub_clicked(self):
@@ -878,22 +857,19 @@ class CourseEditorPage(Page):
         as well. If no element, a workload element or an element with
         only one lesson is selected, this button should be disabled.
         """
-        lg = self.current_lesson[1]
-        llist = lg["lessons"]
-        lthis = llist[self.current_lesson[2]]
-        if lg["nLessons"] < 2:
-            raise Bug(
-                f"Tried to delete LESSON with lid={lthis['lid']}"
-                " although it is the only one for this element"
-            )
-        db_delete_rows("LESSONS", lid=lthis["lid"])
-        newid = db_values(
+        lthis = self.current_lesson[1]
+        newids = db_values(
             "LESSONS",
             "lid",
-            lesson_group=lg["lesson_group"]
-        )[-1]
-        self.display_lessons(newid)
-        self.total_calc()
+            lesson_group=lthis["Lesson_group"]
+        )
+        newids.remove(lid := lthis["Lid"])
+        assert newids, (
+            f"Tried to delete LESSON with lid={lid}"
+            " although it is the only one for this element"
+        )
+        db_delete_rows("LESSONS", lid=lid)
+        self.load_course_table(lesson_id=newids[-1])
 
     @Slot()
     def on_remove_element_clicked(self):

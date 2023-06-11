@@ -220,6 +220,9 @@ class BlockNameDialog(QDialog):
 
         else:
             ## "New element" mode
+#TODO--
+            print("§NEW:", self.this_course)
+            for l in self.lesson_list: print(" +++", l[1])
             self.rb_new.setChecked(True)
             self.rb_simple.setChecked(True) # default choice
             self.set_sid("")

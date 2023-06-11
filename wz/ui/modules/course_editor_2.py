@@ -92,7 +92,7 @@ from ui.dialogs.dialog_courses_field_mod import FieldChangeForm
 from ui.dialogs.dialog_day_period import DayPeriodDialog
 from ui.dialogs.dialog_room_choice import RoomDialog
 from ui.dialogs.dialog_workload import WorkloadDialog
-from ui.dialogs.dialog_block_name import BlockNameDialog
+from ui.dialogs.dialog_block_data import BlockNameDialog
 from ui.dialogs.dialog_parallel_lessons import ParallelsDialog
 from ui.dialogs.dialog_text_line import TextLineDialog
 from ui.dialogs.dialog_make_course_tables import ExportTable
@@ -518,7 +518,7 @@ class CourseEditorPage(Page):
             self.remove_element.setEnabled(True)
             self.payment.setEnabled(True)
             self.current_lesson = self.course_lessons[row]
-            data = self.current_lesson[1]
+            data = self.current_lesson[1]   # the Record object
             self.payment.setText(data["PAY_TAG"])
             self.block_name.setEnabled(True)
             wl = f'[{data["Workload"]}]'
@@ -578,19 +578,23 @@ class CourseEditorPage(Page):
         object_name = obj.objectName()
         ### PAYMENT (COURSE_LESSONS)
         if object_name == "payment":
-            cl = self.current_lesson[1]
+            cl = self.current_lesson[1] # the Record object
             result = WorkloadDialog.popup(
                 start_value=cl["PAY_TAG"], parent=self
             )
             if result is not None:
-                # Update the db, no redisplay necessary
+                # Update the db. No redisplay is necessary, but all loaded
+                # "activities" with the same "Workload" must be updated.
                 db_update_field(
                     "WORKLOAD",
                     "PAY_TAG",
                     result,
-                    workload=cl["workload"]
+                    workload=(w := cl["Workload"])
                 )
-                cl["PAY_TAG"] = result
+                for crs_l in self.course_list:
+                    for a in crs_l:
+                        if a["Workload"] == w:
+                            a["PAY_TAG"] = result
                 obj.setText(result)
                 self.total_calc()
         ### ROOM (COURSE_LESSONS)
@@ -609,15 +613,19 @@ class CourseEditorPage(Page):
                     "WORKLOAD",
                     "ROOM",
                     result,
-                    workload=cl["workload"]
+                    workload=cl["Workload"]
                 )
-                cl["ROOM"] = result
+                for crs_l in self.course_list:
+                    for a in crs_l:
+                        if a["Workload"] == w:
+                            a["ROOM"] = result
                 obj.setText(result)
         ### BLOCK (LESSON_GROUPS)
         elif object_name == "block_name":
             row = self.lesson_table.currentRow()
             assert(row >= 0)
             result = BlockNameDialog.popup(
+#TODO: Is course_data superfluous? It is available in course_lessons.
                 course_data=self.course_data,
                 course_lessons=self.course_lessons,
                 lesson_row=row,
@@ -625,17 +633,22 @@ class CourseEditorPage(Page):
             )
             if result is not None:
                 assert(result["type"] == "CHANGE_BLOCK")
-                lg = self.current_lesson[1]
+                lthis = self.current_lesson[1]
+                bsid = result["BLOCK_SID"]
+                btag = result["BLOCK_TAG"]
                 db_update_fields(
                     "LESSON_GROUPS",
-                    [(r, result[r]) for r in ("BLOCK_SID", "BLOCK_TAG")],
-                    lesson_group=lg["lesson_group"]
+                    #[(r, result[r]) for r in ("BLOCK_SID", "BLOCK_TAG")],
+                    [("BLOCK_SID", bsid), ("BLOCK_TAG", btag)],
+                    lesson_group=(lg := lthis["Lesson_group"])
                 )
                 # Redisplay lessons
-                llist = lg["lessons"]
-                lthis = llist[self.current_lesson[2]]
-                lesson_select_id = lthis["lid"]
-                self.display_lessons(lesson_select_id)
+                for crs_l in self.course_list:
+                    for a in crs_l:
+                        if a["Lesson_group"] == lg:
+                            a["BLOCK_SID"] = bsid
+                            a["BLOCK_TAG"] = btag
+                self.display_lessons(lthis["Lid"])
         ### NOTES (LESSON_GROUPS)
         elif object_name == "notes":
             lg = self.current_lesson[1]

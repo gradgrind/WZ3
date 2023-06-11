@@ -1,5 +1,5 @@
 """
-core/basic_data.py - last updated 2023-05-22
+core/basic_data.py - last updated 2023-06-11
 
 Handle caching of the basic data sources
 
@@ -209,7 +209,11 @@ class BlockTag(NamedTuple):
         raise ValueError(T["BLOCKTAG_INVALID_TAG"].format(tag=tag))
 
     def __str__(self):
-        return f"{self.sid}#{self.tag}"
+        return self. to_string(self.sid, self.tag)
+
+    @staticmethod
+    def to_string(sid, tag):
+        return f"{sid}#{tag}"
 
 
 '''

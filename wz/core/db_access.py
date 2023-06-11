@@ -1,7 +1,7 @@
 """
 core/db_access.py
 
-Last updated:  2023-06-10
+Last updated:  2023-06-11
 
 Helper functions for accessing the database.
 
@@ -227,7 +227,7 @@ class Record:
         return ((r.fieldName(i), r.value(i)) for i in range(r.count()))
 
     def __str__(self):
-        return "; ".join(f"{k}: {v}" for k, v in self.items())
+        return "; ".join(f"{k}: {repr(v)}" for k, v in self.items())
 
 
 #TODO: Replace this by db_select?

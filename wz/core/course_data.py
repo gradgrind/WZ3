@@ -1,7 +1,7 @@
 """
 core/course_data.py
 
-Last updated:  2023-06-10
+Last updated:  2023-06-11
 
 Support functions dealing with courses, lessons, etc.
 
@@ -41,7 +41,6 @@ if __name__ == "__main__":
 from typing import Optional
 from core.db_access import (
     db_select,
-    db_sqlrecord,
     db_read_full_table,
     db_read_unique_entry,
     db_read_fields,
@@ -115,7 +114,7 @@ def filter_activities(filter:str, value:str) -> dict[str, list[Record]]:
             coalesce(BLOCK_TAG, '') BLOCK_TAG,
             coalesce(NOTES, '') NOTES,
             coalesce(Lid, 0) Lid,
-            coalesce(LENGTH, '') LENGTH,
+            coalesce(LENGTH, 0) LENGTH,
             coalesce(TIME, '') TIME,
             coalesce(PLACEMENT, '') PLACEMENT,
             coalesce(ROOMS, '') ROOMS
@@ -296,7 +295,7 @@ def activities_for_course(course_id:int
             -- coalesce(SUBJECT, '') SUBJECT,
             -- coalesce(TEACHER, '') TEACHER,
             coalesce(Lid, 0) Lid,
-            coalesce(LENGTH, '') LENGTH,
+            coalesce(LENGTH, 0) LENGTH,
             coalesce(TIME, '') TIME,
             coalesce(PLACEMENT, '') PLACEMENT,
             coalesce(ROOMS, '') ROOMS
@@ -330,28 +329,35 @@ def activities_for_course(course_id:int
             workload_elements.append(rec)
     return (workload_elements, simple_elements, block_elements)
 
-def workload_teacher(activity_list: list[db_sqlrecord]
+
+def workload_teacher(activity_list: list[Record]
 ) -> tuple[int, float]:
     """Calculate the total number of lessons and the pay-relevant
     workload.
     """
-    # Each WORKLOAD entry must be counted only once for each lesson,
+    # Each WORKLOAD entry must be counted only once, for all lessons,
     # so keep track:
-    w_lid = set()
+    w2pay_lid2len = {}  # {workload: (pay-tag, {lid: length})}
     # Keep track of lessons: don't count blocks twice for plan time
     lidset = set()
     total = 0.0
     nlessons = 0
     for data in activity_list:
         w = data["Workload"]
+        try:
+            ptag, lid2len = w2pay_lid2len[w]
+        except KeyError:
+            ptag, lid2len = data["PAY_TAG"], {}
+            w2pay_lid2len[w] = (ptag, lid2len)
         lid = data["Lid"]
-        if (wl := (w, lid)) in w_lid: continue
-        w_lid.add(wl)
         lessons = data["LENGTH"]
+        lid2len[lid] = lessons
         if (lid) not in lidset:
             lidset.add(lid)
             nlessons += lessons
-        pay = Workload.build(data["PAY_TAG"]).payment(lessons)
+    for ptag, lid2len in w2pay_lid2len.values():
+        lessons = sum(lid2len.values())
+        pay = Workload.build(ptag).payment(lessons)
         total += pay
     return (nlessons, total)
  
@@ -385,7 +391,7 @@ def teacher_workload(activity_list: list[dict]) -> tuple[int, float]:
     return (nlessons, total)
 
 
-def workload_class(klass:str, activity_list: list[tuple[str, db_sqlrecord]]
+def workload_class(klass:str, activity_list: list[tuple[str, Record]]
 ) -> list[tuple[str, int]]:
     """Calculate the total number of lessons for the pupils.
     The results should cover all (sub-)groups.
@@ -406,13 +412,13 @@ def workload_class(klass:str, activity_list: list[tuple[str, db_sqlrecord]]
             ag2lessons[ag] = 0
             lgsets[ag] = set()
     # Collect lessons per group
-    for g, data in activity_list:
+    for g, a in activity_list:
         assert g, "This function shouldn't receive activities with no group"
-        lg = data["Lesson_group"]
+        lg = a["Lesson_group"]
         if not lg: continue # no lessons (payment-only entry)
-        lid = data["Lid"]
+        lid = a["Lid"]
         lg_l = (lg, lid)
-        lessons = data["LENGTH"]
+        lessons = a["LENGTH"]
         if lessons:
             if no_subgroups:
                 assert g == GROUP_ALL, "group in class without subgroups???"

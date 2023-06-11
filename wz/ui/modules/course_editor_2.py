@@ -1,7 +1,7 @@
 """
 ui/modules/course_editor.py
 
-Last updated:  2023-06-10
+Last updated:  2023-06-11
 
 Edit course and blocks+lessons data.
 
@@ -64,11 +64,10 @@ from core.basic_data import (
     ParallelTag,
     get_payment_weights,
     DECIMAL_SEP,
+    BlockTag,
 )
 from core.course_data import (
-    filtered_courses,
     filter_activities,
-    activities_for_course,
     workload_teacher,
     workload_class,
 )
@@ -214,7 +213,7 @@ class CourseEditorPage(Page):
         Choose the initial value selection on the basis of the last
         selected course.
         """
-        fv = self.last_course.get(field) if self.last_course else None
+        fv = self.last_course[field] if self.last_course else None
         self.filter_field = field
         # class, subject, teacher
         self.select_list = self.filter_list[self.filter_field]
@@ -243,67 +242,19 @@ class CourseEditorPage(Page):
 
     def load_course_table(self, select_index, table_row):
         self.filter_value = self.select_list[select_index][0]
-        self.courses = filtered_courses(self.filter_field, self.filter_value)
-
-        ## Populate the course table
-        self.course_table.setRowCount(len(self.courses))
-        for r, _course in enumerate(self.courses):
-            c = 0
-            for cid, ctype, align in COURSE_TABLE_FIELDS:
-                cell_value = _course[cid]
-                item = self.course_table.item(r, c)
-                if not item:
-                    item = QTableWidgetItem()
-                    if align == -1:
-                        a = Qt.AlignmentFlag.AlignLeft
-                    elif align == 1:
-                        a = Qt.AlignmentFlag.AlignRight
-                    else:
-                        a = Qt.AlignmentFlag.AlignHCenter
-                    item.setTextAlignment(a | Qt.AlignmentFlag.AlignVCenter)
-                    self.course_table.setItem(r, c, item)
-                if ctype == 1:
-                    for k, v in self.filter_list[cid]:
-                        if k == cell_value:
-                            item.setText(v)
-                            break
-                    else:
-                        REPORT(
-                            "ERROR",
-                            T["UNKNOWN_VALUE_IN_FIELD"].format(
-                                cid=cid, cell_value=cell_value
-                            )
-                        )
-                else:
-                    item.setText(cell_value)
-                c += 1
-        self.course_table.setCurrentCell(-1, 0)
-        self.course_dict = None
-        self.pb_delete_course.setEnabled(False)
-        self.pb_edit_course.setEnabled(False)
-        self.frame_r.setEnabled(False)
-        if len(self.courses) > 0:
-            if table_row >= len(self.courses):
-                table_row = len(self.courses) - 1
-            self.course_table.setCurrentCell(table_row, 0)
-        self.total_calc()
-
-#TODO: 
-    def load_course_table_2(self, select_index, table_row):
-        self.filter_value = self.select_list[select_index][0]
-#        self.courses = filtered_courses(self.filter_field, self.filter_value)
-
         self.course_activities = filter_activities(
             self.filter_field, self.filter_value
         )
-        
         ## Populate the course table
         self.course_table.setRowCount(len(self.course_activities))
-        for r, _course in enumerate(self.course_activities):
-            cdata = self.course_activities[_course]
+        self.course_list = []
+        for r, course in enumerate(self.course_activities):
+            self.course_list.append(
+                cdatalist := self.course_activities[course]
+            )
             c = 0
             for cid, ctype, align in COURSE_TABLE_FIELDS:
-                cell_value = cdata[0][cid]
+                cell_value = cdatalist[0][cid]
                 item = self.course_table.item(r, c)
                 if not item:
                     item = QTableWidgetItem()
@@ -331,14 +282,13 @@ class CourseEditorPage(Page):
                     item.setText(cell_value)
                 c += 1
         self.course_table.setCurrentCell(-1, 0)
-        self.course_dict = None
+        self.course_data = None
         self.pb_delete_course.setEnabled(False)
         self.pb_edit_course.setEnabled(False)
         self.frame_r.setEnabled(False)
-#???
-        if len(self.courses) > 0:
-            if table_row >= len(self.courses):
-                table_row = len(self.courses) - 1
+        if (rn := len(self.course_activities)) > 0:
+            if table_row >= rn:
+                table_row = rn - 1
             self.course_table.setCurrentCell(table_row, 0)
         self.total_calc()
 
@@ -347,15 +297,15 @@ class CourseEditorPage(Page):
         if row >= 0:
             self.pb_delete_course.setEnabled(True)
             self.pb_edit_course.setEnabled(True)
-            self.course_dict = self.courses[row]
-            self.last_course = self.course_dict     # for restoring views
-            self.course_id = self.course_dict["course"]
+            self.course_data = self.course_list[row][0]
+            self.last_course = self.course_data     # for restoring views
+            self.course_id = self.course_data["Course"]
             self.display_lessons(-1)
             self.frame_r.setEnabled(True)
         else:
             # e.g. when entering an empty table
             self.lesson_table.setRowCount(0)
-            self.course_dict = None
+            self.course_data = None
             self.course_id = None
 
     def display_lessons(self, lesson_select_id: int):
@@ -374,10 +324,19 @@ class CourseEditorPage(Page):
         self.lesson_table.setRowCount(0)
         self.course_lessons = []
         ### Build a list of entries
-        (   pay_only_l,
-            simple_lesson_l,
-            block_lesson_l
-        ) = activities_for_course(self.course_id)
+        alist = self.course_activities[self.course_id]
+        pay_only_l, simple_lesson_l, block_lesson_l = [], [], []
+        subjects = get_subjects()
+        for a in alist:
+            lg = a["Lesson_group"]
+            if lg:
+                if (sid := a["BLOCK_SID"]): # block
+                    blocksub = subjects.map(sid)
+                    block_lesson_l.append((a, blocksub))
+                else: # simple
+                    simple_lesson_l.append(a)
+            else: # pay-only
+                pay_only_l.append(a)
         row = 0
         row_to_select = -1
         for pay_only in pay_only_l:
@@ -396,10 +355,6 @@ class CourseEditorPage(Page):
             self.course_lessons.append((-1, pay_only))
             row += 1
         for simple_lesson in simple_lesson_l:
-
-#TODO:???
-#            lessons = simple_lesson["LESSONS"]
-#            simple_lesson["nLessons"] = len(lessons)
             shared = is_shared_workload(simple_lesson["Workload"])
             # Add a lesson line
             self.lesson_table.insertRow(row)
@@ -415,11 +370,7 @@ class CourseEditorPage(Page):
             if simple_lesson["Lid"] == lesson_select_id:
                 row_to_select = row
             row += 1
-        for bl in block_lesson_l:
-            # Additional info used by the course editor
-#TODO:???
-#            lessons = bl["lessons"]
-#            bl["nLessons"] = len(lessons)
+        for bl, blocksub in block_lesson_l:
             shared = is_shared_workload(bl["Workload"])
             # Add a lesson line
             self.lesson_table.insertRow(row)
@@ -428,7 +379,7 @@ class CourseEditorPage(Page):
             ln = bl["LENGTH"]
             w = QTableWidgetItem(str(ln))
             self.lesson_table.setItem(row, 1, w)
-            w = QTableWidgetItem(f"{shared}{bl['block_subject']}")
+            w = QTableWidgetItem(f"{shared}{blocksub}")
             self.lesson_table.setItem(row, 2, w)
             self.course_lessons.append((1, bl)
             )
@@ -467,7 +418,10 @@ class CourseEditorPage(Page):
 
     @Slot()
     def on_pb_change_all_clicked(self):
-        if not self.course_dict:
+        """Either all teacher fields or all class fields for the current
+        teacher+class are to be changed to a new value.
+        """
+        if not self.course_data:
             return
         if not self.course_field_changer:
             # Initialize dialog
@@ -475,16 +429,17 @@ class CourseEditorPage(Page):
                 self.filter_list, self
             )
         changes = self.course_field_changer.activate(
-            self.course_dict, self.filter_field
+            self.course_data, self.filter_field
         )
         if changes:
             cid, tid, field, newval = changes
-            chlist = [
-                cdata["course"]
-                for cdata in self.courses
-                if cdata["CLASS"] == cid and cdata["TEACHER"] == tid
-            ]
+            chlist = []
+            for cdatalist in self.course_list:
+                cdata = cdatalist[0]
+                if cdata["CLASS"] == cid and cdata["TEACHER"] == tid:
+                    chlist.append(cdata["Course"])
             for course in chlist:
+                #print("CHANGE", field, newval, course)
                 db_update_field("COURSES", field, newval, course=course)
             self.load_course_table(
                 self.combo_class.currentIndex(),
@@ -493,7 +448,7 @@ class CourseEditorPage(Page):
 
     def edit_course(self, row):
         """Activate the course field editor."""
-        changes = self.edit_course_fields(self.course_dict)
+        changes = self.edit_course_fields(self.course_data)
         if changes:
             self.update_course(row, changes)
 
@@ -513,8 +468,8 @@ class CourseEditorPage(Page):
         The fields of the current course, if there is one, will be taken
         as "template".
         """
-        if self.course_dict:
-            cdict = self.course_dict.copy()
+        if self.course_data:
+            cdict = self.course_data.copy()
         else:
             cdict = {
                 "CLASS": "",
@@ -580,16 +535,17 @@ class CourseEditorPage(Page):
             self.notes.clear()
             self.notes.setEnabled(False)
         else:
-#TODO!
-#            llist = data["lessons"]
-#            lthis = llist[self.current_lesson[2]]
             if self.current_lesson[0] > 0:
-                wl = f'{wl} {str(data["blocktag"])}'
+                bt = BlockTag.to_string(data["BLOCK_SID"], data["BLOCK_TAG"])
+                wl = f"{wl} {bt}"
             self.lesson_add.setEnabled(True)
-#TODO! How do I detect multiple lessons in this lesson_group?
-#            if data["nLessons"] > 1:
-#                self.lesson_sub.setEnabled(True)
-
+            # Enable sub-lesson removal if there is more than one
+            # lesson entry in the lesson-group.
+            lg = data["Lesson_group"]
+            for a in self.course_activities[self.course_id]:
+                if a["Lesson_group"] == lg:
+                    if a["Lid"] != data["Lid"]:
+                        self.lesson_sub.setEnabled(True)
             self.lesson_length.setCurrentText(
                 str(data["LENGTH"])
             )
@@ -617,6 +573,7 @@ class CourseEditorPage(Page):
             self.notes.setEnabled(True)
         self.block_name.setText(wl)
 
+#TODO: This must be updated!
     def field_editor(self, obj: QLineEdit):
         object_name = obj.objectName()
         ### PAYMENT (COURSE_LESSONS)
@@ -640,7 +597,7 @@ class CourseEditorPage(Page):
         elif object_name == "wish_room":
             cl = self.current_lesson[1]
             classroom = get_classes().get_classroom(
-                self.course_dict["CLASS"], null_ok=True
+                self.course_data["CLASS"], null_ok=True
             )
             result = RoomDialog.popup(
                 start_value=cl["ROOM"],
@@ -661,7 +618,7 @@ class CourseEditorPage(Page):
             row = self.lesson_table.currentRow()
             assert(row >= 0)
             result = BlockNameDialog.popup(
-                course_data=self.course_dict,
+                course_data=self.course_data,
                 course_lessons=self.course_lessons,
                 lesson_row=row,
                 parent=self
@@ -758,15 +715,13 @@ class CourseEditorPage(Page):
         For classes, the (sub-)groups will be taken into consideration, so
         that groups with differing total will be shown.
         """
-        #return
         if self.filter_field == "CLASS":
             activities = []
-            for c in self.courses:
-                g = c["GRP"]
-                if not g: continue  # No pupils involved
-                for ctype in activities_for_course(c["course"]):
-                    for data in ctype:
-                        activities.append((g, data))
+            for alist in self.course_list:
+                for a in alist:
+                    g = a["GRP"]
+                    if g:   # pupils involved
+                        activities.append((g, a))
             totals = workload_class(self.filter_value, activities)
             if len(totals) == 1:
                 g, n = totals[0]
@@ -778,10 +733,9 @@ class CourseEditorPage(Page):
             self.total.setEnabled(True)
         elif self.filter_field == "TEACHER":
             activities = []
-            for c in self.courses:
-                for ctype in activities_for_course(c["course"]):
-                    for data in ctype:
-                        activities.append(data)
+            for alist in self.course_list:
+                for a in alist:
+                    activities.append(a)
             nlessons, total = workload_teacher(activities)
             self.total.setText(T["TEACHER_TOTAL"].format(
                 n=nlessons, total=f"{total:.2f}".replace('.', DECIMAL_SEP)
@@ -819,7 +773,7 @@ class CourseEditorPage(Page):
         lesson is also added to the LESSONS table.
         """
         bn = BlockNameDialog.popup(
-            course_data=self.course_dict,
+            course_data=self.course_data,
             course_lessons=self.course_lessons,
             lesson_row=-1,
             parent=self
@@ -969,14 +923,6 @@ class CourseEditorPage(Page):
 
 if __name__ == "__main__":
     from ui.ui_base import run
-
-    open_database()
-    records = activities_for_course(693) # 680
-    for rl in records:
-        for r in rl:
-            print(" ---------")
-            for k, v in r.items():
-                print(f"{k}:", v)
 
     widget = CourseEditorPage()
     widget.enter()

@@ -1,7 +1,7 @@
 """
 ui/modules/course_editor.py
 
-Last updated:  2023-06-11
+Last updated:  2023-06-12
 
 Edit course and blocks+lessons data.
 
@@ -338,6 +338,7 @@ class CourseEditorPage(Page):
         pay_only_l, simple_lesson_l, block_lesson_l = [], [], []
         subjects = get_subjects()
         for a in alist:
+            if not a["Cw"]: continue
             lg = a["Lesson_group"]
             if lg:
                 if (sid := a["BLOCK_SID"]): # block
@@ -625,7 +626,8 @@ class CourseEditorPage(Page):
             row = self.lesson_table.currentRow()
             assert(row >= 0)
             result = BlockNameDialog.popup(
-#TODO: Is course_data superfluous? It is available in course_lessons.
+                # <course_data> is necessary for courses with no "lessons"
+                # Otherwise the data could be taken from <course_lessons>.
                 course_data=self.course_data,
                 course_lessons=self.course_lessons,
                 lesson_row=row,

@@ -1,7 +1,7 @@
 """
 core/course_data.py
 
-Last updated:  2023-06-11
+Last updated:  2023-06-12
 
 Support functions dealing with courses, lessons, etc.
 
@@ -95,41 +95,45 @@ def filter_activities(filter:str, value:str) -> dict[str, list[Record]]:
     and the pay-data identical. Otherwise a block might be better.
     """
     q = f"""select
-            Course,
-            CLASS,
-            GRP,
-            SUBJECT,
-            TEACHER,
-            coalesce(REPORT, '') REPORT,
-            coalesce(GRADES, '') GRADES,
-            coalesce(REPORT_SUBJECT, '') REPORT_SUBJECT,
-            coalesce(AUTHORS, '') AUTHORS,
-            coalesce(INFO, '') INFO,
-            coalesce(Cw, 0) Cw,
-            coalesce(Workload, 0) Workload,
-            coalesce(Lesson_group, 0) Lesson_group,
-            coalesce(ROOM, '') ROOM,
-            coalesce(PAY_TAG, '') PAY_TAG,
-            coalesce(BLOCK_SID, '') BLOCK_SID,
-            coalesce(BLOCK_TAG, '') BLOCK_TAG,
-            coalesce(NOTES, '') NOTES,
-            coalesce(Lid, 0) Lid,
-            coalesce(LENGTH, 0) LENGTH,
-            coalesce(TIME, '') TIME,
-            coalesce(PLACEMENT, '') PLACEMENT,
-            coalesce(ROOMS, '') ROOMS
-            from COURSE_WORKLOAD
-            full join WORKLOAD -- inner join avoids spurious entries in WORKLOAD/LESSON_GROUPS!
-            using (workload)
-            
-            full join LESSON_GROUPS -- includes null lesson_groups in WORKLOAD
-            -- inner join LESSON_GROUPS -- excludes null lesson_groups in WORKLOAD
-            using (lesson_group)
-            
-            full join LESSONS using (lesson_group)
-            right join COURSES using (Course)
-            where {filter} = '{value}'
-            --where lesson_group NOT NULL -- alternative way to filter out null lesson_groups
+        Course,
+        CLASS,
+        GRP,
+        SUBJECT,
+        -- NAME as SUBJECT_NAME,
+        TEACHER,
+        coalesce(REPORT, '') REPORT,
+        coalesce(GRADES, '') GRADES,
+        coalesce(REPORT_SUBJECT, '') REPORT_SUBJECT,
+        coalesce(AUTHORS, '') AUTHORS,
+        coalesce(INFO, '') INFO,
+        coalesce(Cw, 0) Cw,
+        coalesce(Workload, 0) Workload,
+        coalesce(Lesson_group, 0) Lesson_group,
+        coalesce(ROOM, '') ROOM,
+        coalesce(PAY_TAG, '') PAY_TAG,
+        coalesce(BLOCK_SID, '') BLOCK_SID,
+        coalesce(BLOCK_TAG, '') BLOCK_TAG,
+        coalesce(NOTES, '') NOTES,
+        coalesce(Lid, 0) Lid,
+        coalesce(LENGTH, 0) LENGTH,
+        coalesce(TIME, '') TIME,
+        coalesce(PLACEMENT, '') PLACEMENT,
+        coalesce(ROOMS, '') ROOMS
+        from COURSES
+        
+        -- left join SUBJECTS on COURSES.SUBJECT = SUBJECTS.SID
+
+        left join COURSE_WORKLOAD using (course)
+        
+        left join WORKLOAD using (workload)
+        
+        left join LESSON_GROUPS -- includes null lesson_groups in WORKLOAD
+        -- inner join LESSON_GROUPS -- excludes null lesson_groups in WORKLOAD
+        using (lesson_group)
+        
+        left join LESSONS using (lesson_group)
+        
+        where {filter} = '{value}'
     """
     # The uniqueness of a COURSES/WORKLOAD connection
     # should be enforced by the UNIQUE constraint on the

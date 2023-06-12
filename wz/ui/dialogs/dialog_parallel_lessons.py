@@ -1,7 +1,7 @@
 """
 ui/dialogs/dialog_parallel_lessons.py
 
-Last updated:  2023-05-15
+Last updated:  2023-06-12
 
 Supporting "dialog" for the course editor – handle wishes for lessons
 starting at the same time.
@@ -105,12 +105,13 @@ class ParallelsDialog(QDialog):
         except KeyError:
             # no references
             return
+        print("§ref_list:", ref_list)
         for r in ref_list:
             lid = r[1]
             lg_id, ll, lt = db_read_unique(
                 "LESSONS",
                 ["lesson_group", "LENGTH", "TIME"],
-                id=lid,
+                lid=lid,
             )
             bsid, btag = db_read_unique(
                 "LESSON_GROUPS",

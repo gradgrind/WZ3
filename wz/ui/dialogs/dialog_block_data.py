@@ -1,7 +1,7 @@
 """
 ui/dialogs/dialog_block_data.py
 
-Last updated:  2023-06-11
+Last updated:  2023-06-12
 
 Supporting "dialog" for the course editor – handle course elements.
 That is, add new elements or inspect existing ones.
@@ -220,9 +220,8 @@ class BlockNameDialog(QDialog):
 
         else:
             ## "New element" mode
-#TODO--
-            print("§NEW:", self.this_course)
-            for l in self.lesson_list: print(" +++", l[1])
+            #print("§NEW:", self.this_course)
+            #for l in self.lesson_list: print(" +++", l[1])
             self.rb_new.setChecked(True)
             self.rb_simple.setChecked(True) # default choice
             self.set_sid("")
@@ -273,20 +272,6 @@ class BlockNameDialog(QDialog):
                         self.list_lessons.addItem(f"{str(n)}  @ {t}")
                     else:
                         self.list_lessons.addItem(str(n))
-
-#            lessons = data["lessons"]
-#            assert(lessons)
-#            ## Show lessons
-#            for l in lessons:
-#                n = l["LENGTH"]
-#                t = l["TIME"]
-#                if t:
-#                    self.list_lessons.addItem(f"{str(n)}  @ {t}")
-#                else:
-#                    self.list_lessons.addItem(str(n))
-
-
-
             ## Get all WORKLOAD entries for this lesson_group
             wlist = [this_w]
             for w in db_values(

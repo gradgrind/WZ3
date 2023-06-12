@@ -177,7 +177,8 @@ class CourseEditorPage(Page):
             return super().eventFilter(obj, event)
 
     def enter(self):
-        open_database()
+#TODO: Note special database file!
+        open_database("wzx.sqlite")
         clear_cache()
         self.init_data()
         if self.filter_field == "CLASS": pb = self.pb_CLASS
@@ -302,7 +303,7 @@ class CourseEditorPage(Page):
         row = self.course_table.currentRow()
         lesson_id = self.lesson_restore_id
 #TODO--
-        print("§COURSE ROW SELECT", row, lesson_id)
+        print("§COURSE ROW SELECT", row, lesson_id, "\n +", self.course_data)
 
         if row >= 0:
             self.pb_delete_course.setEnabled(True)
@@ -324,6 +325,8 @@ class CourseEditorPage(Page):
         If <lesson_select_id> is above 0, select the lesson with the given id.
         Otherwise select the first element (if there is one).
         """
+        print("§DISPLAY LESSONS:", lesson_select_id)
+
         def is_shared_workload(key:int) -> str:
             """Determine whether a WORKLOAD entry is used by multiple courses.
             """
@@ -480,20 +483,23 @@ class CourseEditorPage(Page):
         as "template".
         """
         if self.course_data:
-            cdict = self.course_data.copy()
+            cdict0 = self.course_data.todict()
         else:
-            cdict = {
-                "CLASS": "",
-                "GRP": "",
-                "SUBJECT": "",
-                "TEACHER": "",
-                "REPORT": "",
-                "GRADES": "",
-                "REPORT_SUBJECT": "",
-                "AUTHORS": "",
-                "INFO": "",
-            }
-            cdict[self.filter_field] = self.filter_value
+            cdict0 = {self.filter_field: self.filter_value}
+        cdict = {
+            k: cdict0.get(k, "")
+            for k in (
+                "CLASS",
+                "GRP",
+                "SUBJECT",
+                "TEACHER",
+                "REPORT",
+                "GRADES",
+                "REPORT_SUBJECT",
+                "AUTHORS",
+                "INFO",
+            )
+        }
         cdict["course"] = 0
         changes = self.edit_course_fields(cdict)
         if changes:
@@ -833,9 +839,8 @@ class CourseEditorPage(Page):
             course=self.course_id,
             workload=wld,
         )
-        # Redisplay lessons
-        self.display_lessons(l)
-        self.total_calc()
+        # Redisplay
+        self.load_course_table(lesson_id=l)
 
     @Slot()
     def on_lesson_add_clicked(self):
@@ -901,8 +906,7 @@ class CourseEditorPage(Page):
                     "LESSON_GROUPS",
                     lesson_group=lg["lesson_group"]
                 )
-        self.display_lessons(-1)
-        self.total_calc()
+        self.load_course_table()
 
 
     @Slot()

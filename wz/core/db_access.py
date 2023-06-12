@@ -1,15 +1,19 @@
 """
 core/db_access.py
 
-Last updated:  2023-06-11
+Last updated:  2023-06-12
 
 Helper functions for accessing the database.
 
-NOTE: Empty text fields should be NULL in the database.
-Reading NULL must return "", so if a null field contained "" it
-would still be read correctly.
-Writing "" should place NULL in the database field (so writing an
-actual "" should not be possible).
+TODO: There is some irregularity in the handling of empty/null fields.
+Initially I was insisting that empty text fields should be NULL in
+the database and that reading NULL should return "" (to allow it to
+be read correctly). Also, writing "" should place NULL in the database
+field (making it impossible to write an actual "".
+However, in the meantime I am not so convinced by this and there are
+certainly fields with "" cropping up _ it is difficult to avoid them.
+I have started trying to alleviate problems with null foreign keys by
+providing entries with 0-key in the target table.
 
 =+LICENCE=============================
 Copyright 2023 Michael Towers
@@ -75,12 +79,14 @@ class NoRecord(Exception):
 ### -----
 
 
-def open_database():
+def open_database(dbfile=None):
     """Ensure the connection to the database is open.
     The QtSql default connection is used.
     """
-    dbpath = DATAPATH(DATABASE)
-    bupath = DATAPATH(f"BACKUP/{Dates.today().rsplit('-', 1)[0]}_{DATABASE}")
+    if not dbfile:
+        dbfile = DATABASE
+    dbpath = DATAPATH(dbfile)
+    bupath = DATAPATH(f"BACKUP/{Dates.today().rsplit('-', 1)[0]}_{dbfile}")
     if not os.path.isfile(bupath):
         os.makedirs(os.path.dirname(bupath), exist_ok=True)
         copyfile(dbpath, bupath)
@@ -186,33 +192,16 @@ def table_extent(table):
 """
 
 
-#def db_select(query_text: str) -> list[QSqlRecord]:
-def db_select(query_text: str) -> list[dict[str, Union[str,int]]]:
-    query = QSqlQuery(query_text)
-    if not query.isActive():
-        error = query.lastError()
-        REPORT("ERROR", f"SQL query failed: {error.text()}\n  {query_text}")
-    records = []
-    while query.next():
-        records.append(Record(query.record()))
-    return records
-
-    rec = query.record()
-    nfields = rec.count()
-    names = [rec.fieldName(i) for i in range(nfields)]
-    records = []
-    while query.next():
-        records.append(
-            {n: query.value(i) for i, n in enumerate(names)}
-        )
-    return records
-
-
 class Record:
     def __getitem__(self, key):
         if (r := self._record).contains(key):
             return r.value(key)
         raise KeyError(f"Key {key} not in {{{self}}}")
+
+    def get(self, key, default=None):
+        if (r := self._record).contains(key):
+            return r.value(key)
+        return default
 
     def __setitem__(self, key, value):
         if (r := self._record).contains(key):
@@ -230,6 +219,21 @@ class Record:
 
     def __str__(self):
         return "; ".join(f"{k}: {repr(v)}" for k, v in self.items())
+
+    def todict(self):
+        r = self._record
+        return {r.fieldName(i): r.value(i) for i in range(r.count())}
+
+
+def db_select(query_text: str) -> list[Record]:
+    query = QSqlQuery(query_text)
+    if not query.isActive():
+        error = query.lastError()
+        REPORT("ERROR", f"SQL query failed: {error.text()}\n  {query_text}")
+    records = []
+    while query.next():
+        records.append(Record(query.record()))
+    return records
 
 
 #TODO: Replace this by db_select?

@@ -46,6 +46,7 @@ T = TRANSLATIONS("ui.modules.course_editor")
 from typing import NamedTuple
 from core.db_access import (
     open_database,
+    db_select,
     db_read_unique,
     db_read_full_table,
     db_update_field,
@@ -416,36 +417,40 @@ class CourseEditorPage(Page):
         if not SHOW_CONFIRM(T["REALLY_DELETE"]):
             return
         if db_delete_rows("COURSES", course=self.course_id):
-#TODO: Check that the db tidying really occurs:
-            # The foreign key constraints should tidy up the database.
-# When the last reference to a WORKLOAD entry goes, that entry must be
-# removed!
-
+            # The foreign key constraints should tidy up the database to
+            # a certain extent.
+            # However, when the last reference to a WORKLOAD entry goes,
+            # that entry must be removed here. If the removed entry contains
+            # the last reference to a LESSON_GROUPS entry, also this entry
+            # must be removed.
             q1 = """select
                     Workload,
-                    Lesson_group,
-                    Cw
+                    Lesson_group
                 from LESSON_GROUPS
                 left join WORKLOAD using (Lesson_group)
                 left join COURSE_WORKLOAD using (Workload)
                 where Cw is null
             """
-            # Actually, I wouldn't need Cw in the result!
-
-            # Then, on the basis of this query:
-            q2 = """select
-                Workload,
-                Lesson_group
-            from LESSON_GROUPS
-            left join WORKLOAD using (Lesson_group)
-            where Lesson_group = 347 and Workload != 512
-            """
-            # decide whether to delete the LESSON_GROUPS or the WORKLOAD entry.
-
-
-
-
-
+            for record in db_select(q1):
+                w = record["Workload"]
+                lg = record["Lesson_group"]
+                # Then, on the basis of this query:
+                q2 = f"""select
+                        Workload,
+                        Lesson_group
+                    from LESSON_GROUPS
+                    left join WORKLOAD using (Lesson_group)
+                    where Lesson_group = {lg} and Workload != {w}
+                """
+                # ... decide whether to delete the LESSON_GROUPS or
+                # the WORKLOAD entry.
+                if db_select(q2):
+                    # Just delete the WORKLOAD entry.
+                    db_delete_rows("WORKLOAD", Workload=w)
+                else:
+                    # Delete the LESSON_GROUPS entry, and – via the foreign
+                    # key constraint – also the WORKLOAD entry.
+                    db_delete_rows("LESSON_GROUPS", Lesson_group=lg)
             # Reload the course table
             self.load_course_table(self.combo_class.currentIndex(), row)
 

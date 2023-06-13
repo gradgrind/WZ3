@@ -1,7 +1,7 @@
 """
 ui/modules/course_editor.py
 
-Last updated:  2023-06-12
+Last updated:  2023-06-13
 
 Edit course and blocks+lessons data.
 
@@ -247,11 +247,12 @@ class CourseEditorPage(Page):
             self.filter_value = self.select_list[select_index][0]
         if table_row < 0:
             table_row = self.course_table.currentRow()
-            print("§course_table.currentRow:", table_row)
         self.course_activities = filter_activities(
             self.filter_field, self.filter_value
         )
         ## Populate the course table
+        _sh = self.suppress_handlers
+        self.suppress_handlers = True
         self.course_table.setRowCount(len(self.course_activities))
         self.course_list = []
         for r, course in enumerate(self.course_activities):
@@ -287,7 +288,6 @@ class CourseEditorPage(Page):
                 else:
                     item.setText(cell_value)
                 c += 1
-        self.course_table.setCurrentCell(-1, 0)
         self.course_data = None
         self.pb_delete_course.setEnabled(False)
         self.pb_edit_course.setEnabled(False)
@@ -296,15 +296,17 @@ class CourseEditorPage(Page):
             if table_row >= rn:
                 table_row = rn - 1
             self.course_table.setCurrentCell(table_row, 0)
+        else:
+            self.course_table.setCurrentCell(-1, 0)
+        self.suppress_handlers = _sh
+        self.on_course_table_itemSelectionChanged()
         self.lesson_restore_id = -1
         self.total_calc()
 
     def on_course_table_itemSelectionChanged(self):
+        if self.suppress_handlers: return
         row = self.course_table.currentRow()
         lesson_id = self.lesson_restore_id
-#TODO--
-        print("§COURSE ROW SELECT", row, lesson_id, "\n +", self.course_data)
-
         if row >= 0:
             self.pb_delete_course.setEnabled(True)
             self.pb_edit_course.setEnabled(True)
@@ -325,7 +327,6 @@ class CourseEditorPage(Page):
         If <lesson_select_id> is above 0, select the lesson with the given id.
         Otherwise select the first element (if there is one).
         """
-        print("§DISPLAY LESSONS:", lesson_select_id)
 
         def is_shared_workload(key:int) -> str:
             """Determine whether a WORKLOAD entry is used by multiple courses.
@@ -419,6 +420,32 @@ class CourseEditorPage(Page):
             # The foreign key constraints should tidy up the database.
 # When the last reference to a WORKLOAD entry goes, that entry must be
 # removed!
+
+            q1 = """select
+                    Workload,
+                    Lesson_group,
+                    Cw
+                from LESSON_GROUPS
+                left join WORKLOAD using (Lesson_group)
+                left join COURSE_WORKLOAD using (Workload)
+                where Cw is null
+            """
+            # Actually, I wouldn't need Cw in the result!
+
+            # Then, on the basis of this query:
+            q2 = """select
+                Workload,
+                Lesson_group
+            from LESSON_GROUPS
+            left join WORKLOAD using (Lesson_group)
+            where Lesson_group = 347 and Workload != 512
+            """
+            # decide whether to delete the LESSON_GROUPS or the WORKLOAD entry.
+
+
+
+
+
             # Reload the course table
             self.load_course_table(self.combo_class.currentIndex(), row)
 
@@ -518,8 +545,7 @@ class CourseEditorPage(Page):
         return self.course_field_editor.activate(course_dict)
 
     def on_lesson_table_itemSelectionChanged(self):
-        if self.suppress_handlers:
-            return
+        if self.suppress_handlers: return
         # Populate the form fields
         self.lesson_sub.setEnabled(False)
         row = self.lesson_table.currentRow()

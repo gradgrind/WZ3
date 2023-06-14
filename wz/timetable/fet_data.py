@@ -80,6 +80,7 @@ from core.db_access import (
     NoRecord,
     read_pairs,
     db_read_mappings,
+    db_name,
 )
 from core.activities import collect_activity_groups
 
@@ -1570,7 +1571,9 @@ def add_constraints(constraints, ctype, constraint_list):
 
 if __name__ == "__main__":
     from core.db_access import open_database
-    open_database()
+    dbfile = "wzx.sqlite"
+    print("\n DATABASE:", dbfile)
+    open_database(dbfile)
 
     fet_days = get_days_fet()
     if _TEST:
@@ -1693,6 +1696,7 @@ if __name__ == "__main__":
                 __rlist = ' / '.join([','.join(rl) for rl in fr[2]])
                 fh.write(f"{__id:36}: [{len(fr[2])}] {__rlist}\n")
         print("\nADDITIONAL ROOM DATA ->", outpath)
+        print("\nDATA from (database file):", db_name())
 
     quit(0)
 

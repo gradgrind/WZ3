@@ -1,7 +1,7 @@
 """
 core/db_access.py
 
-Last updated:  2023-06-12
+Last updated:  2023-06-14
 
 Helper functions for accessing the database.
 
@@ -110,6 +110,12 @@ def open_database(dbfile=None):
     foreign_keys_on = "PRAGMA foreign_keys = ON"
     assert QSqlQuery(foreign_keys_on).isActive(), f"Failed: {foreign_keys_on}"
     return con
+
+
+def db_name():
+    """Return the "name" (file path) of the default database.
+    """
+    return QSqlDatabase.database().databaseName()
 
 
 class DatabaseShortAccess:

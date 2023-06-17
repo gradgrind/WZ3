@@ -1,7 +1,7 @@
 """
 ui/modules/pupil_editor.py
 
-Last updated:  2023-05-06
+Last updated:  2023-06-17
 
 Edit pupil data.
 
@@ -68,7 +68,7 @@ from ui.dialogs.dialog_text_line_message import TextLineDialog
 from ui.dialogs.dialog_text_line_offer import TextLineOfferDialog
 from ui.dialogs.dialog_choose_class import ClassSelectDialog
 from ui.dialogs.dialog_pupil_groups import PupilGroupsDialog
-from ui.dialogs.dialog_number_constraint import NumberConstraintDialog
+from ui.dialogs.dialog_constraint_number import NumberConstraintDialog
 from local.name_support import asciify, tvSplit
 from local.pupil_support import pupil_name, check_pid_valid
 from core.basic_data import get_classes, clear_cache

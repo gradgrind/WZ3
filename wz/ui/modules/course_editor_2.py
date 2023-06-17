@@ -830,10 +830,12 @@ class CourseEditorPage(Page):
                 )
             elif btag == "$":
                 # new payment-only
-                lesson_group = None
+                lesson_group = 0
                 wld = db_new_row(
                     "WORKLOAD",
+                    lesson_group=lesson_group,
                     PAY_TAG=f"1*{get_payment_weights()[0][0]}",
+                    ROOM="$"
                 )
             else:
                 assert(not btag)

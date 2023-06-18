@@ -1,5 +1,5 @@
 """
-timetable/fet_read_results.py - last updated 2023-05-20
+timetable/fet_read_results.py - last updated 2023-06-18
 
 Fetch the placements after a fet run and update the database accordingly.
 There is also a function to generate an aSc-file.
@@ -104,7 +104,7 @@ def read_placements(fet_file, placement_file):
                 else:
                     field_values.append(("ROOMS", room))
             # print("§§§", lesson_id, field_values)
-            db_update_fields("LESSONS", field_values, id=int(lesson_id))
+            db_update_fields("LESSONS", field_values, lid=int(lesson_id))
 
 
 def getActivities(working_folder):

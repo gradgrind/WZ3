@@ -1,7 +1,7 @@
 """
 ui/modules/course_editor.py
 
-Last updated:  2023-06-13
+Last updated:  2023-06-18
 
 Edit course and blocks+lessons data.
 
@@ -178,8 +178,8 @@ class CourseEditorPage(Page):
             return super().eventFilter(obj, event)
 
     def enter(self):
-#TODO: Note special database file!
-        open_database("wzx.sqlite")
+        #open_database("wzx.sqlite")
+        open_database("wz.sqlite")
         clear_cache()
         self.init_data()
         if self.filter_field == "CLASS": pb = self.pb_CLASS

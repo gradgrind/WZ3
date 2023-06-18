@@ -1,5 +1,5 @@
 """
-timetable/fet_data.py - last updated 2023-05-30
+timetable/fet_data.py - last updated 2023-06-18
 
 Prepare fet-timetables input from the database ...
 
@@ -314,6 +314,7 @@ class TimetableCourses:
         "space_constraints",
         "class2sid2ag2aids",
         "fancy_rooms",
+        "block_classes",
     )
 
     def __init__(self, fet_classes):
@@ -321,12 +322,15 @@ class TimetableCourses:
         self.group2atoms = fet_classes.g2a
         self.TT_CONFIG = MINION(DATAPATH("CONFIG/TIMETABLE"))
 
-    def read_lessons(self):
+    def read_lessons(self, block_classes=None):
         """Produce a list of fet-activity (lesson) items with a
         reference to the id of the source line in the LESSONS table.
         Any blocks with no sublessons are ignored.
         Constraints for time and rooms are added as appropriate.
+        If classes are supplied (as a list or set) in <block_classes>,
+        no lessons will be generated for them.
         """
+        self.block_classes = block_classes or []
         # Collect teachers and subjects with timetable entries:
         self.timetable_teachers = set()
         self.timetable_subjects = set()
@@ -381,6 +385,9 @@ class TimetableCourses:
             # Get "usable" groups
             groups = []
             for klass, aset in group_sets.items():
+                # Filter out a class? Also class constraints need to go.
+                if klass in self.block_classes:
+                    continue
                 a2g = atoms2group[klass]
                 try:
                     key = tuple(sorted(aset))
@@ -1120,6 +1127,8 @@ class TimetableCourses:
         unsupported = set()
         classes = get_classes()
         for klass, _ in classes.get_class_list():
+            if klass in self.block_classes:
+                continue
             try:
                 available, cstr = tt_constraints[klass]
             except KeyError:
@@ -1571,7 +1580,8 @@ def add_constraints(constraints, ctype, constraint_list):
 
 if __name__ == "__main__":
     from core.db_access import open_database
-    dbfile = "wzx.sqlite"
+    #dbfile = "wzx.sqlite"
+    dbfile = "wz.sqlite"
     print("\n DATABASE:", dbfile)
     open_database(dbfile)
 
@@ -1615,6 +1625,7 @@ if __name__ == "__main__":
     courses = TimetableCourses(fet_classes)
     if _TEST:
         print("\n ********** READ LESSON DATA **********\n")
+    #courses.read_lessons(["08K"])
     courses.read_lessons()
 
     # quit(0)

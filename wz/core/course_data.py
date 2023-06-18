@@ -1,7 +1,7 @@
 """
 core/course_data.py
 
-Last updated:  2023-06-12
+Last updated:  2023-06-18
 
 Support functions dealing with courses, lessons, etc.
 
@@ -134,6 +134,7 @@ def filter_activities(filter:str, value:str) -> dict[str, list[Record]]:
         left join LESSONS using (lesson_group)
         
         where {filter} = '{value}'
+        order by CLASS, SUBJECT, GRP, TEACHER
     """
     # The uniqueness of a COURSES/WORKLOAD connection
     # should be enforced by the UNIQUE constraint on the

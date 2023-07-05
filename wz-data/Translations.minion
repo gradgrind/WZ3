@@ -47,6 +47,10 @@ core.classes: {
     TOO_FEW_GROUPS:     "Klassenteilung „{div}“: mindestens zwei Gruppen erforderlich"
 }
 
+core.course_data: {
+    INVALID_PAY_TAG:    "Ungültige Deputatsangabe: {n}*('{t}'={w})"
+}
+
 core.list_activities: {
     H_class:            Klasse
     H_group:            Gruppe
@@ -220,10 +224,10 @@ timetable.timetable_base: {
     BLOCK_ROOMS_INCOMPATIBLE: "Raumangaben für den Block „{sid}“ in Klasse(n) {classes} sind nicht umsetzbar:\n  {rooms}"
 }
 
-ui.dialogs.dialog_block_name: {
-    NEW_ITEM:       "Neu: Unterricht, Block oder Deputat"
-    UPDATE_ITEM:    "Blockfach oder -kennzeichen ändern"
-}
+#ui.dialogs.dialog_block_name: {
+#    NEW_ITEM:       "Neu: Unterricht, Block oder Deputat"
+#    UPDATE_ITEM:    "Blockfach oder -kennzeichen ändern"
+#}
 
 ui.dialogs.dialog_choose_one_item_pair: {
     UNKNOWN_KEY:    "unbekanntes Kürzel: „{id}“"
@@ -283,6 +287,7 @@ ui.dialogs.dialog_room_choice: {
 #}
 
 #ui.dialogs.dialog_workload: {
+#    INVALID_PAY_VALUE: "Ungültige Deputatszahl: {p}"
 #}
 
 ui.grid_base: {

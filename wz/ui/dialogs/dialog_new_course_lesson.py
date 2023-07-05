@@ -1,24 +1,17 @@
 """
-ui/dialogs/dialog_block_data.py
+ui/dialogs/dialog_new_course_lesson.py
 
-Last updated:  2023-06-12
+Last updated:  2023-07-05
 
 Supporting "dialog" for the course editor – handle course elements.
 That is, add new elements or inspect existing ones.
 The basic types are simple lesson item, block lesson item and
 no-lesson item (payment-only).
-A new element can be completely new, that is a new entry in
-COURSE_WORKLOAD and in WORKLOAD. Unless it is payment-only there
-will also be a new entry in LESSON_GROUPS and a single entry in
-LESSONS.
-A new element can be a membership in an existing block. The
-existing LESSON_GROUPS entry for that block will be shared,
-there will be a new entry in COURSE_WORKLOAD and in WORKLOAD.
-Finally, a new element can share an existing WORKLOAD element
-(and thus room and payment details). Here there will only be
-a new entry in COURSE_WORKLOAD.
-In "inspection mode", no changes can be made, except that a
-block may have its name changed.
+A new element can be completely new, that is a new lesson-group or (in
+the case of a pay-only element) just a new pay-tag-id. Unless it is
+pay-only there will also be a new entry in LESSONS.
+A new element can be attached to an existing lesson group, or just share
+a pay-tag (?).
 
 
 =+LICENCE=============================
@@ -49,7 +42,7 @@ if __name__ == "__main__":
     from core.base import start
     start.setup(os.path.join(basedir, 'TESTDATA'))
 
-#T = TRANSLATIONS("ui.dialogs.dialog_block_data")
+#T = TRANSLATIONS("ui.dialogs.dialog_new_course_lesson")
 
 ### +++++
 
@@ -65,8 +58,9 @@ from core.db_access import (
     db_values,
     db_read_unique_field,
     db_read_unique,
+    db_query,
 )
-from core.course_data import (
+from core.course_data_3 import (
     courses_in_block,
     simple_with_subject,
     payonly_with_subject,
@@ -91,21 +85,22 @@ INVALID_RESULT = {"type": "INVALID"}    # invalid result
 
 ### -----
 
-class BlockNameDialog(QDialog):
+#TODO
+class NewCourseLessonDialog(QDialog):
     """This dialog is evoked from the course editor.
     There are the following scenarios:
 
     1) A new course/lesson_group connection is to be made.
        There is the choice between a simple lesson, a block lesson
        and a payment-only item.
-       The new item consists of a new WORKLOAD entry and an entry in
-       COURSE_WORKLOAD linking the course to the workload. Unless the
-       new item is payment-only, there will also be a new LESSON_GROUPS
-       entry (linked from the WORKLOAD entry), and a single entry in
-       LESSONS for the lesson_group.
+       The new item consists of a new COURSE_LESSONS entry. Unless the
+       new item is payment-only, there will also be a new lesson-group
+       and a single new entry in LESSONS for this lesson-group.
        Note that further lessons may be added to existing
        lesson_groups in the course editor, using the "+" button.
-       A payment-only item doesn't have a lesson group.
+       A payment-only item doesn't have a lesson-group (it is 0).
+
+
 
     2) A course may "join" an existing block (named lesson_group).
 
@@ -113,7 +108,7 @@ class BlockNameDialog(QDialog):
        the same subject. This covers simple cases of team-teaching and
        mixed pupil groups where only one room (at most) is specified
        and the payment details for all the teachers are the same.
-       
+
     4) The "linkages" of the current course/workload/lesson group can
        be shown.
        In this case the table row (lesson_row) of the current element
@@ -161,7 +156,7 @@ class BlockNameDialog(QDialog):
 
     def __init__(self, parent=None):
         super().__init__(parent=parent)
-        uic.loadUi(APPDATAPATH("ui/dialog_block_name.ui"), self)
+        uic.loadUi(APPDATAPATH("ui/dialog_new_course_lesson.ui"), self)
         self.table_courses.horizontalHeader().setSectionResizeMode(
             QHeaderView.ResizeMode.ResizeToContents
         )
@@ -170,6 +165,49 @@ class BlockNameDialog(QDialog):
         )
         validator = QRegularExpressionValidator(BLOCK_TAG_FORMAT)
         self.BLOCK_TAG.setValidator(validator)
+
+    @Slot(bool)
+    def on_cb_block_toggled(self, on):
+        self.blockstack.setCurrentIndex(1 if on else 0)
+
+    def set_block_subject_list(self):
+        """Populate the subject chooser.
+        This is called (only) at the beginning of <activate>.
+        """
+        self.block_subject.clear()
+        self.sid_list = []
+        self.sid_index = {}
+        for sid, name in get_subjects():
+            if sid[0] == "-":
+                continue
+            self.sid_index[sid] = len(self.sid_list)
+            self.sid_list.append(sid)
+            self.block_subject.addItem(name)
+        self.block_subject.setCurrentIndex(-1)
+
+    def get_block_sid_tags(self):
+        """Get mapping from BLOCK_SID to the list of defined BLOCK_TAGs
+        for that subject. Also the lesson_group is included:
+            {BLOCK_SID: (BLOCK_TAG, lesson_group), ... }
+        This is used by <set_sid>, so it can be called multiple times.
+        The result is cached to avoid unnecessary reloading.
+        """
+        if self.__block_sid_tags is not None:
+            return self.__block_sid_tags
+        bst = {}
+        for lg, BLOCK_SID, BLOCK_TAG in db_read_fields(
+            "COURSE_LESSONS", ("lesson_group", "BLOCK_SID", "BLOCK_TAG")
+        ):
+            if BLOCK_SID:
+                tag_lg = (BLOCK_TAG, lg)
+                try:
+                    bst[BLOCK_SID].add(tag_lg)
+                except KeyError:
+                    bst[BLOCK_SID] = {tag_lg}
+        # Sort the resulting list
+        bst2 = {k: sorted(v) for k, v in bst.items()}
+        self.__block_sid_tags = bst2
+        return bst2
 
     def activate(
         self,
@@ -183,6 +221,8 @@ class BlockNameDialog(QDialog):
         current element will be displayed. The only change possible
         is to assign a new name to a block.
         """
+        print("???", this_course)
+        print("+++", lesson_row, lesson_list)
         self.result = None
         self.__block_sid_tags = None    # cache for block-names
         self.this_course = this_course
@@ -236,19 +276,6 @@ class BlockNameDialog(QDialog):
         self.disable_triggers = False
         self.exec()
         return self.result
-            
-    def set_block_subject_list(self):
-        """Populate the subject chooser."""
-        self.block_subject.clear()
-        self.sid_list = []
-        self.sid_index = {}
-        for sid, name in get_subjects():
-            if sid[0] == "-":
-                continue
-            self.sid_index[sid] = len(self.sid_list)
-            self.sid_list.append(sid)
-            self.block_subject.addItem(name)
-        self.block_subject.setCurrentIndex(-1)
 
     def set_table_use_selection(self, on:bool):
         self.disable_table_row_select = not on
@@ -260,7 +287,9 @@ class BlockNameDialog(QDialog):
         """
         self.list_lessons.clear()
         ltype, data = this_data
-        this_w = data["Workload"]
+        clist = []
+        this_c = data["Course"]
+        this_r = None
         lg = data["Lesson_group"]
         if lg:
             ## Show lessons
@@ -272,36 +301,46 @@ class BlockNameDialog(QDialog):
                         self.list_lessons.addItem(f"{str(n)}  @ {t}")
                     else:
                         self.list_lessons.addItem(str(n))
-            ## Get all WORKLOAD entries for this lesson_group
-            wlist = [this_w]
-            for w in db_values(
-                "WORKLOAD",
-                "workload",
-                lesson_group=lg
-            ):
-                if w != this_w:
-                    wlist.append(w)
-            if not data["BLOCK_SID"]:
-                # simple lessons
-                assert(len(wlist) == 1)
+            ## Get all COURSE entries for this lesson_group
+            q = f"""select
+                    CLASS,
+                    GRP,
+                    SUBJECT,
+                    TEACHER,
+                    pay_tag_id,
+                    coalesce(ROOM, '') ROOM,
+                    course
+                    coalesce(Lesson_group, 0) Lesson_group,
+                    coalesce(BLOCK_TAG, '') BLOCK_TAG,
+                    coalesce(BLOCK_SID, '') BLOCK_SID
+                from COURSE_LESSONS
+                inner join COURSES using(course)
+                where lesson_group = {lg}
+            """
         else:
-            ## no lessons (pay-only)
-            wlist = [data["Workload"]]
-        ## Show courses, the current one first
-        this_course = data["Course"]
-        courses = [(this_course, this_w)]
-        for w in wlist:
-            for course in db_values("COURSE_WORKLOAD", "course", workload=w):
-                if course != this_course:
-                    courses.append((course, w))
-        self.course_table_data = []
-        for course, w in courses:
-            cdata = db_read_unique(
-                "COURSES",
-                ("CLASS", "GRP", "SUBJECT", "TEACHER"),
-                course=course
-            )
-            self.course_table_data.append((cdata, w, lg, course))
+            ## Get all COURSE entries for this pay-tag
+            q = f"""select
+                    CLASS,
+                    GRP,
+                    SUBJECT,
+                    TEACHER,
+                    pay_tag_id,
+                    coalesce(ROOM, '') ROOM,
+                    course
+                from COURSE_LESSONS
+                inner join COURSES using(course)
+                where pay_tag_id = {data["Pay_tag_id"]}
+            """
+        for r in db_query(q):
+            if r[-1] == this_c:
+                assert this_r is None
+                this_r = r
+            else:
+                clist.append(r)
+        self.course_table_lines = [this_r] + sorted(clist)
+        #for r in self.course_table_lines:
+        #    print(r)
+## old:    self.course_table_data.append((cdata, w, lg, course))
         self.show_courses()
         #self.set_table_use_selection(False) # the default?
 
@@ -313,23 +352,26 @@ class BlockNameDialog(QDialog):
         """
         self.course_table_activate_line(-1)
         self.pb_accept.setEnabled(False)
-        if self.rb_add2block.isChecked():
-            ## Add an element to an existing block.
-            self.cb_block.setEnabled(False)
-            self.cb_block.setChecked(True)
-        else:
-            self.cb_block.setEnabled(True)
+        self.cb_block.setEnabled(True)
+#        if self.rb_add2block.isChecked():
+            ## Add an element to an existing lesson group.
+#?
+            #self.cb_block.setEnabled(False)
+#            self.cb_block.setChecked(True)
         if self.cb_block.isChecked():
             ## Dealing with block lesson element
             self.BLOCK_TAG.setEditable(self.rb_new.isChecked())
             btag = self.BLOCK_TAG.currentText()
-            self.course_table_data = courses_in_block(self.sid, btag)
-            if self.rb_add2team.isChecked():
+#?
+            print("???$", self.sid, btag)
+            self.course_table_lines = courses_in_block(self.sid, btag)
+            self.this_sid = self.this_course["SUBJECT"]
+            if self.cb_unit.isChecked():
                 # Show just the courses with the given subject
                 sid = self.this_course["SUBJECT"]
-                self.course_table_data = [
-                    ctd for ctd in self.course_table_data
-                    if ctd[0][2] == sid
+                self.course_table_lines = [
+                    cdata for cdata in self.course_table_lines
+                    if cdata[2] == sid
                 ]
                 self.set_table_use_selection(True)
             else:
@@ -337,23 +379,21 @@ class BlockNameDialog(QDialog):
         elif self.rb_simple.isChecked():
             ## Dealing with simple lesson element
             if self.rb_new.isChecked():
-                self.course_table_data = []
-                c = self.this_course["course"]
-                cdata = (
-                    self.this_course["CLASS"],
-                    self.this_course["GRP"],
-                    self.this_course["SUBJECT"],
-                    self.this_course["TEACHER"],
-                )
+#?
+                self.course_table_lines = []
+#                self.course_table_data = []
+#                c = self.this_course["course"]
+#                cdata = (
+#                    self.this_course["CLASS"],
+#                    self.this_course["GRP"],
+#                    self.this_course["SUBJECT"],
+#                    self.this_course["TEACHER"],
+#                )
                 for l in self.lesson_list:
                     if l[0] == 0:
                         # simple lesson
-                        self.course_table_data.append((
-                            cdata,
-                            l[1]["workload"],
-                            l[1]["lesson_group"],
-                            c
-                        ))
+#?
+                        self.course_table_lines.append(l[1])
             else:
                 sid = self.this_course["SUBJECT"]
                 self.course_table_data = simple_with_subject(sid)
@@ -386,7 +426,7 @@ class BlockNameDialog(QDialog):
                 self.set_table_use_selection(True)
             self.set_table_use_selection(self.rb_add2team.isChecked())
         self.show_courses()
-        if self.course_table_data:
+        if self.course_table_lines:
             self.course_table_activate_line(0)
             if not self.disable_table_row_select:
                 self.table_courses.setCurrentCell(0, 0)
@@ -394,11 +434,12 @@ class BlockNameDialog(QDialog):
 
     def show_courses(self):
         """Display the courses corresponding to the "filter" values.
-        Their data is stored as a list in <self.course_table_data>.
+        Their data is stored as a list in <self.course_table_lines>.
         """
-        self.table_courses.setRowCount(len(self.course_table_data))
-        for r, cw in enumerate(self.course_table_data):
-            cdata, workload = cw[:2]    # cdata: (CLASS, GRP, sid, tid)
+# was <self.course_table_data>
+        self.table_courses.setRowCount(len(self.course_table_lines))
+        for r, cdata in enumerate(self.course_table_lines):
+            ## cdata: CLASS, GRP, SUBJECT, TEACHER, pay_tag_id, ROOM, course
             # class field
             if not (tw := self.table_courses.item(r, 0)):
                 tw = QTableWidgetItem()
@@ -421,18 +462,17 @@ class BlockNameDialog(QDialog):
                 tw = QTableWidgetItem()
                 self.table_courses.setItem(r, 3, tw)
             tw.setText(get_teachers().name(cdata[3]))
-            # workload (key)
+            # pay-tag-id
             if not (tw := self.table_courses.item(r, 4)):
                 tw = QTableWidgetItem()
                 tw.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
                 self.table_courses.setItem(r, 4, tw)
-            tw.setText(str(workload))
+            tw.setText(str(cdata[4]))
             # room-choice field
             if not (tw := self.table_courses.item(r, 5)):
                 tw = QTableWidgetItem()
                 self.table_courses.setItem(r, 5, tw)
-            room = db_read_unique_field("WORKLOAD", "ROOM", workload=workload)
-            tw.setText(room)
+            tw.setText(cdata[5])
 
     def show_lessons(self, lesson_group:int):
         """Display the individual lessons for the given <lesson_group> value.
@@ -458,28 +498,7 @@ class BlockNameDialog(QDialog):
         if self.BLOCK_TAG.count():
             self.BLOCK_TAG.setCurrentIndex(0)
         self.disable_triggers = False
-        self.on_BLOCK_TAG_currentTextChanged(self.BLOCK_TAG.currentText())        
-        
-    def get_block_sid_tags(self):
-        """Get mapping from BLOCK_SID to the list of defined BLOCK_TAGs
-        for that subject. Also the lesson_group is included:
-            {BLOCK_SID: (BLOCK_TAG, lesson_group), ... }
-        The result is cached to avoid unnecessary action
-        """
-        if self.__block_sid_tags is not None:
-            return self.__block_sid_tags
-        bst = {}
-        for lg, BLOCK_SID, BLOCK_TAG in db_read_fields(
-            "LESSON_GROUPS", ("lesson_group", "BLOCK_SID", "BLOCK_TAG")
-        ):
-            if BLOCK_SID:
-                tag_lg = (BLOCK_TAG, lg)
-                try:
-                    bst[BLOCK_SID].append(tag_lg)
-                except KeyError:
-                    bst[BLOCK_SID] = [tag_lg]
-        self.__block_sid_tags = bst
-        return bst
+        self.on_BLOCK_TAG_currentTextChanged(self.BLOCK_TAG.currentText())
 
     def set_sid(self, sid):
         """Set up the block-tag widget according to the given subject.
@@ -516,13 +535,13 @@ class BlockNameDialog(QDialog):
         self.last_table_row = row
         if row < 0:
             lg = 0
-            self.workload = 0
+#            self.workload = 0
             self.selected_course = 0
         else:
-            ctd = self.course_table_data[row]
-            lg = ctd[2]
-            self.workload = ctd[1]
-            self.selected_course = ctd[3]
+            cdata = self.course_table_lines[row]
+            lg = cdata[-3]
+#            self.workload = ctd[1]
+            self.selected_course = cdata[-4]
         if lg != self.lesson_group:
             self.show_lessons(lg)
             self.lesson_group = lg
@@ -543,7 +562,19 @@ class BlockNameDialog(QDialog):
         self.set_courses()
 
     @Slot(bool)
-    def on_rb_payonly_toggled(self, payonly:bool):
+    def on_rb_payonly_toggled(self, on:bool):
+        if self.disable_triggers:
+            return
+        self.set_courses()
+
+    @Slot(bool)
+    def on_rb_add2block_toggled(self, on:bool):
+        if self.disable_triggers:
+            return
+        self.set_courses()
+
+    @Slot(bool)
+    def on_cb_unit_toggled(self, on:bool):
         if self.disable_triggers:
             return
         self.set_courses()
@@ -578,7 +609,7 @@ class BlockNameDialog(QDialog):
                 if self.lesson_group or not self.sid:
                     self.value = INVALID_RESULT
                     self.pb_accept.setEnabled(False)
-                else:                        
+                else:
                     self.value = {
                         "type": "NEW",
                         "BLOCK_SID": self.sid,
@@ -593,7 +624,9 @@ class BlockNameDialog(QDialog):
                 }
                 self.pb_accept.setEnabled(True)
         elif self.rb_add2block.isChecked():
-            assert(self.cb_block.isChecked())
+#            assert(self.cb_block.isChecked())
+#TODO: I think I am allowing non-blocks here ...
+
             if self.lesson_group:
                 self.value = {
                     "type": "ADD2BLOCK",
@@ -605,7 +638,7 @@ class BlockNameDialog(QDialog):
                 self.pb_accept.setEnabled(False)
         else:
             # share WORKLOAD entry
-            assert(self.rb_add2team.isChecked())
+#            assert(self.rb_add2team.isChecked())
             # Don't allow adding a course to a "workload", if there
             # is already a link.
             if self.workload:
@@ -638,7 +671,7 @@ class BlockNameDialog(QDialog):
 
 if __name__ == "__main__":
     from core.db_access import open_database
-    open_database()
+    open_database("wz3.sqlite")
     # Stand-alone testing is difficult because data from the course
     # editor is required. It should rather be tested from there.
     course_data = {
@@ -648,7 +681,7 @@ if __name__ == "__main__":
         "SUBJECT": "KoRa",
         "TEACHER": "ML",
     }
-    print("----->", BlockNameDialog.popup(course_data, [], -1))
+    print("----->", NewCourseLesson.popup(course_data, [], -1))
     course_data = {
         "course": 350,
         "CLASS": "11G",
@@ -656,4 +689,4 @@ if __name__ == "__main__":
         "SUBJECT": "Ma",
         "TEACHER": "MT",
     }
-    print("----->", BlockNameDialog.popup(course_data, [], -1))
+    print("----->", NewCourseLesson.popup(course_data, [], -1))

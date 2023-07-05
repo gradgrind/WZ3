@@ -1,7 +1,7 @@
 """
 core/db_access.py
 
-Last updated:  2023-06-14
+Last updated:  2023-07-01
 
 Helper functions for accessing the database.
 
@@ -453,10 +453,12 @@ def db_update_fields(table, field_values, *wheres, **keys):
     fields = []
     for f, v in field_values:
         if isinstance(v, str):
-            if v:
-                fields.append(f'"{f}" = "{v}"')
-            else:
-                fields.append(f'"{f}" = NULL')
+#TODO: Is this better than the commented out bit?
+            fields.append(f'"{f}" = "{v}"')
+            #if v:
+            #    fields.append(f'"{f}" = "{v}"')
+            #else:
+            #    fields.append(f'"{f}" = NULL')
         elif isinstance(v, int):
             fields.append(f'"{f}" = {v}')
         else:
@@ -703,7 +705,50 @@ if __name__ == "__main__":
     print("KeyValueList:", l)
     print("   ... map('b'):", l.map("b"))
 
-    open_database()
+    #open_database("wz3.sqlite")
+    open_database("wz.sqlite")
+
+    """
+    pay_factors = {
+        r[1]: r[0]
+        for r in db_read_fields(
+            "PAY_FACTORS",
+            ("pay_factor_id", "TAG", "WEIGHT")
+        )
+    }
+    print(pay_factors)
+
+    wls = {}
+
+    for lg_id, w, p in db_read_fields(
+        "L_GROUPS2",
+        ("lg_id", "workload", "PAY_TAG")
+    ):
+        print("  --", p)
+        try:
+            n, t = p.split('*')
+        except:
+            wi = 0
+        else:
+            f = pay_factors[t]
+
+            if n == '.':
+                ni = -1
+            else:
+                ni = int(n)
+
+            try:
+                wi = wls[w]
+            except KeyError:
+                wi = db_new_row("PAY_TAGS", pay_factor_id=f, NLESSONS=ni)
+# Note that there could be leakage here: if all references to a PAY_TAGS
+# entry are deleted, the entry will still remain. So there should probably
+# be programmatic intervention when deleting l-g entries.
+#xxxxxxxxxxxxxxxxxxx
+                wls[w] = wi
+
+        db_update_field("L_GROUPS2", "pay_tag_id", wi, lg_id=lg_id)
+    """
 
     print("\nTEACHERS:")
     for k, v in db_key_value_list(

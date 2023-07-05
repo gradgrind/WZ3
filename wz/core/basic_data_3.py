@@ -1,5 +1,5 @@
 """
-core/basic_data.py - last updated 2023-06-11
+core/basic_data.py - last updated 2023-07-03
 
 Handle caching of the basic data sources
 
@@ -286,7 +286,6 @@ def get_payment_weights() -> KeyValueList:
     """
 
     def check(item):
-        print("???", item)
         i2 = item[1]
         if PAYMENT_FORMAT.match(i2).hasMatch():
             return i2
@@ -300,7 +299,7 @@ def get_payment_weights() -> KeyValueList:
     except KeyError:
         pass
     payment_weights = db_key_value_list(
-        "PAY_FACTORS", "TAG", "WEIGHT", check=check
+        "PAY_FACTORS", "PAY_TAG", "PAY_WEIGHT", check=check
     )
     SHARED_DATA["PAYMENT"] = payment_weights
     return payment_weights

@@ -1,17 +1,19 @@
 """
 ui/dialogs/dialog_new_course_lesson.py
 
-Last updated:  2023-07-06
+Last updated:  2023-07-07
 
 Supporting "dialog" for the course editor – handle course elements.
 That is, add new elements or inspect existing ones.
 The basic types are simple lesson item, block lesson item and
 no-lesson item (payment-only).
-A new element can be completely new, that is a new lesson-group or (in
-the case of a pay-only element) just a new pay-tag-id. Unless it is
-pay-only there will also be a new entry in LESSONS.
-A new element can be attached to an existing lesson group, or just share
-a pay-tag (?).
+A new element can be completely new, that is a new lesson-group, or
+attach to an existing lesson-group, i.e. share the lesson times. If in
+addition to sharing a lesson-group the new item has the "unit" box
+ticked, it will also share the room and pay-data. This latter case is
+intended for team-teaching and/or lessons where more than one pupil-group
+is present.
+If a new lsson-group is added, there will also be a new entry in LESSONS.
 
 
 =+LICENCE=============================
@@ -63,8 +65,9 @@ from core.db_access import (
     db_read_unique_field,
     db_read_unique,
     db_query,
+    db_select,
 )
-from core.course_data_3 import (
+from core.course_data_3a import (
     courses_in_block,
     simple_with_subject,
     payonly_with_subject,
@@ -95,33 +98,29 @@ INVALID_RESULT = {"type": "INVALID"}    # invalid result
 #TODO
 class NewCourseLessonDialog(QDialog):
     """This dialog is evoked from the course editor.
-    There are the following scenarios:
+    There are the following possibilities:
 
     1) A new course/lesson_group connection is to be made.
        There is the choice between a simple lesson, a block lesson
        and a payment-only item.
        The new item consists of a new COURSE_LESSONS entry. Unless the
-       new item is payment-only, there will also be a new lesson-group
-       and a single new entry in LESSONS for this lesson-group.
+       new item is no-lesson (payment-only), this will have a new
+       lesson-group and a single new entry in LESSONS for this
+       lesson-group.
        Note that further lessons may be added to existing
        lesson_groups in the course editor, using the "+" button.
        A payment-only item doesn't have a lesson-group (it is 0).
 
-
-
-    2) A course may "join" an existing block (named lesson_group).
-
-    3) A course may "join" an existing workload. All members must have
-       the same subject. This covers simple cases of team-teaching and
-       mixed pupil groups where only one room (at most) is specified
-       and the payment details for all the teachers are the same.
-
-    4) The "linkages" of the current course/workload/lesson group can
-       be shown.
-       In this case the table row (lesson_row) of the current element
-       is passed as argument (otherwise).
-       In the case of a block member, the name of the block may be
-       changed (to a completely new one), otherwise no changes are possible.
+    2) A course may "join" an existing lesson-group (block). This
+       means, essentially, that the lesson times (and lengths) are
+       shared. In this way blocks of courses, etc., can be provided
+       for – for blocks there is the possibility of setting a special
+       "subject" name and tag as identification.
+       This "joining" is also a fairly simple way to ensure that
+       distinct lessons take place in parallel.
+       In addition, the payment-data and room (lesson-data) can be
+       shared, thus covering team-teaching and lessons with multiple
+       pupil groups.
 
     This dialog itself causes no database changes, that must be done by
     the calling code on the basis of the returned value.
@@ -129,26 +128,17 @@ class NewCourseLessonDialog(QDialog):
     no changes to the database.
     Otherwise a mapping is returned: {"type": type of element, ...}
     Further entries depend on the type.
-    In "inspection" mode, only one return type is possible:
-        {   "type": "CHANGE_BLOCK",
-            "BLOCK_SID": new block-subject-id,
-            "BLOCK_TAG": new block-tag
-        }
-    In "new element" mode, the following return values are possible:
     1) A completely new entry:
         {   "type": "NEW",
             "BLOCK_SID": ("" or block-subject-id),
             "BLOCK_TAG": ("", "$" or block-tag)
         }
         If BLOCK_SID is empty, BLOCK_TAG must be "" (new simple lesson)
-        or "$" (new payment-only item).
-    2) Add to existing block:
-        {   "type": "ADD2BLOCK",
-            "lesson_group": lesson_group of existing block
-        }
-    3) Add to existing WORKLOAD entry:
-        {   "type": "ADD2TEAM",
-            "workload": self.workload,
+        or "$" (new no-lesson item).
+    2) Add to existing lesson-group:
+        {   "type": "PARALLEL",
+            "lesson_group": (lesson_group of existing item),
+            "unit": (True or False)
         }
     """
     @classmethod
@@ -189,7 +179,7 @@ class NewCourseLessonDialog(QDialog):
         q = f"""select distinct
             BLOCK_SID
             from COURSE_LESSONS
-            inner join COURSES using(course)
+            inner join COURSES using(Course)
             where BLOCK_SID != '' and CLASS = '{c}'
         """
         bsids = []
@@ -244,10 +234,11 @@ class NewCourseLessonDialog(QDialog):
         current element will be displayed. The only change possible
         is to assign a new name to a block.
         """
+#TODO--
         print("\n???", this_course)
         for l in lesson_list:
             print("  --", l[0], l[1])
-# <this_course> is needed (contrast dialog_block_name_3) because the
+# <this_course> is needed (contrast dialog_block_name_3a) because the
 # lesson list can be empty. If it is, Lesson_group (and Cl_id) will be -1.
 # Is <lesson_list> really needed?
 # The record passed as <this_course> is not necessarily for the selected
@@ -333,7 +324,7 @@ class NewCourseLessonDialog(QDialog):
         # shown which "match" the current one and have entries of the
         # same type.
         lg = self.this_course["Lesson_group"]
-        pay = self.this_course["Pay_tag_id"]
+        pay = self.this_course["Lesson_data"]
         if lg > 0:
             ## Get all COURSE entries for this lesson_group
             q = f"""select
@@ -341,17 +332,18 @@ class NewCourseLessonDialog(QDialog):
                     GRP,
                     SUBJECT,
                     TEACHER,
-                    pay_tag_id,
+                    Lesson_data,
                     coalesce(ROOM, '') ROOM,
-                    course,
+                    Course,
                     coalesce(Lesson_group, 0) Lesson_group,
                     coalesce(BLOCK_TAG, '') BLOCK_TAG,
                     coalesce(BLOCK_SID, '') BLOCK_SID
                 from COURSE_LESSONS
-                inner join COURSES using(course)
-                where lesson_group = {lg}
+                inner join COURSES using(Course)
+                inner join LESSON_DATA using(Lesson_data)
+                where Lesson_group = {lg}
             """
-            for r in db_query(q):
+            for r in db_select(q):
                 print("  ++", r)
         elif lg == 0:
             ## Get all COURSE entries for this pay-tag
@@ -360,14 +352,13 @@ class NewCourseLessonDialog(QDialog):
                     GRP,
                     SUBJECT,
                     TEACHER,
-                    pay_tag_id,
-                    coalesce(ROOM, '') ROOM,
-                    course
+                    Lesson_data,
+                    Course
                 from COURSE_LESSONS
-                inner join COURSES using(course)
-                where pay_tag_id = {pay}
+                inner join COURSES using(Course)
+                where Lesson_data = {pay}
             """
-            for r in db_query(q):
+            for r in db_select(q):
                 print("  ++!", r)
         else:
             ## No courses
@@ -458,43 +449,41 @@ class NewCourseLessonDialog(QDialog):
         """Display the courses corresponding to the "filter" values.
         Their data is stored as a list in <self.course_table_lines>.
         """
-# was <self.course_table_data>
         self.table_courses.setRowCount(len(self.course_table_lines))
         for r, cdata in enumerate(self.course_table_lines):
-            ## cdata: CLASS, GRP, SUBJECT, TEACHER, pay_tag_id, ROOM, course
             # class field
             if not (tw := self.table_courses.item(r, 0)):
                 tw = QTableWidgetItem()
                 tw.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
                 self.table_courses.setItem(r, 0, tw)
-            tw.setText(cdata[0])
+            tw.setText(cdata["CLASS"])
             # group field
             if not (tw := self.table_courses.item(r, 1)):
                 tw = QTableWidgetItem()
                 tw.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
                 self.table_courses.setItem(r, 1, tw)
-            tw.setText(cdata[1])
+            tw.setText(cdata["GRP"])
             # subject field
             if not (tw := self.table_courses.item(r, 2)):
                 tw = QTableWidgetItem()
                 self.table_courses.setItem(r, 2, tw)
-            tw.setText(get_subjects().map(cdata[2]))
+            tw.setText(get_subjects().map(cdata["SUBJECT"]))
             # teacher field
             if not (tw := self.table_courses.item(r, 3)):
                 tw = QTableWidgetItem()
                 self.table_courses.setItem(r, 3, tw)
-            tw.setText(get_teachers().name(cdata[3]))
-            # pay-tag-id
+            tw.setText(get_teachers().name(cdata["TEACHER"]))
+            # pay-tag/lesson-data
             if not (tw := self.table_courses.item(r, 4)):
                 tw = QTableWidgetItem()
                 tw.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
                 self.table_courses.setItem(r, 4, tw)
-            tw.setText(str(cdata[4]))
+            tw.setText(str(cdata["Lesson_data"]))
             # room-choice field
             if not (tw := self.table_courses.item(r, 5)):
                 tw = QTableWidgetItem()
                 self.table_courses.setItem(r, 5, tw)
-            tw.setText(cdata[5])
+            tw.setText(cdata.get("ROOM", ""))
 
     def show_lessons(self, lesson_group:int):
         """Display the individual lessons for the given <lesson_group> value.
@@ -564,8 +553,8 @@ class NewCourseLessonDialog(QDialog):
             self.selected_course = 0
         else:
             cdata = self.course_table_lines[row]
-            lg = cdata[7]
-            self.selected_course = cdata[6]
+            lg = cdata["Lesson_group"]
+            self.selected_course = cdata["Course"]
         self.lesson_group = lg
         self.show_lessons(lg)
 
@@ -679,7 +668,7 @@ class NewCourseLessonDialog(QDialog):
 
 if __name__ == "__main__":
     from core.db_access import open_database
-    open_database("wz3.sqlite")
+    open_database("wz_db.sqlite")
     # Stand-alone testing is difficult because data from the course
     # editor is required. It should rather be tested from there.
     course_data = {
@@ -690,7 +679,7 @@ if __name__ == "__main__":
         "TEACHER": "EL",
         "BLOCK_SID": '',
         "BLOCK_TAG": '',
-        "Pay_tag_id": 16,
+        "Lesson_data": 16,
         "Lesson_group": 17,
         "LENGTH": 1,
         "TIME": '',
@@ -704,7 +693,7 @@ if __name__ == "__main__":
         "TEACHER": "CG",
         "BLOCK_SID": '',
         "BLOCK_TAG": '',
-        "Pay_tag_id": 429,
+        "Lesson_data": 429,
         "Lesson_group": 0,
     }
     print("----->", NewCourseLessonDialog.popup(course_data, [(-1, course_data)]))
@@ -716,7 +705,7 @@ if __name__ == "__main__":
         "TEACHER": "AH",
         "BLOCK_SID": 'Rel',
         "BLOCK_TAG": '01',
-        "Pay_tag_id": 25,
+        "Lesson_data": 25,
         "Lesson_group": 14,
         "LENGTH": 1,
         "TIME": '',
@@ -731,7 +720,7 @@ if __name__ == "__main__":
         "TEACHER": "--",
         "BLOCK_SID": '',
         "BLOCK_TAG": '',
-        "Pay_tag_id": 0,
+        "Lesson_data": 0,
         "Lesson_group": -1,
         "LENGTH": 0,
         "TIME": '',

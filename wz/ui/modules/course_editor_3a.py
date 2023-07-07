@@ -1,7 +1,7 @@
 """
 ui/modules/course_editor.py
 
-Last updated:  2023-07-06
+Last updated:  2023-07-07
 
 Edit course and blocks+lessons data.
 
@@ -43,12 +43,10 @@ T = TRANSLATIONS("ui.modules.course_editor")
 
 ### +++++
 
-from typing import NamedTuple
 from core.db_access import (
     open_database,
     db_select,
     db_read_unique,
-    db_read_full_table,
     db_update_field,
     db_update_fields,
     db_new_row,
@@ -59,7 +57,6 @@ from core.db_access import (
 from core.teachers import Teachers
 from core.basic_data_3 import (
     get_classes,
-    Workload,
     clear_cache,
     get_subjects,
     ParallelTag,
@@ -67,7 +64,7 @@ from core.basic_data_3 import (
     DECIMAL_SEP,
     BlockTag,
 )
-from core.course_data_3 import (
+from core.course_data_3a import (
     filter_activities,
     workload_teacher,
     workload_class,
@@ -94,8 +91,8 @@ from ui.dialogs.dialog_courses_field_mod import FieldChangeForm
 from ui.dialogs.dialog_day_period import DayPeriodDialog
 from ui.dialogs.dialog_room_choice import RoomDialog
 from ui.dialogs.dialog_workload_3 import WorkloadDialog
-from ui.dialogs.dialog_new_course_lesson import NewCourseLessonDialog
-from ui.dialogs.dialog_block_name_3 import BlockNameDialog
+from ui.dialogs.dialog_new_course_lesson_3a import NewCourseLessonDialog
+from ui.dialogs.dialog_block_name_3a import BlockNameDialog
 from ui.dialogs.dialog_parallel_lessons import ParallelsDialog
 from ui.dialogs.dialog_text_line import TextLineDialog
 from ui.dialogs.dialog_make_course_tables import ExportTable
@@ -181,7 +178,8 @@ class CourseEditorPage(Page):
 
     def enter(self):
         #open_database("wz.sqlite")
-        open_database("wz3.sqlite")
+        #open_database("wz3.sqlite")
+        open_database("wz_db.sqlite")
         clear_cache()
         self.init_data()
         if self.filter_field == "CLASS": pb = self.pb_CLASS
@@ -337,7 +335,7 @@ class CourseEditorPage(Page):
         def is_shared_pay(key:int) -> str:
             """Determine whether a PAY_TAGS entry is used by multiple courses.
             """
-            clist = db_values("COURSE_LESSONS", "Pay_tag_id", Pay_tag_id=key)
+            clist = db_values("COURSE_LESSONS", "Lesson_data", Lesson_data=key)
             return f"[{key}] " if len(clist) > 1 else ""
 
         self.suppress_handlers = True
@@ -372,13 +370,13 @@ class CourseEditorPage(Page):
             w.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
             self.lesson_table.setItem(row, 1, w)
             w = QTableWidgetItem(
-                is_shared_pay(pay_only["Pay_tag_id"])
+                is_shared_pay(pay_only["Lesson_data"])
             )
             self.lesson_table.setItem(row, 2, w)
             self.course_lessons.append((-1, pay_only))
             row += 1
         for simple_lesson in simple_lesson_l:
-            shared = is_shared_pay(simple_lesson["Pay_tag_id"])
+            shared = is_shared_pay(simple_lesson["Lesson_data"])
             # Add a lesson line
             self.lesson_table.insertRow(row)
             w = QTableWidgetItem(self.icons["LESSON"], "")
@@ -396,7 +394,7 @@ class CourseEditorPage(Page):
                 row_to_select = row
             row += 1
         for bl, blocksub in block_lesson_l:
-            shared = is_shared_pay(bl["Pay_tag_id"])
+            shared = is_shared_pay(bl["Lesson_data"])
             # Add a lesson line
             self.lesson_table.insertRow(row)
             w = QTableWidgetItem(self.icons["BLOCK"], "")
@@ -419,6 +417,7 @@ class CourseEditorPage(Page):
         self.suppress_handlers = False
         self.on_lesson_table_itemSelectionChanged()
 
+#TODO
     @Slot()
     def on_pb_delete_course_clicked(self):
         """Delete the current course."""
@@ -647,7 +646,7 @@ class CourseEditorPage(Page):
                 db_update_fields(
                     "PAY_TAGS",
                     result,
-                    Pay_tag_id=lthis["Pay_tag_id"]
+                    Lesson_data=lthis["Lesson_data"]
                 )
                 self.load_course_table(lesson_id=lid)
         ### ROOM (COURSE_LESSONS)
@@ -934,7 +933,7 @@ class CourseEditorPage(Page):
         """
         cldata = self.current_lesson[1]
         lg = cldata["Lesson_group"]
-        pay_tag_id = cldata["Pay_tag_id"]
+        Lesson_data = cldata["Lesson_data"]
         # Delete COURSE_LESSONS entry
         db_delete_rows("COURSE_LESSONS", cl_id=cldata["Cl_id"])
         # Delete associated lessons if they are no longer referenced
@@ -948,9 +947,9 @@ class CourseEditorPage(Page):
         if not db_values(
             "COURSE_LESSONS",
             "cl_id",
-            pay_tag_id=pay_tag_id
+            Lesson_data=Lesson_data
         ):
-            db_delete_rows("PAY_TAGS", pay_tag_id=pay_tag_id)
+            db_delete_rows("PAY_TAGS", Lesson_data=Lesson_data)
         # Reload course data
         self.load_course_table()
 

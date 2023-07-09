@@ -1,7 +1,7 @@
 """
 ui/dialogs/dialog_block_name.py
 
-Last updated:  2023-07-07
+Last updated:  2023-07-08
 
 Supporting "dialog" for the course editor – inspect the lesson group
 fields (including block tags and pay-id), allow changing of existing
@@ -51,8 +51,10 @@ from core.db_access import (
     db_select,
     Record,
 )
-from core.course_data_3 import (
+from core.course_data_3a import (
     read_block_sid_tags,
+    courses_with_lesson_group,
+    courses_with_no_lessons,
 )
 from ui.ui_base import (
     ### QtWidgets:
@@ -197,40 +199,12 @@ class BlockNameDialog(QDialog):
                     else:
                         self.list_lessons.addItem(str(n))
             ## Get all COURSE entries for this lesson_group
-            q = f"""select
-                    CLASS,
-                    GRP,
-                    SUBJECT,
-                    TEACHER,
-                    Lesson_data,
-                    coalesce(ROOM, '') ROOM,
-                    Course
-                    --coalesce(Lesson_group, 0) Lesson_group,
-                    --coalesce(BLOCK_TAG, '') BLOCK_TAG,
-                    --coalesce(BLOCK_SID, '') BLOCK_SID
-                from COURSE_LESSONS
-                inner join COURSES using(Course)
-                inner join LESSON_DATA using(Lesson_data)
-                where Lesson_group = {lg}
-            """
+            clist = courses_with_lesson_group(lg)
         else:
             ## Get all COURSE entries for this pay-tag
-            q = f"""select
-                    CLASS,
-                    GRP,
-                    SUBJECT,
-                    TEACHER,
-                    Lesson_data,
-                    Course
-                from COURSE_LESSONS
-                inner join COURSES using(Course)
-                where Lesson_data = {data["Lesson_data"]}
-            """
+            clist = courses_with_no_lessons(data["Lesson_data"])
         rlist = [None]
-        for r in sorted(
-            db_select(q),
-            key=lambda x: (x["CLASS"], x["SUBJECT"], x["GRP"], x["TEACHER"])
-        ):
+        for r in clist:
             if r["Course"] == this_c:
                 assert rlist[0] is None
                 rlist[0] = r

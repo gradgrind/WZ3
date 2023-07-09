@@ -1,7 +1,7 @@
 """
 core/course_data.py
 
-Last updated:  2023-07-07
+Last updated:  2023-07-09
 
 Support functions dealing with courses, lessons, etc.
 
@@ -114,7 +114,7 @@ def filter_activities(filter:str, value:str) -> dict[str, list[Record]]:
         -- left join SUBJECTS on COURSES.SUBJECT = SUBJECTS.SID
 
         left join COURSE_LESSONS using (Course) -- includes "unused" courses
-
+        left join LESSON_GROUPS using(Lesson_group)
         left join LESSON_DATA using(Lesson_data)
         left join PAY_FACTORS using (Pay_factor_id)
 
@@ -285,8 +285,8 @@ def workload_class(klass:str, activity_list: list[tuple[str, Record]]
 
 ######### for dialog_block_name and dialog_new_course_lesson #########
 
-def courses_in_block(bsid, btag):
-    """Find all courses which are members of the given block.
+def courses_with_lesson_group(lesson_group):
+    """Find all courses which have an entry for the given lesson-group.
     Return a list of <Record>s.
     """
     q = f"""select
@@ -296,12 +296,74 @@ def courses_in_block(bsid, btag):
             TEACHER,
             Lesson_data,
             coalesce(ROOM, '') ROOM,
-            Course,
-            coalesce(Lesson_group, 0) Lesson_group
+            Course
         from COURSE_LESSONS
         inner join COURSES using(Course)
         inner join LESSON_DATA using(Lesson_data)
-        where BLOCK_SID = '{bsid}' and BLOCK_TAG = '{btag}'
+        where Lesson_group = {lesson_group}
+    """
+    return sorted(
+        db_select(q),
+        key=lambda x: (x["CLASS"], x["SUBJECT"], x["GRP"], x["TEACHER"])
+    )
+
+
+def courses_with_no_lessons(lesson_data):
+    """Find all courses which have an entry for the given lesson-data.
+    Return a list of <Record>s.
+    """
+    q = f"""select
+            CLASS,
+            GRP,
+            SUBJECT,
+            TEACHER,
+            Lesson_data,
+            Course
+        from COURSE_LESSONS
+        inner join COURSES using(Course)
+        where Lesson_data = {lesson_data}
+    """
+    return sorted(
+        db_select(q),
+        key=lambda x: (x["CLASS"], x["SUBJECT"], x["GRP"], x["TEACHER"])
+    )
+
+
+def block_sids_in_class(klass):
+    """Return a list of block subject ids already used in the given class.
+    """
+    q = f"""select distinct
+        BLOCK_SID
+        from COURSE_LESSONS
+        inner join LESSON_GROUPS using(Lesson_group)
+        inner join COURSES using(Course)
+        where BLOCK_SID != '' and CLASS = '{klass}'
+    """
+    return [r[0] for r in db_query(q)]
+
+
+def courses_in_block(bsid, btag, sid=None):
+    """Find all courses which are members of the given block.
+    If <sid> is passed, only consider the courses with this subject.
+    Return a list of <Record>s.
+    """
+    x = "" if sid is None else f"and SUBJECT = '{sid}'"
+    q = f"""select
+            CLASS,
+            GRP,
+            SUBJECT,
+            TEACHER,
+            Lesson_data,
+            coalesce(ROOM, '') ROOM,
+            Course,
+            Lesson_group,
+            PAY_NLESSONS,
+            Pay_factor_id
+        from COURSE_LESSONS
+        inner join COURSES using(Course)
+        inner join LESSON_GROUPS using(Lesson_group)
+        inner join LESSON_DATA using(Lesson_data)
+        where BLOCK_SID = '{bsid}' and BLOCK_TAG = '{btag}' {x}
     """
     return sorted(
         db_select(q),
@@ -321,11 +383,14 @@ def simple_with_subject(sid):
             Lesson_data,
             coalesce(ROOM, '') ROOM,
             Course,
-            coalesce(Lesson_group, 0) Lesson_group
+            Lesson_group,
+            PAY_NLESSONS,
+            Pay_factor_id
         from COURSE_LESSONS
         inner join COURSES using(Course)
+        inner join LESSON_GROUPS using(Lesson_group)
         inner join LESSON_DATA using(Lesson_data)
-        where SUBJECT = '{sid}' and BLOCK_SID = ''
+        where Lesson_group != 0 and BLOCK_SID = '' and SUBJECT = '{sid}'
     """
     return sorted(
         db_select(q),
@@ -345,7 +410,9 @@ def payonly_with_subject(sid):
             Lesson_data,
             coalesce(ROOM, '') ROOM,
             Course,
-            coalesce(Lesson_group, 0) Lesson_group
+            Lesson_group,
+            PAY_NLESSONS,
+            Pay_factor_id
         from COURSE_LESSONS
         inner join COURSES using(Course)
         inner join LESSON_DATA using(Lesson_data)
@@ -364,7 +431,7 @@ def read_block_sid_tags():
     """
     bst = {}
     for lg, BLOCK_SID, BLOCK_TAG in db_read_fields(
-        "COURSE_LESSONS", ("Lesson_group", "BLOCK_SID", "BLOCK_TAG")
+        "LESSON_GROUPS", ("Lesson_group", "BLOCK_SID", "BLOCK_TAG")
     ):
         if BLOCK_SID:
             tag_lg = (BLOCK_TAG, lg)

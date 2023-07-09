@@ -45,6 +45,7 @@ T = TRANSLATIONS("ui.modules.course_editor")
 
 from core.db_access import (
     open_database,
+    db_query,
     db_select,
     db_read_unique,
     db_update_field,
@@ -808,8 +809,8 @@ class CourseEditorPage(Page):
     @Slot()
     def on_new_element_clicked(self):
         """Add an item type: block, simple lesson or workload/payment.
-        The item can be completely new or share a LESSON_GROUP (block
-        only) or WORKLOAD entry.
+        The item can be completely new or share a LESSON_GROUP, and
+        possibly a LESSON_DATA, entry.
         All the fiddly details are taken care of in <NewCourseLessonDialog>,
         which should only return valid results.
         If a completely new simple or block lesson is added, a single
@@ -819,73 +820,113 @@ class CourseEditorPage(Page):
         # current course, the first one in the list returned by
         # <filter_activities(...)>.
         # It is not necessarily that of the currently selected "lesson".
-        bn = NewCourseLessonDialog.popup(
-            course_data=self.course_data,
-# Is the next one necessary?
-            course_lessons=self.course_lessons,
-            parent=self
-        )
+        bn = NewCourseLessonDialog.popup(self.course_data)
         if not bn:
             return
-        wld = None
-        l = -1
-        tp = bn["type"]
-        if tp == "NEW":
+        if bn["new"]:
             bsid = bn["BLOCK_SID"]
             btag = bn["BLOCK_TAG"]
             if bsid:
                 # new block
-                lesson_group = db_new_row(
+                lesson_group = new_lesson_group(bsid, btag)
+                lg = db_new_row(
                     "LESSON_GROUPS",
                     BLOCK_SID=bsid,
                     BLOCK_TAG=btag,
-                    NOTES="",
+                    NOTES=''
+                )
+                ld = db_new_row(
+                    "LESSON_DATA",
+                    Pay_factor_id=get_payment_weights()[0][0],
+                    PAY_NLESSONS="1",
+                    ROOM=''
+                )
+                cl_id = db_new_row(
+                    "COURSE_LESSONS",
+                    Course=self.course_id,
+                    Lesson_group=lg,
+                    Lesson_data=ld
+                )
+                l = db_new_row(
+                    "LESSONS",
+                    Lesson_group=lg,
+                    LENGTH=1,
+                    TIME="",
+                    PLACEMENT="",
+                    ROOMS=""
                 )
             elif btag == "$":
                 # new payment-only
-                lesson_group = 0
-                wld = db_new_row(
-                    "WORKLOAD",
-                    lesson_group=lesson_group,
-                    PAY_TAG=f"1*{get_payment_weights()[0][0]}",
-                    ROOM="$"
+                lg = 0
+                ld = db_new_row(
+                    "LESSON_DATA",
+                    Pay_factor_id=get_payment_weights()[0][0],
+                    PAY_NLESSONS="1",
+                    ROOM=""
+                )
+                cl_id = db_new_row(
+                    "COURSE_LESSONS",
+                    Course=self.course_id,
+                    Lesson_group=lg,
+                    Lesson_data=ld
                 )
             else:
                 assert(not btag)
                 # new simple lesson
-                lesson_group = db_new_row(
+                lesson_group = new_lesson_group(bsid, btag)
+                lg = db_new_row(
                     "LESSON_GROUPS",
-                    NOTES="",
+                    BLOCK_SID="",
+                    BLOCK_TAG="",
+                    NOTES=""
                 )
-            if lesson_group:
+                ld = db_new_row(
+                    "LESSON_DATA",
+                    Pay_factor_id=get_payment_weights()[0][0],
+                    PAY_NLESSONS="-1",
+                    ROOM=""
+                )
+                cl_id = db_new_row(
+                    "COURSE_LESSONS",
+                    Course=self.course_id,
+                    Lesson_group=lg,
+                    Lesson_data=ld
+                )
                 l = db_new_row(
                     "LESSONS",
-                    lesson_group=lesson_group,
+                    Lesson_group=lg,
                     LENGTH=1,
+                    TIME="",
+                    PLACEMENT="",
+                    ROOMS=""
                 )
-            else:
-                l = 0
-        elif tp == "ADD2BLOCK":
-            lesson_group = bn["lesson_group"]
         else:
-            assert(tp == "ADD2TEAM")
-            lesson_group = None
-            wld = bn["workload"]
-        if lesson_group:
-            wld = db_new_row(
-                "WORKLOAD",
-                lesson_group=lesson_group,
-                PAY_TAG=f".*{get_payment_weights()[0][0]}",
-                ROOM="$"
+            lesson_group = bn["lesson_group"]
+            unit = bn["unit"]
+
+# Different behaviour (pay?) for block?
+            if unit:
+                pass
+#TODO: where does ld come from?
+            else:
+                ld = db_new_row(
+                    "LESSON_DATA",
+                    Pay_factor_id=get_payment_weights()[0][0],
+                    PAY_NLESSONS="-1",
+                    ROOM=""
+                )
+            cl_id = db_new_row(
+                "COURSE_LESSONS",
+                Course=self.course_id,
+                Lesson_group=lg,
+                Lesson_data=ld
             )
-        assert(wld)
-        assert(self.course_id)
-        cw = db_new_row(
-            "COURSE_WORKLOAD",
-            course=self.course_id,
-            workload=wld,
-        )
+
+
+
+
         # Redisplay
+#TODO: need l
         self.load_course_table(lesson_id=l)
 
     @Slot()

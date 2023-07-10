@@ -1,19 +1,16 @@
 """
 core/db_access.py
 
-Last updated:  2023-07-01
+Last updated:  2023-07-10
 
 Helper functions for accessing the database.
 
-TODO: There is some irregularity in the handling of empty/null fields.
-Initially I was insisting that empty text fields should be NULL in
-the database and that reading NULL should return "" (to allow it to
-be read correctly). Also, writing "" should place NULL in the database
-field (making it impossible to write an actual "".
-However, in the meantime I am not so convinced by this and there are
-certainly fields with "" cropping up _ it is difficult to avoid them.
-I have started trying to alleviate problems with null foreign keys by
-providing entries with 0-key in the target table.
+After experiencing difficulties in the handling of empty/null fields,
+I am now trying to avoid NULL fields altogether. Setting empty fields to
+NULL saves some space, but can lead to bugs.
+Where empty foreign keys are possible (which may also be a questionable
+design choice, but it seems to be convenient) I use a 0-key and a
+corresponding entry in the target table.
 
 =+LICENCE=============================
 Copyright 2023 Michael Towers
@@ -453,12 +450,7 @@ def db_update_fields(table, field_values, *wheres, **keys):
     fields = []
     for f, v in field_values:
         if isinstance(v, str):
-#TODO: Is this better than the commented out bit?
             fields.append(f'"{f}" = "{v}"')
-            #if v:
-            #    fields.append(f'"{f}" = "{v}"')
-            #else:
-            #    fields.append(f'"{f}" = NULL')
         elif isinstance(v, int):
             fields.append(f'"{f}" = {v}')
         else:

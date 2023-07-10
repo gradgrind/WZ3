@@ -1,7 +1,7 @@
 """
 ui/modules/course_editor.py
 
-Last updated:  2023-07-07
+Last updated:  2023-07-10
 
 Edit course and blocks+lessons data.
 
@@ -91,7 +91,7 @@ from ui.dialogs.dialog_course_fields import CourseEditorForm
 from ui.dialogs.dialog_courses_field_mod import FieldChangeForm
 from ui.dialogs.dialog_day_period import DayPeriodDialog
 from ui.dialogs.dialog_room_choice import RoomDialog
-from ui.dialogs.dialog_workload_3 import WorkloadDialog
+from ui.dialogs.dialog_workload_3a import WorkloadDialog
 from ui.dialogs.dialog_new_course_lesson_3a import NewCourseLessonDialog
 from ui.dialogs.dialog_block_name_3a import BlockNameDialog
 from ui.dialogs.dialog_parallel_lessons import ParallelsDialog
@@ -116,21 +116,6 @@ COURSE_TABLE_FIELDS = ( # the fields shown in the course table
     ("GRADES", -1, 0),
     ("INFO", 0, -1),
 )
-
-'''
-class LessonRowData(NamedTuple):
-    """ROW_TYPE:
-        -2 – no item (all other fields <None>)
-        -1 – workload/payment item (only COURSE_LESSON_INFO not <None>)
-         0 – "normal" lesson group (not a block)
-         1 – block lesson group
-    """
-    ROW_TYPE: int
-    WORKLOAD_INFO: Workload
-    COURSE_LESSON_INFO: dict
-    LESSON_GROUP_INFO: dict
-    LESSON_INFO: dict
-'''
 
 ### -----
 
@@ -334,7 +319,8 @@ class CourseEditorPage(Page):
         """
 
         def is_shared_pay(key:int) -> str:
-            """Determine whether a PAY_TAGS entry is used by multiple courses.
+            """Determine whether a LESSON_DATA entry is used by multiple
+            courses.
             """
             clist = db_values("COURSE_LESSONS", "Lesson_data", Lesson_data=key)
             return f"[{key}] " if len(clist) > 1 else ""
@@ -643,10 +629,11 @@ class CourseEditorPage(Page):
                 # Update the db. A redisplay is only necessary because
                 # all loaded "activities" with the same pay data must
                 # be updated.
-#TODO xxxxxxxxxxxxxxxxxxxxxx
                 db_update_fields(
-                    "PAY_TAGS",
-                    result,
+                    "LESSON_DATA",
+                    (   ("Pay_factor_id", result[1]),
+                        ("PAY_NLESSONS", result[0])
+                    ),
                     Lesson_data=lthis["Lesson_data"]
                 )
                 self.load_course_table(lesson_id=lid)
@@ -662,10 +649,10 @@ class CourseEditorPage(Page):
             )
             if result is not None:
                 db_update_field(
-                    "WORKLOAD",
+                    "LESSON_DATA",
                     "ROOM",
                     result,
-                    workload=lthis["Workload"]
+                    Lesson_data=lthis["Lesson_data"]
                 )
                 self.load_course_table(lesson_id=lid)
         ### BLOCK (LESSON_GROUPS)
@@ -805,10 +792,9 @@ class CourseEditorPage(Page):
             # Redisplay
             self.load_course_table(lesson_id=lid)
 
-#TODO
     @Slot()
     def on_new_element_clicked(self):
-        """Add an item type: block, simple lesson or workload/payment.
+        """Add an item type: block, simple lesson or no-lesson/pay-only.
         The item can be completely new or share a LESSON_GROUP, and
         possibly a LESSON_DATA, entry.
         All the fiddly details are taken care of in <NewCourseLessonDialog>,
@@ -820,26 +806,31 @@ class CourseEditorPage(Page):
         # current course, the first one in the list returned by
         # <filter_activities(...)>.
         # It is not necessarily that of the currently selected "lesson".
+#TODO--
+        print("?????", self.course_data)
+
         bn = NewCourseLessonDialog.popup(self.course_data)
         if not bn:
             return
-        if bn["new"]:
+        l= -1
+        lg = bn["Lesson_group"]
+        ld = bn["Lesson_data"]
+        if lg < 0:
             bsid = bn["BLOCK_SID"]
             btag = bn["BLOCK_TAG"]
             if bsid:
                 # new block
-                lesson_group = new_lesson_group(bsid, btag)
                 lg = db_new_row(
                     "LESSON_GROUPS",
                     BLOCK_SID=bsid,
                     BLOCK_TAG=btag,
-                    NOTES=''
+                    NOTES=""
                 )
                 ld = db_new_row(
                     "LESSON_DATA",
                     Pay_factor_id=get_payment_weights()[0][0],
                     PAY_NLESSONS="1",
-                    ROOM=''
+                    ROOM=""
                 )
                 cl_id = db_new_row(
                     "COURSE_LESSONS",
@@ -858,6 +849,7 @@ class CourseEditorPage(Page):
             elif btag == "$":
                 # new payment-only
                 lg = 0
+                l = 0
                 ld = db_new_row(
                     "LESSON_DATA",
                     Pay_factor_id=get_payment_weights()[0][0],
@@ -873,7 +865,6 @@ class CourseEditorPage(Page):
             else:
                 assert(not btag)
                 # new simple lesson
-                lesson_group = new_lesson_group(bsid, btag)
                 lg = db_new_row(
                     "LESSON_GROUPS",
                     BLOCK_SID="",
@@ -901,18 +892,11 @@ class CourseEditorPage(Page):
                     ROOMS=""
                 )
         else:
-            lesson_group = bn["lesson_group"]
-            unit = bn["unit"]
-
-# Different behaviour (pay?) for block?
-            if unit:
-                pass
-#TODO: where does ld come from?
-            else:
+            if ld < 0:
                 ld = db_new_row(
                     "LESSON_DATA",
-                    Pay_factor_id=get_payment_weights()[0][0],
-                    PAY_NLESSONS="-1",
+                    Pay_factor_id=bn["Pay_factor_id"],
+                    PAY_NLESSONS=bn["PAY_NLESSONS"],
                     ROOM=""
                 )
             cl_id = db_new_row(
@@ -921,12 +905,9 @@ class CourseEditorPage(Page):
                 Lesson_group=lg,
                 Lesson_data=ld
             )
-
-
-
-
+            if lg == 0:
+                l = 0
         # Redisplay
-#TODO: need l
         self.load_course_table(lesson_id=l)
 
     @Slot()
@@ -965,6 +946,7 @@ class CourseEditorPage(Page):
         db_delete_rows("LESSONS", lid=lid)
         self.load_course_table(lesson_id=newids[-1])
 
+#TODO
     @Slot()
     def on_remove_element_clicked(self):
         """Remove the current element (pay-only or lesson-group) from

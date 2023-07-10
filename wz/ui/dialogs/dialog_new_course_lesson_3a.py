@@ -1,7 +1,7 @@
 """
 ui/dialogs/dialog_new_course_lesson.py
 
-Last updated:  2023-07-09
+Last updated:  2023-07-10
 
 Supporting "dialog" for the course editor – handle course elements.
 That is, add new elements or inspect existing ones.
@@ -171,17 +171,26 @@ class NewCourseLessonDialog(QDialog):
     Otherwise a mapping is returned: {"type": type of element, ...}
     Further entries depend on the type.
     1) A completely new entry:
-        {   "lesson_group": -1,
+        {   "Lesson_group": -1,
             "BLOCK_SID": ("" or block-subject-id),
             "BLOCK_TAG": ("", "$" or block-tag)
         }
         If BLOCK_SID is empty, BLOCK_TAG must be "" (new simple lesson)
         or "$" (new no-lesson item).
     2) Add to existing lesson-group:
-        {   "lesson_group": > 0 (lesson_group of existing item),
+        {   "Lesson_group": > 0 (lesson_group of existing item),
             "BLOCK_SID": ("" or block-subject-id),
             "BLOCK_TAG": ("" or block-tag),
-            "lesson_data": -1 (if not "unit") or > 0 (lesson_data of
+            "Lesson_data": -1 (if not "unit") or > 0 (lesson_data of
+                existing item),
+            "Pay_factor_id": (from existing item),
+            "PAY_NLESSONS": (from existing item)
+        }
+    3) Add no-lesson item with data from – or sharing – lesson_data.:
+        {   "Lesson_group": 0,
+            "BLOCK_SID": "",
+            "BLOCK_TAG": "",
+            "Lesson_data": -1 (if not "unit") or > 0 (lesson_data of
                 existing item),
             "Pay_factor_id": (from existing item),
             "PAY_NLESSONS": (from existing item)
@@ -301,8 +310,7 @@ class NewCourseLessonDialog(QDialog):
         This is called whenever a parameter is changed (except line
         change in the course table).
         """
-        self.course_table_activate_line(-1)
-        self.pb_accept.setEnabled(False)
+        self.pb_acceptable = False
         self.btag = ""
         if self.cb_block.isChecked():
             ## Dealing with block lesson element
@@ -327,7 +335,7 @@ class NewCourseLessonDialog(QDialog):
                 )
                 if self.rb_new.isChecked():
                     if not self.course_table_lines:
-                        self.pb_accept.setEnabled(True)
+                        self.pb_acceptable = True
                 else:
                     if self.cb_unit.isChecked():
                         # Keep only the lines with the same course subject
@@ -337,7 +345,7 @@ class NewCourseLessonDialog(QDialog):
                             if row["SUBJECT"] == this_sid
                         ]
                     if self.course_table_lines:
-                        self.pb_accept.setEnabled(True)
+                        self.pb_acceptable = True
         else:
             self.set_table_use_selection(True)
             if self.rb_add2block.isChecked():
@@ -357,25 +365,21 @@ class NewCourseLessonDialog(QDialog):
                         self.this_course["SUBJECT"]
                     )
                 if self.course_table_lines:
-                    self.pb_accept.setEnabled(True)
+                    self.pb_acceptable = True
             else:
                 # "new": whether the course table rows are selectable
                 # is not relevant as there aren't any rows.
                 self.course_table_lines = []
-                self.pb_accept.setEnabled(True)
+                self.pb_acceptable = True
         self.show_courses()
         if self.course_table_lines:
-            # If the "calling" course is in the list, disable "accept".
-            cid = self.this_course["Course"]
-            for cdata in self.course_table_lines:
-                if cdata["Course"] == cid:
-                    self.pb_accept.setEnabled(False)
-                    break
             if not self.disable_table_row_select:
                 self.disable_table_row_select = True
                 self.table_courses.setCurrentCell(0, 0)
                 self.disable_table_row_select = False
             self.course_table_activate_line(0)
+        else:
+            self.course_table_activate_line(-1)
 
     def show_courses(self):
         """Display the courses corresponding to the "filter" values.
@@ -459,9 +463,21 @@ class NewCourseLessonDialog(QDialog):
         if row < 0:
             self.course_data = None
             lesson_group = 0
+            # Set enabled status of accept button
+            self.pb_accept.setEnabled(self.pb_acceptable)
         else:
             self.course_data = self.course_table_lines[row]
             lesson_group = self.course_data["Lesson_group"]
+            # Set enabled status of accept button
+            pb_accept = self.pb_acceptable
+            if (
+                self.course_data["Course"] == self.this_course["Course"]
+                and self.course_data["Lesson_group"] == lesson_group
+            ) or (
+                self.course_data["Lesson_data"] == self.this_course["Lesson_data"]
+            ):
+                pb_accept = False
+            self.pb_accept.setEnabled(pb_accept)
         # Display the individual lessons for the given <lesson_group> value.
         if self.lesson_group == lesson_group:
             return
@@ -508,13 +524,13 @@ class NewCourseLessonDialog(QDialog):
                 # There must be a block-sid, and block-sid + block-tag
                 # must be new.
                 self.result = {
-                    "lesson_group": -1,
+                    "Lesson_group": -1,
                     "BLOCK_SID": self.blocksid,
                     "BLOCK_TAG": self.BLOCK_TAG.currentText(),
                 }
             else:
                 self.result = {
-                    "lesson_group": -1,
+                    "Lesson_group": -1,
                     "BLOCK_SID": "",
                     "BLOCK_TAG": "" if self.rb_simple.isChecked() else "$",
                 }
@@ -525,7 +541,7 @@ class NewCourseLessonDialog(QDialog):
                 else -1
             )
             self.result = {
-                "lesson_group": self.lesson_group,
+                "Lesson_group": self.lesson_group,
                 "BLOCK_SID": self.blocksid,
                 "BLOCK_TAG": self.btag,
                 "Lesson_data": lesson_data,

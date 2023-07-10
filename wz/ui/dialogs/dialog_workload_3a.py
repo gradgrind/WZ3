@@ -39,9 +39,7 @@ if __name__ == "__main__":
 ### +++++
 
 from typing import Optional
-from core.basic_data_3 import (
-    get_payment_weights,
-)
+from core.basic_data_3 import get_payment_weights
 from core.db_access import Record, db_read_unique_field
 from core.course_data_3a import lesson_pay_display
 from ui.ui_base import (

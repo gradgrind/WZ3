@@ -45,8 +45,8 @@ T = TRANSLATIONS("ui.modules.course_editor")
 
 from core.db_access import (
     open_database,
-    db_query,
     db_select,
+    db_read_fields,
     db_read_unique,
     db_update_field,
     db_update_fields,
@@ -61,7 +61,6 @@ from core.basic_data_3 import (
     clear_cache,
     get_subjects,
     ParallelTag,
-    get_payment_weights,
     DECIMAL_SEP,
     BlockTag,
 )
@@ -87,7 +86,7 @@ from ui.ui_base import (
     ### uic
     uic,
 )
-from ui.dialogs.dialog_course_fields import CourseEditorForm
+from ui.dialogs.dialog_course_fields_3a import CourseEditorForm
 from ui.dialogs.dialog_courses_field_mod import FieldChangeForm
 from ui.dialogs.dialog_day_period import DayPeriodDialog
 from ui.dialogs.dialog_room_choice import RoomDialog
@@ -404,52 +403,46 @@ class CourseEditorPage(Page):
         self.suppress_handlers = False
         self.on_lesson_table_itemSelectionChanged()
 
-#TODO
     @Slot()
     def on_pb_delete_course_clicked(self):
         """Delete the current course."""
         row = self.course_table.currentRow()
-        if row < 0:
-            raise Bug("No course, delete button should be disabled")
+        assert row >= 0, "No course, delete button should be disabled"
         if not SHOW_CONFIRM(T["REALLY_DELETE"]):
             return
-        if db_delete_rows("COURSES", course=self.course_id):
-            # The foreign key constraints should tidy up the database to
-            # a certain extent.
-            # However, when the last reference to a WORKLOAD entry goes,
-            # that entry must be removed here. If the removed entry contains
-            # the last reference to a LESSON_GROUPS entry, also this entry
-            # must be removed.
-            q1 = """select
-                    Workload,
-                    Lesson_group
-                from LESSON_GROUPS
-                left join WORKLOAD using (Lesson_group)
-                left join COURSE_WORKLOAD using (Workload)
-                where Cw is null
-            """
-            for record in db_select(q1):
-                w = record["Workload"]
-                lg = record["Lesson_group"]
-                # Then, on the basis of this query:
-                q2 = f"""select
-                        Workload,
-                        Lesson_group
-                    from LESSON_GROUPS
-                    left join WORKLOAD using (Lesson_group)
-                    where Lesson_group = {lg} and Workload != {w}
-                """
-                # ... decide whether to delete the LESSON_GROUPS or
-                # the WORKLOAD entry.
-                if db_select(q2):
-                    # Just delete the WORKLOAD entry.
-                    db_delete_rows("WORKLOAD", Workload=w)
-                else:
-                    # Delete the LESSON_GROUPS entry, and – via the foreign
-                    # key constraint – also the WORKLOAD entry.
-                    db_delete_rows("LESSON_GROUPS", Lesson_group=lg)
-            # Reload the course table
-            self.load_course_table(self.combo_class.currentIndex(), row)
+        # Delete each connected entry in COURSE_LESSONS, keeping track
+        # of the lesson-groups and lesson-datas.
+        lg_set = set()
+        ld_set = set()
+        for cl_id, cl_lg, cl_ld in db_read_fields(
+            "COURSE_LESSONS",
+            ("Cl_id", "Lesson_group", "Lesson_data"),
+            Course=self.course_id
+        ):
+            print("§++", cl_id, cl_lg, cl_ld)
+            lg_set.add(cl_lg)
+            ld_set.add(cl_ld)
+            db_delete_rows("COURSE_LESSONS", Cl_id=cl_id)
+        # Delete associated lessons if they are no longer referenced
+        for lg in lg_set:
+            if not db_values(
+                "COURSE_LESSONS",
+                "Cl_id",
+                lesson_group=lg
+            ):
+                db_delete_rows("LESSONS", Lesson_group=lg)
+        # Delete LESSON_DATA entries if they are no longer referenced
+        for ld in ld_set:
+            if not db_values(
+                "COURSE_LESSONS",
+                "Cl_id",
+                Lesson_data=Lesson_data
+            ):
+                db_delete_rows("LESSON_DATA", Lesson_data=ld)
+        # Finally, delete the course itself
+        db_delete_rows("COURSES", course=self.course_id)
+        # Reload the course table
+        self.load_course_table(self.combo_class.currentIndex(), row)
 
     @Slot(int,int)
     def on_course_table_cellDoubleClicked(self, r, c):
@@ -620,7 +613,7 @@ class CourseEditorPage(Page):
         object_name = obj.objectName()
         lthis = self.current_lesson[1] # the Record object
         lid = lthis["Lid"]
-        ### PAYMENT (COURSE_LESSONS)
+        ### PAYMENT (LESSON_DATA)
         if object_name == "payment":
             result = WorkloadDialog.popup(
                 start_value=lthis, parent=self
@@ -637,7 +630,7 @@ class CourseEditorPage(Page):
                     Lesson_data=lthis["Lesson_data"]
                 )
                 self.load_course_table(lesson_id=lid)
-        ### ROOM (COURSE_LESSONS)
+        ### ROOM (LESSON_DATA)
         elif object_name == "wish_room":
             classroom = get_classes().get_classroom(
                 self.course_data["CLASS"], null_ok=True
@@ -658,7 +651,7 @@ class CourseEditorPage(Page):
         ### BLOCK (LESSON_GROUPS)
         elif object_name == "block_name":
             row = self.lesson_table.currentRow()
-            assert(row >= 0)
+            assert row >= 0
             result = BlockNameDialog.popup(
                 # <course_data> is necessary for courses with no "lessons"
                 # Otherwise the data could be taken from <course_lessons>.
@@ -667,12 +660,9 @@ class CourseEditorPage(Page):
                 parent=self
             )
             if result is not None:
-                assert(result["type"] == "CHANGE_BLOCK")
-                bsid = result["BLOCK_SID"]
-                btag = result["BLOCK_TAG"]
+                bsid, btag = result
                 db_update_fields(
                     "LESSON_GROUPS",
-                    #[(r, result[r]) for r in ("BLOCK_SID", "BLOCK_TAG")],
                     [("BLOCK_SID", bsid), ("BLOCK_TAG", btag)],
                     lesson_group=lthis["Lesson_group"]
                 )
@@ -732,7 +722,7 @@ class CourseEditorPage(Page):
                             lesson_id = lid,
                         )
                 else:
-                    assert(result.TAG)
+                    assert result.TAG
                     # Make a new parallel record
                     db_new_row(
                         "PARALLEL_LESSONS",
@@ -812,9 +802,12 @@ class CourseEditorPage(Page):
         bn = NewCourseLessonDialog.popup(self.course_data)
         if not bn:
             return
+#TODO--
+        print("? ->", bn)
+
         l= -1
         lg = bn["Lesson_group"]
-        ld = bn["Lesson_data"]
+        ld = bn.get("Lesson_data", -1)
         if lg < 0:
             bsid = bn["BLOCK_SID"]
             btag = bn["BLOCK_TAG"]
@@ -828,7 +821,7 @@ class CourseEditorPage(Page):
                 )
                 ld = db_new_row(
                     "LESSON_DATA",
-                    Pay_factor_id=get_payment_weights()[0][0],
+                    Pay_factor_id=get_default_pay_factor_id(),
                     PAY_NLESSONS="1",
                     ROOM=""
                 )
@@ -852,7 +845,7 @@ class CourseEditorPage(Page):
                 l = 0
                 ld = db_new_row(
                     "LESSON_DATA",
-                    Pay_factor_id=get_payment_weights()[0][0],
+                    Pay_factor_id=get_default_pay_factor_id(),
                     PAY_NLESSONS="1",
                     ROOM=""
                 )
@@ -863,7 +856,7 @@ class CourseEditorPage(Page):
                     Lesson_data=ld
                 )
             else:
-                assert(not btag)
+                assert not btag
                 # new simple lesson
                 lg = db_new_row(
                     "LESSON_GROUPS",
@@ -873,7 +866,7 @@ class CourseEditorPage(Page):
                 )
                 ld = db_new_row(
                     "LESSON_DATA",
-                    Pay_factor_id=get_payment_weights()[0][0],
+                    Pay_factor_id=get_default_pay_factor_id(),
                     PAY_NLESSONS="-1",
                     ROOM=""
                 )
@@ -935,18 +928,17 @@ class CourseEditorPage(Page):
         lthis = self.current_lesson[1]
         newids = db_values(
             "LESSONS",
-            "lid",
+            "Lid",
             lesson_group=lthis["Lesson_group"]
         )
         newids.remove(lid := lthis["Lid"])
         assert newids, (
-            f"Tried to delete LESSON with lid={lid}"
+            f"Tried to delete LESSON with Lid={lid}"
             " although it is the only one for this element"
         )
-        db_delete_rows("LESSONS", lid=lid)
+        db_delete_rows("LESSONS", Lid=lid)
         self.load_course_table(lesson_id=newids[-1])
 
-#TODO
     @Slot()
     def on_remove_element_clicked(self):
         """Remove the current element (pay-only or lesson-group) from
@@ -956,29 +948,39 @@ class CourseEditorPage(Page):
         """
         cldata = self.current_lesson[1]
         lg = cldata["Lesson_group"]
-        Lesson_data = cldata["Lesson_data"]
+        ld = cldata["Lesson_data"]
         # Delete COURSE_LESSONS entry
-        db_delete_rows("COURSE_LESSONS", cl_id=cldata["Cl_id"])
+        db_delete_rows("COURSE_LESSONS", Cl_id=cldata["Cl_id"])
         # Delete associated lessons if they are no longer referenced
         if not db_values(
             "COURSE_LESSONS",
-            "cl_id",
+            "Cl_id",
             lesson_group=lg
         ):
-            db_delete_rows("PAY_TAGS", lesson_group=lg)
-        # Delete PAY_TAGS entry if it is no longer referenced
+            db_delete_rows("LESSONS", Lesson_group=lg)
+        # Delete LESSON_DATA entry if it is no longer referenced
         if not db_values(
             "COURSE_LESSONS",
-            "cl_id",
-            Lesson_data=Lesson_data
+            "Cl_id",
+            Lesson_data=ld
         ):
-            db_delete_rows("PAY_TAGS", Lesson_data=Lesson_data)
+            db_delete_rows("LESSON_DATA", Lesson_data=ld)
         # Reload course data
         self.load_course_table()
 
     @Slot()
     def on_make_tables_clicked(self):
         ExportTable(parent=self).activate()
+
+
+def get_default_pay_factor_id():
+    for pfi, pt in db_read_fields(
+        "PAY_FACTORS",
+        ("Pay_factor_id", "PAY_TAG")
+    ):
+        if pt:
+            return pfi
+    return 0
 
 
 # --#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#

@@ -1,7 +1,7 @@
 """
 ui/modules/course_editor.py
 
-Last updated:  2023-07-10
+Last updated:  2023-07-19
 
 Edit course and blocks+lessons data.
 
@@ -45,7 +45,7 @@ T = TRANSLATIONS("ui.modules.course_editor")
 
 from core.db_access import (
     open_database,
-    db_select,
+    #db_select,
     db_read_fields,
     db_read_unique,
     db_update_field,
@@ -436,7 +436,7 @@ class CourseEditorPage(Page):
             if not db_values(
                 "COURSE_LESSONS",
                 "Cl_id",
-                Lesson_data=Lesson_data
+                Lesson_data=ld
             ):
                 db_delete_rows("LESSON_DATA", Lesson_data=ld)
         # Finally, delete the course itself

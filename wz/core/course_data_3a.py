@@ -1,7 +1,7 @@
 """
 core/course_data.py
 
-Last updated:  2023-07-09
+Last updated:  2023-07-19
 
 Support functions dealing with courses, lessons, etc.
 
@@ -38,24 +38,14 @@ T = TRANSLATIONS("core.course_data")
 
 ### +++++
 
-from typing import Optional
 from core.db_access import (
     db_select,
-    db_read_full_table,
-    db_read_unique_entry,
     db_read_fields,
-    db_read_unique,
-    db_read_unique_field,
-    db_values,
     db_query,
     Record,
-    NoRecord,
 )
-from core.basic_data import (
-    BlockTag,
-    Workload,
+from core.basic_data_3 import (
     get_classes,
-    get_subjects,
     DECIMAL_SEP,
 )
 from core.classes import GROUP_ALL

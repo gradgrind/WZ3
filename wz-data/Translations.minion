@@ -57,11 +57,11 @@ core.list_activities: {
     H_block_subject:    Blockfach
     H_block_tag:        Block-Kennzeichen
     H_subject:          Fach
-    H_team:             „Team“
+    H_lesson-data:      „Unterrichtsgruppe“
     H_room:             Raum
     H_units:            Einheiten
     H_npay:             Anzahl
-    H_workload:         Stunden
+    H_lesson-group:     „Stundengruppe“
     H_pay:              Anteil
     H_team_tag:         //
     H_teacher:          Lehrkraft

@@ -1,7 +1,7 @@
 """
 core/list_activities.py
 
-Last updated:  2023-07-23
+Last updated:  2023-07-25
 
 Present information on activities for teachers and classes/groups.
 The information is formatted in pdf documents using the reportlab
@@ -97,7 +97,8 @@ class ClassData(NamedTuple):
     teacher_id: str
     block_subject: str
     block_tag: str
-    lesson_group: int   # the LESSON_GROUPS index
+    lesson_group: int
+    lesson_data: int
     room: str
     lessons: str
     nlessons: int
@@ -167,14 +168,13 @@ def print_class_group(klass, group):
     return f"({klass})"
 
 
-def class_list(clist: list[Record]):
+def class_list(clist: list[Record], lg_ll):
     """Deal with the data for a single class. Return the data needed
     for a lesson + teacher list sorted according to subject.
     """
     subjects = get_subjects()
     courses = []
-    lg_ll = activities["Lg_LESSONS"]
-    for data in activities["C_ACTIVITIES"]:
+    for data in clist:
         lg = data["Lesson_group"]
         lessons = lg_ll[lg]              # list of lesson lengths
         nlessons = sum(lessons)
@@ -182,14 +182,14 @@ def class_list(clist: list[Record]):
             subjects.map(data["SUBJECT"]),
             data["GRP"],
             data["TEACHER"],
-            data["CLASS"],
             data["BLOCK_SID"],
             data["BLOCK_TAG"],
             lg,
+            data["Lesson_data"],
             data["ROOM"],
             ','.join(str(l) for l in lessons),
             nlessons,
-            pay_data(data.paytag, nlessons)[1] # pay string
+            pay_data(data, nlessons)[1] # pay string
         )
         courses.append(cdata)
     courses.sort()
@@ -257,11 +257,7 @@ def make_teacher_table_xlsx(activities):
     return db
 
 
-
-#TODO ...
-
-
-def make_class_table_xlsx(activity_lists):
+def make_class_table_xlsx(activities):
     db = xl.Database()
     headers = [
         "H_subject",
@@ -269,15 +265,17 @@ def make_class_table_xlsx(activity_lists):
         "H_teacher",
         "H_block_subject",
         "H_block_tag",
-        "H_team",
+        "H_lesson-group",   # Lesson-group-id
+        "H_lesson-data",    # Lesson-data-id
         "H_room",
         "H_units",
         "H_lessons"
     ]
-    # teachers = get_teachers()
-    for c in sorted(activity_lists):
-        datalist = activity_lists[c]
-        items = class_list(datalist)
+    lg_ll = activities["Lg_LESSONS"]
+    cmap = activities["C_ACTIVITIES"]
+    for c in sorted(cmap):
+        datalist = cmap[c]
+        items = class_list(datalist, lg_ll)
         # Calculate the total number of lessons for the pupils.
         # The results should cover all (sub-)groups.
         # Each LESSON_GROUPS entry must be counted only once FOR
@@ -303,9 +301,10 @@ def make_class_table_xlsx(activity_lists):
         row_id = 2
         for data in items:
             # Allocate the lessons to the minimal subgroups
+            lg = data.lesson_group
             if (
                 (g := data.group)
-                and (lg := data.lesson_group)
+                and lg
                 and (lessons := data.nlessons)
             ):
                 if no_subgroups:
@@ -329,7 +328,8 @@ def make_class_table_xlsx(activity_lists):
                 data.teacher_id,
                 data.block_subject,
                 data.block_tag,
-                data.workgroup,
+                lg,
+                data.lesson_data,
                 data.room,
                 data.lessons,
                 data.paystr,
@@ -376,6 +376,8 @@ def make_class_table_xlsx(activity_lists):
             row_id += 1
     return db
 
+
+#TODO ...
 
 def make_teacher_table_room(activity_lists):
     """Construct a pdf with a table for each teacher, each such table
@@ -791,6 +793,16 @@ if __name__ == "__main__":
     activities = read_from_db()
 
 
+    cdb = make_class_table_xlsx(activities)
+    filepath = saveDialog("Excel-Datei (*.xlsx)", "Klassen-Stunden")
+    if filepath and os.path.isabs(filepath):
+        if not filepath.endswith(".xlsx"):
+            filepath += ".xlsx"
+        xl.writexl(db=cdb, fn=filepath)
+        print("  --->", filepath)
+
+    quit(0)
+
     tdb = make_teacher_table_xlsx(activities)
     filepath = saveDialog("Excel-Datei (*.xlsx)", "Deputate")
     if filepath and os.path.isabs(filepath):
@@ -827,12 +839,4 @@ if __name__ == "__main__":
             filepath += ".pdf"
         with open(filepath, "wb") as fh:
             fh.write(pdfbytes)
-        print("  --->", filepath)
-
-    cdb = make_class_table_xlsx(cl_lists)
-    filepath = saveDialog("Excel-Datei (*.xlsx)", "Klassen-Stunden")
-    if filepath and os.path.isabs(filepath):
-        if not filepath.endswith(".xlsx"):
-            filepath += ".xlsx"
-        xl.writexl(db=cdb, fn=filepath)
         print("  --->", filepath)

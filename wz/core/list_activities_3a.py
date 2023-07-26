@@ -1,7 +1,7 @@
 """
 core/list_activities.py
 
-Last updated:  2023-07-25
+Last updated:  2023-07-26
 
 Present information on activities for teachers and classes/groups.
 The information is formatted in pdf documents using the reportlab
@@ -61,19 +61,11 @@ from tables.pdf_table import TablePages
 
 DECIMAL_SEP = CONFIG["DECIMAL_SEP"]
 
-### -----
-
-
-
-
-############# ?????????
-
 def PAY_FORMAT(pay):
-    if type(pay) == float:
-        return f"{pay:.3f}".replace(".", DECIMAL_SEP)
-    else:
-        return pay
+    assert type(pay) == float
+    return f"{pay:.3f}".replace(".", DECIMAL_SEP)
 
+### -----
 
 class TeacherData(NamedTuple):
     klass: str
@@ -103,7 +95,6 @@ class ClassData(NamedTuple):
     lessons: str
     nlessons: int
     paystr: str         #TODO: not reliable for pay if combined groups!
-#TODO: Do I need the lesson_data_id (for checking valid "shared" pay)?
 
 
 def pay_data(adata: Record, nlessons: int) -> tuple[str, str, float]:
@@ -211,14 +202,13 @@ def make_teacher_table_xlsx(activities):
         "H_group",
         "H_room",           # ($ not substituted)
         "H_units",          # list of lesson lengths
-        "H_npay",           # total number of lessons
+        "H_nunits",         # total number of lessons
         "H_lesson-group",   # Lesson-group-id
         "H_lesson-data",    # Lesson-data-id
-        "H_pay",            # NLESSONS field
+        "H_npay",           # NLESSONS field
+        "H_lessons",        # Pay calculation
+        "H_pay",            # Pay units
     ]
-#        ++        "[2] x DpSt" (for -1)) or "1 x HuEp"
-#        ++        pay (float)
-
     db = xl.Database()
     teachers = get_teachers()
     lg_ll = activities["Lg_LESSONS"]
@@ -241,9 +231,7 @@ def make_teacher_table_xlsx(activities):
         lesson_data_ids = set()
         for line in items:
             if line.lesson_data in lesson_data_ids:
-#?
                 line = line._replace(paynum="", paystr="*", pay=0.0)
-#                line = line._replace(paynum="", paystr="*", pay="")
             else:
                 lesson_data_ids.add(line.lesson_data)
                 pay_total += line.pay
@@ -253,7 +241,7 @@ def make_teacher_table_xlsx(activities):
         # Total
         lastcol = len(headers)
         sheet.update_index(row=row_id, col=lastcol, val=pay_total)
-        sheet.update_index(row=row_id, col=lastcol - 1, val="insgesamt")
+        sheet.update_index(row=row_id, col=lastcol - 1, val=T["total"])
     return db
 
 
@@ -370,16 +358,13 @@ def make_class_table_xlsx(activities):
             sheet.update_index(
                 row=row_id,
                 col=lastcol - 1,
-#TODO: T ...
-                val=g if g else "insgesamt"
+                val=g if g else T["total"]
             )
             row_id += 1
     return db
 
 
-#TODO ...
-
-def make_teacher_table_room(activity_lists):
+def make_teacher_table_room(activities):
     """Construct a pdf with a table for each teacher, each such table
     starting on a new page.
     The sorting within a teacher table is first class, then block,
@@ -413,52 +398,48 @@ def make_teacher_table_room(activity_lists):
 
     noblocklist = []
     teachers = get_teachers()
+    lg_ll = activities["Lg_LESSONS"]
+    tmap = activities["T_ACTIVITIES"]
     for t in teachers:
         try:
-            datalist = activity_lists[t]
+            datalist = tmap[t]
         except KeyError:
             continue    # skip teachers without entries
         tname = teachers.name(t)
         pdf.add_page(tname)
-        items = teacher_list(datalist)
-
-        workgroups = {} # for detecting parallel groups
+        items = teacher_list(datalist, lg_ll)
+        lds = {} # for detecting parallel groups
         lesson_groups = set()
         pay_total = 0.0
         lessons_total = 0
         for item in items:
-            w = item.workgroup
-            if w in workgroups:
-                workgroups[w] = 1
+            ld = item.lesson_data
+            if ld in lds:
+                lds[ld] = 1
             else:
-                workgroups[w] = 0
+                lds[ld] = 0
                 pay_total += item.pay
             if item.lesson_group not in lesson_groups:
                 lesson_groups.add(item.lesson_group)
                 lessons_total += item.nlessons
-#        pdf.add_text(
-##TODO: T ...
-#            f"Deputat, insgesamt: {PAY_FORMAT(pay_total)}"
-#            f"   &   Stundenplanbelegung: {lessons_total}"
-#        )
         pdf.add_text(
-#TODO: T ...
-            f"Stundenplanbelegung: {lessons_total}"
+            f'{T["timetable_lessons"]}: {lessons_total}'
         )
         pdf.add_vspace(5)
 
         klass = None
         for item in items:
-            # The "team" tag is shown only when it is referenced later
-            if workgroups[item.workgroup] > 0:
-                ## first time, show workgroup
-                w = f"[{item.workgroup}]"
-                workgroups[item.workgroup] = -1
+            # The lesson-data-id is shown only when it is referenced later
+            ld = item.lesson_data
+            if lds[ld] > 0:
+                # first time, show lesson-data-id
+                w = f"[{ld}]"
+                lds[ld] = -1
                 ref = ""
                 room = item.room
-            elif workgroups[item.workgroup] < 0:
-                ## second time, show reference to workgroup
-                ref = f"→ [{item.workgroup}]"
+            elif lds[ld] < 0:
+                ## second time, show reference to lesson-data-id
+                ref = f"→ [{ld}]"
                 w = ""
                 room = ""
             else:
@@ -504,7 +485,7 @@ def make_teacher_table_room(activity_lists):
     return pdf.build_pdf()
 
 
-def make_teacher_table_pay(activity_lists):
+def make_teacher_table_pay(activities):
     """Construct a pdf with a table for each teacher, each such table
     starting on a new page.
     The sorting within a teacher table is first class, then block,
@@ -512,7 +493,7 @@ def make_teacher_table_pay(activity_lists):
     """
     def add_simple_items():
         for item in noblocklist:
-            # The "team" tag is shown only when it is referenced later
+            # The "lesson-data" id is shown only when it is referenced later
             pdf.add_line(item)
         noblocklist.clear()
 
@@ -523,7 +504,7 @@ def make_teacher_table_pay(activity_lists):
         ("H_group",             20),
         ("H_subject",           60),
         ("H_units",             30),
-        ("H_workload",          25),
+        ("H_lessons",           25),
         ("H_pay",               20),
     ):
         headers.append(T[h])
@@ -539,48 +520,50 @@ def make_teacher_table_pay(activity_lists):
 
     noblocklist = []
     teachers = get_teachers()
+    lg_ll = activities["Lg_LESSONS"]
+    tmap = activities["T_ACTIVITIES"]
     for t in teachers:
         try:
-            datalist = activity_lists[t]
+            datalist = tmap[t]
         except KeyError:
             continue    # skip teachers without entries
         tname = teachers.name(t)
         pdf.add_page(tname)
-        items = teacher_list(datalist)
+        items = teacher_list(datalist, lg_ll)
 
-        workgroups = {} # for detecting parallel groups
+        lds = {} # for detecting parallel groups
         lesson_groups = set()
         pay_total = 0.0
         lessons_total = 0
         for item in items:
-            w = item.workgroup
-            if w in workgroups:
-                workgroups[w] = 1
+            ld = item.lesson_data
+            if ld in lds:
+                lds[ld] = 1
             else:
-                workgroups[w] = 0
+                lds[ld] = 0
                 pay_total += item.pay
             if item.lesson_group not in lesson_groups:
                 lesson_groups.add(item.lesson_group)
                 lessons_total += item.nlessons
         pdf.add_text(
-#TODO: T ...
-            f"Deputat, insgesamt: {PAY_FORMAT(pay_total)}"
-            f"   &   Stundenplanbelegung: {lessons_total}"
+            f'{T["pay_lessons"]}: {PAY_FORMAT(pay_total)}'
+            f'   &   {T["timetable_lessons"]}: {lessons_total}'
         )
         pdf.add_vspace(5)
 
         klass = None
         for item in items:
-            # The "team" tag is shown only when it is referenced later
-            if workgroups[item.workgroup] > 0:
-                # first time, show pay and workgroup
+            # The lesson-data-id is shown only when it is referenced later
+            ld = item.lesson_data
+            if lds[ld] > 0:
+                # first time, show pay and lesson-data-id
                 paystr = item.paystr
                 pay = PAY_FORMAT(item.pay)
-                w = f"[{item.workgroup}]"
-                workgroups[item.workgroup] = -1
-            elif workgroups[item.workgroup] < 0:
-                # second time, show reference to workgroup
-                paystr = f"→ [{item.workgroup}]"
+                w = f"[{ld}]"
+                lds[ld] = -1
+            elif lds[ld] < 0:
+                # second time, show reference to lesson-data-id
+                paystr = f"→ [{ld}]"
                 pay = ""
                 w = ""
             else:
@@ -617,14 +600,14 @@ def make_teacher_table_pay(activity_lists):
     return pdf.build_pdf()
 
 
-def make_class_table_pdf(activity_lists, lg_2_c):
+def make_class_table_pdf(activities):
     headers = []
     colwidths = []
     for h, w in (
         ("H_subject",           80),
         ("H_group",             20),
         ("H_teacher",           20),
-        ("H_lessons",           20),
+        ("H_npay",              20),
         ("H_units",             30),
     ):
         headers.append(T[h])
@@ -639,11 +622,14 @@ def make_class_table_pdf(activity_lists, lg_2_c):
     )
 
     classes = get_classes()
-    for klass in sorted(activity_lists):
-        datalist = activity_lists[klass]
-        items = class_list(datalist)
+    lg_ll = activities["Lg_LESSONS"]
+    cmap = activities["C_ACTIVITIES"]
+    lg_rec = activities["Lg_ACTIVITIES"]
+    for klass in sorted(cmap):
+        datalist = cmap[klass]
+        items = class_list(datalist, lg_ll)
         class_data = classes[klass]
-        w_set = set()   # to keep track of WORKLOAD indexes
+        ld_set = set()   # to keep track of lesson-data-ids
         # Calculate the total number of lessons for the pupils.
         # The results should cover all (sub-)groups.
         # Each LESSON_GROUPS entry must be counted only once FOR
@@ -672,7 +658,7 @@ def make_class_table_pdf(activity_lists, lg_2_c):
                     f"\u00A0\u00A0– {data.subject}",
                     data.group,
                     data.teacher_id,
-                    data.paystr,
+                    data.paystr.split()[0] if data.paystr else "",
                     "",
                 )
                 try:
@@ -683,7 +669,7 @@ def make_class_table_pdf(activity_lists, lg_2_c):
                     lbtagmap[data.block_tag].append(line)
                 except KeyError:
                     # find parallel classes
-                    clset = {c[0] for c in lg_2_c[data.lesson_group]}
+                    clset = {r["CLASS"] for r in lg_rec[data.lesson_group]}
                     clset.remove(klass)
                     s = f"{data.block_subject}#" # substitute '#' later
                     if clset:
@@ -695,10 +681,10 @@ def make_class_table_pdf(activity_lists, lg_2_c):
 
             else:
                 # Manage "teams"
-                if data.workgroup in w_set:
+                if data.lesson_data in ld_set:
                     l = f"({data.lessons})"
                 else:
-                    w_set.add(data.workgroup)
+                    ld_set.add(data.lesson_data)
                     l = data.lessons
                 simplelessons.append((
                     data.subject,
@@ -792,6 +778,34 @@ if __name__ == "__main__":
     open_database("wz_db.sqlite")
     activities = read_from_db()
 
+    pdfbytes = make_class_table_pdf(activities)
+    filepath = saveDialog("pdf-Datei (*.pdf)", "Klassen-Stunden")
+    if filepath and os.path.isabs(filepath):
+        if not filepath.endswith(".pdf"):
+            filepath += ".pdf"
+        with open(filepath, "wb") as fh:
+            fh.write(pdfbytes)
+        print("  --->", filepath)
+
+    pdfbytes = make_teacher_table_room(activities)
+    filepath = saveDialog("pdf-Datei (*.pdf)", "Lehrer-Stunden")
+    if filepath and os.path.isabs(filepath):
+        if not filepath.endswith(".pdf"):
+            filepath += ".pdf"
+        with open(filepath, "wb") as fh:
+            fh.write(pdfbytes)
+        print("  --->", filepath)
+
+    pdfbytes = make_teacher_table_pay(activities)
+    filepath = saveDialog("pdf-Datei (*.pdf)", "Deputate")
+    if filepath and os.path.isabs(filepath):
+        if not filepath.endswith(".pdf"):
+            filepath += ".pdf"
+        with open(filepath, "wb") as fh:
+            fh.write(pdfbytes)
+        print("  --->", filepath)
+
+#    quit(0)
 
     cdb = make_class_table_xlsx(activities)
     filepath = saveDialog("Excel-Datei (*.xlsx)", "Klassen-Stunden")
@@ -801,7 +815,7 @@ if __name__ == "__main__":
         xl.writexl(db=cdb, fn=filepath)
         print("  --->", filepath)
 
-    quit(0)
+#    quit(0)
 
     tdb = make_teacher_table_xlsx(activities)
     filepath = saveDialog("Excel-Datei (*.xlsx)", "Deputate")
@@ -809,34 +823,4 @@ if __name__ == "__main__":
         if not filepath.endswith(".xlsx"):
             filepath += ".xlsx"
         xl.writexl(db=tdb, fn=filepath)
-        print("  --->", filepath)
-
-    quit(0)
-
-
-    pdfbytes = make_teacher_table_pay(t_lists)
-    filepath = saveDialog("pdf-Datei (*.pdf)", "Deputate")
-    if filepath and os.path.isabs(filepath):
-        if not filepath.endswith(".pdf"):
-            filepath += ".pdf"
-        with open(filepath, "wb") as fh:
-            fh.write(pdfbytes)
-        print("  --->", filepath)
-
-    pdfbytes = make_teacher_table_room(t_lists)
-    filepath = saveDialog("pdf-Datei (*.pdf)", "Lehrer-Stunden")
-    if filepath and os.path.isabs(filepath):
-        if not filepath.endswith(".pdf"):
-            filepath += ".pdf"
-        with open(filepath, "wb") as fh:
-            fh.write(pdfbytes)
-        print("  --->", filepath)
-
-    pdfbytes = make_class_table_pdf(cl_lists, lg_2_c)
-    filepath = saveDialog("pdf-Datei (*.pdf)", "Klassen-Stunden")
-    if filepath and os.path.isabs(filepath):
-        if not filepath.endswith(".pdf"):
-            filepath += ".pdf"
-        with open(filepath, "wb") as fh:
-            fh.write(pdfbytes)
         print("  --->", filepath)

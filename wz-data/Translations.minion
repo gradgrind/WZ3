@@ -57,12 +57,13 @@ core.list_activities: {
     H_block_subject:    Blockfach
     H_block_tag:        Block-Kennzeichen
     H_subject:          Fach
-    H_lesson-data:      „Unterrichtsgruppe“
+    H_lesson-data:      Unterrichtsgruppe
     H_room:             Raum
     H_units:            Einheiten
-    H_npay:             Anzahl
-    H_lesson-group:     „Stundengruppe“
-    H_pay:              Anteil
+    H_nunits:           Anzahl
+    H_lesson-group:     Stundengruppe
+    H_npay:             Anteil
+    H_pay:              Deputat
     H_team_tag:         //
     H_teacher:          Lehrkraft
     H_lessons:          Stunden
@@ -71,6 +72,9 @@ core.list_activities: {
     teacher_activities: "Lehrer-Stunden"
     class_lessons:      "Klassen-Stunden"
     total_lessons:      "Gesamtstunden:"
+    total:              "insgesamt"
+    timetable_lessons:  "Stundenplanbelegung"
+    pay_lessons:        "Deputat, insgesamt"
 }
 
 core.db_access: {

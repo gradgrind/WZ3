@@ -1,7 +1,7 @@
 """
 ui/modules/course_editor.py
 
-Last updated:  2023-07-19
+Last updated:  2023-07-26
 
 Edit course and blocks+lessons data.
 
@@ -95,7 +95,7 @@ from ui.dialogs.dialog_new_course_lesson_3a import NewCourseLessonDialog
 from ui.dialogs.dialog_block_name_3a import BlockNameDialog
 from ui.dialogs.dialog_parallel_lessons import ParallelsDialog
 from ui.dialogs.dialog_text_line import TextLineDialog
-from ui.dialogs.dialog_make_course_tables import ExportTable
+from ui.dialogs.dialog_make_course_tables_3a import ExportTable
 
 COURSE_TABLE_FIELDS = ( # the fields shown in the course table
 # (db-field name, column-type, horizontal text alignment)

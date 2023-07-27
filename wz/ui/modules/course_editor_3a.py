@@ -93,7 +93,7 @@ from ui.dialogs.dialog_room_choice import RoomDialog
 from ui.dialogs.dialog_workload_3a import WorkloadDialog
 from ui.dialogs.dialog_new_course_lesson_3a import NewCourseLessonDialog
 from ui.dialogs.dialog_block_name_3a import BlockNameDialog
-from ui.dialogs.dialog_parallel_lessons import ParallelsDialog
+from ui.dialogs.dialog_parallel_lessons_3a import ParallelsDialog
 from ui.dialogs.dialog_text_line import TextLineDialog
 from ui.dialogs.dialog_make_course_tables_3a import ExportTable
 

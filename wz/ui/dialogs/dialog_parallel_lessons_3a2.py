@@ -44,11 +44,13 @@ from core.basic_data_3 import (
     TAG_FORMAT,
     BlockTag,
     ParallelTag,
+#TODO: ?
+    #get_subjects,
 )
 from core.db_access import (
-    db_select,
     db_read_fields,
     db_read_unique,
+    db_read_unique_field,
 )
 from ui.ui_base import (
     ### QtWidgets:
@@ -64,7 +66,15 @@ from ui.ui_base import (
 
 ### -----
 
-#TODO: How to organize the tags when there are many?
+#TODO: This version should use a field in the LESSONS entry to reference
+# another LESSONS entry. That would consist of a Lid-value and a weight.
+# Could it use the TIME field? That would otherwise be empty ...
+# I could format a reference thus (for example):
+#       f"^{lid}@{weight}"
+
+
+
+# How to organize the tags when there are many?
 # The simple list might become difficult to navigate.
 # What about splitting on the first '.' and using the
 # first part as a combobox selector?
@@ -77,13 +87,13 @@ from ui.ui_base import (
 
 class ParallelsDialog(QDialog):
     @classmethod
-    def popup(cls, start_value, parent=None):
+    def popup(cls, lesson_id, start_value, parent=None):
         d = cls(parent)
-        return d.activate(start_value)
+        return d.activate(lesson_id, start_value)
 
     def __init__(self, parent=None):
         super().__init__(parent=parent)
-        uic.loadUi(APPDATAPATH("ui/dialog_parallel_lessons.ui"), self)
+        uic.loadUi(APPDATAPATH("ui/dialog_parallel_lessons_2.ui"), self)
         self.pb_reset = self.buttonBox.button(
             QDialogButtonBox.StandardButton.Reset
         )
@@ -104,9 +114,8 @@ class ParallelsDialog(QDialog):
             ref_list = self.tag_map[text] # [[id, lesson-id, weight], ...]
         except KeyError:
             # no references
-            #print("§no_refs")
             return
-        #print("§ref_list:", ref_list)
+        print("§ref_list:", ref_list)
         for r in ref_list:
             lid = r[1]
             lg_id, ll, lt = db_read_unique(
@@ -121,31 +130,35 @@ class ParallelsDialog(QDialog):
             )
             courses = []
             if bsid:
-                bname = BlockTag.to_string(bsid, btag)
+                bname = str(BlockTag.build(bsid, btag))
             else:
-                # Get the course data for this lesson-group.
-                # There can be be more than one.
-                q = f"""select
-                    CLASS,
-                    GRP,
-                    SUBJECT,
-                    TEACHER
-
-                    from COURSES
-                    inner join COURSE_LESSONS using(Course)
-
-                    where Lesson_group = '{lg_id}'
-                    order by CLASS, SUBJECT, GRP, TEACHER
-                """
-                clist = db_select(q)
-                assert clist
+            # There can be multiple WORKLOAD entries
+                wlist = [
+                    row[0]for row in db_read_fields(
+                        "WORKLOAD",
+                        ["workload"],
+                        lesson_group=lg_id
+                    )
+                ]
+                assert wlist
                 bname = None
-                for c in clist:
-                    n = f'{c["CLASS"]}.{c["GRP"]}:{c["SUBJECT"]}/{c["TEACHER"]}'
-                    if bname is None:
-                        bname = n
-                    else:
-                        courses.append(n)
+                for wl in wlist:
+                    # There can be multiple COURSE_WORKLOAD entries
+                    for row in db_read_fields(
+                        "COURSE_WORKLOAD",
+                        ["course"],
+                        workload=wl,
+                    ):
+                        cdata = db_read_unique(
+                            "COURSES",
+                            ["CLASS", "GRP", "SUBJECT", "TEACHER"],
+                            course=row[0],
+                        )
+                        n = f"{cdata[0]}.{cdata[1]}:{cdata[2]}/{cdata[3]}"
+                        if bname is None:
+                            bname = n
+                        else:
+                            courses.append(n)
                 assert bname
             self.lesson_list.addItem(
                 f"{lid}: {bname} || {ll}@{lt or '-'} %{r[2]}"
@@ -169,7 +182,8 @@ class ParallelsDialog(QDialog):
         else:
             self.pb_accept.setEnabled(False)
 
-    def activate(self, start_value:ParallelTag) -> Optional[ParallelTag]:
+    def activate(self, lesson_id: int, start_value:ParallelTag
+    ) -> Optional[ParallelTag]:
         """Open the dialog.
         """
         self.result = None
@@ -219,6 +233,66 @@ class ParallelsDialog(QDialog):
         w = self.weight.currentText()
         self.result = ParallelTag(t, w)
         super().accept()
+
+
+#TODO: Wouldn't I rather go from the courses of a class?
+# For all courses in the class, find the lesson-ids and – in the case
+# of blocks the block tag/name.
+# On the other hand, when the popup is entered, there may be an existing
+# target. If so, we would need to find its class, to decide which class
+# to show initially.
+# Does that apply to teacher and subject view too?
+# Actually, I think this is most useful for class view, so I see no
+# problem in concentrating on that.
+    def test(self, lesson_id: int, target_id: Optional[int]):
+        # Get lesson-group and block-info for a lesson-id
+        q = f"""
+            select
+                Lesson_group,
+                BLOCK_SID,
+                BLOCK_TAG
+            from LESSONS
+            inner join LESSON_GROUPS using (Lesson_group)
+            where Lid = {lesson_id}
+        """
+        records = db_query(q)
+        assert len(records) == 1
+        lg = (r := records[0])["Lesson_group"]
+        if (bsid := r["BLOCK_SID"]):
+            # Use the block subject/tag
+#TODO: Do I want the full subject?
+# get_subjects().map(bsid)
+            field1 = BlockTag.to_string(bsid, r["BLOCK_TAG"])
+        else:
+            # Get the course subject(s) and teacher(s)for a lesson-group:
+            q = f"""
+                select
+                    --Workload,
+                    SUBJECT,
+                    TEACHER
+                from WORKLOAD
+                inner join COURSE_WORKLOAD using (Workload)
+                inner join COURSES using (Course)
+                where Lesson_group = {lg}
+            """
+            records = db_query(q)
+            # If no block lesson-groups are used, there may be multiple
+            # teachers (team-teaching), but the subject should be the same!
+            sid = None
+            for r in records:
+                if sid:
+                    assert r["SUBJECT"] == sid
+                else:
+                    sid = r["SUBJECT"]
+                tid = r["TEACHER"]
+            assert sid
+#TODO: Do I want the full subject?
+# get_subjects().map(bsid)
+            field1 = f"{sid} ({tid})"
+
+        pass
+# Shouldn't I be starting from the COURSES table here (CLASS)? I want to
+# populate an activity list  for a particular class!
 
 
 # --#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#

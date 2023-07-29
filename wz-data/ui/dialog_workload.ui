@@ -11,7 +11,7 @@
    </rect>
   </property>
   <property name="windowTitle">
-   <string>Dialog</string>
+   <string>Deputatsanteil festlegen</string>
   </property>
   <layout class="QVBoxLayout" name="verticalLayout_3">
    <item>
@@ -129,13 +129,13 @@ QLineEdit {
      <property name="tabSpacing">
       <number>12</number>
      </property>
-     <widget class="QWidget" name="page">
+     <widget class="QWidget" name="page_0">
       <property name="geometry">
        <rect>
         <x>0</x>
         <y>0</y>
-        <width>373</width>
-        <height>169</height>
+        <width>418</width>
+        <height>194</height>
        </rect>
       </property>
       <attribute name="label">
@@ -249,13 +249,13 @@ QLineEdit {
        </item>
       </layout>
      </widget>
-     <widget class="QWidget" name="page_3">
+     <widget class="QWidget" name="page_1">
       <property name="geometry">
        <rect>
         <x>0</x>
         <y>0</y>
-        <width>355</width>
-        <height>135</height>
+        <width>353</width>
+        <height>114</height>
        </rect>
       </property>
       <attribute name="label">

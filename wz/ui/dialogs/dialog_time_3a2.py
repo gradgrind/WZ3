@@ -1,7 +1,7 @@
 """
 ui/dialogs/dialog_time.py
 
-Last updated:  2023-07-29
+Last updated:  2023-08-02
 
 Supporting "dialog" for the course editor – handle the TIME field
 (LESSONS table):
@@ -41,7 +41,7 @@ if __name__ == "__main__":
 
 ### +++++
 
-#TODO: Add stuff to deal with paired lessons (^lid@weight)
+from typing import Optional
 
 from core.basic_data_3 import (
     get_days,
@@ -66,12 +66,12 @@ from ui.ui_base import (
 
 class DayPeriodDialog(QDialog):
     @classmethod
-    def popup(cls, start_value="", parent=None, pos=None):
+    def popup(cls, start_value="", lesson_id=0, parent=None, pos=None):
         d = cls(parent)
         d.init()
         if pos:
             d.move(pos)
-        return d.activate(start_value)
+        return d.activate(start_value, lesson_id)
 
     def __init__(self, parent=None):
         super().__init__(parent=parent)
@@ -85,9 +85,14 @@ class DayPeriodDialog(QDialog):
         )
 
     def accept(self):
-        self.result = index2timeslot(
-            (self.daylist.currentRow(), self.periodlist.currentRow())
-        )
+        if self.stackedWidget.currentIndex() == 0:
+            self.result = index2timeslot(
+                (self.daylist.currentRow(), self.periodlist.currentRow())
+            )
+        else:
+            w = self.weight.currentText()
+            lid = self.selected_lid
+            self.result = f"^{lid}@{w}"
         super().accept()
 
     def reset(self):
@@ -100,42 +105,53 @@ class DayPeriodDialog(QDialog):
         self.periodlist.clear()
         self.periodlist.addItems([p[1] for p in get_periods()])
 
-    def activate(self, start_value):
+    def activate(self, start_value: str, lesson_id: int
+    ) -> Optional[str]:
         self.result = None
+        self.value = None
+        self.lesson_id = lesson_id
         self.selected_lid = 0
+        self.start_lid = 0
+        self.start_w = ""
         self.suppress_events = True
         self.pb_reset.setVisible(bool(start_value))
         self.dp0 = (-1, -1)
         d, p = 0, 0
         self.stackedWidget.setCurrentIndex(0)
+        self.show_classes()
         if start_value.startswith("^"):
             # Parallel
             try:
-                lid, w = start_value[1:].split("@")
+                lid, self.start_w = start_value[1:].split("@")
+                self.start_lid = int(lid)
                 q = f"""select
                     Lesson_group,
-                    CLASS,
-                    GRP,
-                    SUBJECT,
-                    TEACHER,
-                    BLOCK_SID,
-                    BLOCK_TAG
+                    CLASS
+                    --GRP,
+                    --SUBJECT,
+                    --TEACHER,
+                    --BLOCK_SID,
+                    --BLOCK_TAG
 
                     from LESSONS
                     inner join COURSE_LESSONS using (Lesson_group)
-                    inner join LESSON_GROUPS using (Lesson_group)
+                    --inner join LESSON_GROUPS using (Lesson_group)
                     inner join COURSES using (Course)
                     where Lid = '{lid}'
                 """
-                cdata = db_select(q)
-                ldata = db_read_fields(
-                    "LESSONS",
-                    ("LENGTH", "TIME"),
-                    Lesson_group=cdata["Lesson_group"]
+                cdlist = db_select(q)
+                if cdlist:
+                    cdata = cdlist[0]
+                else:
+                    raise ValueError
+                self.select_parallel(
+                    cdata["CLASS"], cdata["Lesson_group"], self.start_lid
                 )
+                self.weight.setCurrentText(self.start_w)
+                self.rb_parallel.setChecked(True)
                 self.stackedWidget.setCurrentIndex(1)
             except ValueError:
-#TODO: T ...
+#TODO: T ...?
                 REPORT("ERROR", "START VALUE: {val}".format(val=start_value))
 
         else:
@@ -150,9 +166,6 @@ class DayPeriodDialog(QDialog):
         self.periodlist.setCurrentRow(p)
         self.acceptable()
         self.suppress_events = False
-#?
-        self.show_classes()
-
         self.exec()
         return self.result
 
@@ -162,6 +175,17 @@ class DayPeriodDialog(QDialog):
         for k, n in get_classes().get_class_list():
             self.list_class.addItem(n)
             self.classes.append(k)
+
+    def select_parallel(self, klass, lesson_group, lesson_id):
+        i = self.classes.index(klass)
+        self.list_class.setCurrentRow(i)
+        self.on_list_class_currentRowChanged(i)
+        i = self.lg_list.index(lesson_group)
+        self.list_course.setCurrentRow(i)
+        self.on_list_course_currentRowChanged(i)
+        i = self.lids.index(lesson_id)
+        self.list_lesson.setCurrentRow(i)
+        self.on_list_lesson_currentRowChanged(i)
 
     @Slot(int)
     def on_list_class_currentRowChanged(self, i):
@@ -193,7 +217,7 @@ class DayPeriodDialog(QDialog):
                     continue
                 blocks.add(bs)
                 course_list.append(
-                    (f"[{bs}]", data["Lesson_group"])
+                    (f'[]{bs}#{data["BLOCK_SID"]}', data["Lesson_group"])
                 )
             else:
                 # Normal lesson
@@ -206,30 +230,32 @@ class DayPeriodDialog(QDialog):
         self.list_course.clear()
         self.lg_list = []
         for c, lg in sorted(course_list):
-            self.list_course.addItem(f"{c} -- {lg}")
+            self.list_course.addItem(f"{c}  -- [{lg}]")
             self.lg_list.append(lg)
 
     @Slot(int)
     def on_list_course_currentRowChanged(self, i):
         self.selected_lid = 0
+        self.list_lesson.clear()
         if i < 0: return
         lg = self.lg_list[i]
         self.lids = []
-        self.list_lesson.clear()
         for lid, l, t in db_read_fields(
             "LESSONS",
             ("Lid", "LENGTH", "TIME"),
             Lesson_group=lg
         ):
-            self.list_lesson.addItem(f"{l} @ {t}" if t else str(l))
+            if lid == self.lesson_id: continue
+            tx = f" @ {t}" if t else ""
+            self.list_lesson.addItem(f"{l}{tx}  -- [{lid}]")
             self.lids.append(lid)
-        assert(self.lids)
 
     @Slot(int)
     def on_list_lesson_currentRowChanged(self, i):
-        if i < 0: return
-        self.selected_lid = self.lids[i]
-        self.pb_accept.setEnabled(True)
+        if i >= 0:
+            self.selected_lid = self.lids[i]
+        if not self.suppress_events:
+            self.acceptable()
 
     @Slot(bool)
     def on_rb_day_period_toggled(self, on):
@@ -247,12 +273,23 @@ class DayPeriodDialog(QDialog):
         if self.suppress_events: return
         self.acceptable()
 
+    @Slot(int)
+    def on_weight_currentIndexChanged(self, i):
+        self.acceptable()
+
     def acceptable(self):
         if self.stackedWidget.currentIndex() == 0:
             dp = (self.daylist.currentRow(), self.periodlist.currentRow())
             self.pb_accept.setEnabled(dp != self.dp0)
         else:
-            self.pb_accept.setEnabled(bool(self.selected_lid))
+            lid = self.selected_lid
+            self.pb_accept.setEnabled(
+                bool(lid)
+                and (
+                    lid != self.start_lid
+                    or self.weight.currentText() != self.start_w
+                )
+            )
 
 
 # --#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#
@@ -260,6 +297,7 @@ class DayPeriodDialog(QDialog):
 if __name__ == "__main__":
     from core.db_access import open_database
     open_database("wz_db.sqlite")
+    print("----->", DayPeriodDialog.popup("^12@7", 13))
     print("----->", DayPeriodDialog.popup())
     print("----->", DayPeriodDialog.popup("Di.4"))
     print("----->", DayPeriodDialog.popup("Di.9"))

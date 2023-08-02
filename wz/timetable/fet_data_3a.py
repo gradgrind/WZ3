@@ -1,5 +1,5 @@
 """
-timetable/fet_data.py - last updated 2023-07-27
+timetable/fet_data.py - last updated 2023-07-30
 
 Prepare fet-timetables input from the database ...
 
@@ -542,33 +542,38 @@ class TimetableCourses:
 
     def add_placement(self, id_str, lesson_group, time, rooms):
         if time:
-            try:
-                d, p = time.split(".", 1)
-            except ValueError:
-#????
-                raise
+            if time[0] == "^":
+#TODO:
+                print("TODO: parallel", id_str, lesson_group, time, rooms)
+
             else:
-                # Fixed starting time
                 try:
-                    timeslot2index(time)    # This is just a check
-                except ValueError as e:
-                    REPORT("ERROR", str(e))
+                    d, p = time.split(".", 1)
+                except ValueError:
+#????
+                    raise
                 else:
-                    self.locked_aids[id_str] = (d, p)
-                    # Constraint to fix day and period
-                    add_constraint(
-                        self.time_constraints,
-                        "ConstraintActivityPreferredStartingTime",
-                        {
-                            "Weight_Percentage": "100",
-                            "Activity_Id": id_str,
-                            "Preferred_Day": d,
-                            "Preferred_Hour": p,
-                            "Permanently_Locked": "true",
-                            "Active": "true",
-                            "Comments": None,
-                        },
-                    )
+                    # Fixed starting time
+                    try:
+                        timeslot2index(time)    # This is just a check
+                    except ValueError as e:
+                        REPORT("ERROR", str(e))
+                    else:
+                        self.locked_aids[id_str] = (d, p)
+                        # Constraint to fix day and period
+                        add_constraint(
+                            self.time_constraints,
+                            "ConstraintActivityPreferredStartingTime",
+                            {
+                                "Weight_Percentage": "100",
+                                "Activity_Id": id_str,
+                                "Preferred_Day": d,
+                                "Preferred_Hour": p,
+                                "Permanently_Locked": "true",
+                                "Active": "true",
+                                "Comments": None,
+                            },
+                        )
         ## Lesson room
         n = len(rooms)
         if n > 1:

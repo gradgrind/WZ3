@@ -1,7 +1,7 @@
 """
 core/course_data.py
 
-Last updated:  2023-07-19
+Last updated:  2023-08-04
 
 Support functions dealing with courses, lessons, etc.
 
@@ -227,8 +227,10 @@ def workload_class(klass:str, activity_list: list[tuple[str, Record]]
             ag2lessons[ag] = 0
             lgsets[ag] = set()
     # Collect lessons per group
+    reported = []
     for g, a in activity_list:
         assert g, "This function shouldn't receive activities with no group"
+        not_reported = True
         lg = a["Lesson_group"]
         if lg <= 0: continue # no lessons (no activities or payment-only entry)
         lid = a["Lid"]
@@ -241,7 +243,13 @@ def workload_class(klass:str, activity_list: list[tuple[str, Record]]
                 lgsets[GROUP_ALL].add(lg_l)
                 ag2lessons[GROUP_ALL] += lessons
             else:
-                ags = lgsets.keys() if g == GROUP_ALL else g2ags[g]
+                try:
+                    ags = lgsets.keys() if g == GROUP_ALL else g2ags[g]
+                except KeyError:
+                    if g not in reported:
+                        REPORT("ERROR", T["BAD_GROUP"].format(group=g))
+                        reported.append(g)
+                    ags = []
                 for ag in ags:
                     if lg_l in lgsets[ag]: continue
                     lgsets[ag].add(lg_l)

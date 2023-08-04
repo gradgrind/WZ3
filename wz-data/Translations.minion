@@ -49,6 +49,7 @@ core.classes: {
 
 core.course_data: {
     INVALID_PAY_TAG:    "Ungültige Deputatsangabe: {n}*('{t}'={w})"
+    BAD_GROUP:          "Unbekannte Schülergruppe: {group}"
 }
 
 core.list_activities: {

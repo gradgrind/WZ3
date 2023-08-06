@@ -106,7 +106,7 @@ class ParallelsDialog(QDialog):
             # no references
             #print("§no_refs")
             return
-        #print("§ref_list:", ref_list)
+        #print("§ref_list:", text, "->", ref_list)
         for r in ref_list:
             lid = r[1]
             lg_id, ll, lt = db_read_unique(

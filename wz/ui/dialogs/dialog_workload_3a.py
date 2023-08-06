@@ -174,7 +174,7 @@ class WorkloadDialog(QDialog):
 
     def reset(self):
         """Return an "empty" value."""
-        self.result = ""
+        self.result = ("0", 0)
         super().accept()
 
     def accept(self):

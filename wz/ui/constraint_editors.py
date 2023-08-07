@@ -1,7 +1,7 @@
 """
 ui/constraint_editors.py
 
-Last updated:  2023-05-11
+Last updated:  2023-08-07
 
 Editor dialogs for timetable constraints.
 
@@ -82,6 +82,15 @@ def PAIRGAP(val, label, empty_ok):
     return TwoSubjectConstraintDialog.popup(
         val,
         label=label,
+    )
+
+
+def MAXBLOCK(val, label, empty_ok):
+    return NumberConstraintDialog.popup(
+        val,
+        # items=None,
+        label=label,
+        empty_ok=empty_ok,
     )
 
 

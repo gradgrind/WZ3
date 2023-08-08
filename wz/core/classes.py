@@ -1,5 +1,5 @@
 """
-core/classes.py - last updated 2023-05-18
+core/classes.py - last updated 2023-08-08
 
 Manage class data.
 
@@ -41,6 +41,7 @@ from itertools import product
 from core.db_access import open_database, db_read_fields
 
 GROUP_ALL = "*"
+NO_CLASS = "--"
 
 ### -----
 
@@ -62,13 +63,13 @@ class Classes(dict):
     def get_class_list(self, skip_null=True):
         classes = []
         for k, data in self.items():
-            if k == "--" and skip_null:
+            if k == NO_CLASS and skip_null:
                 continue
             classes.append((k, data.name))
         return classes
 
     def get_classroom(self, klass, null_ok=False):
-        if (not null_ok) and klass == "--":
+        if (not null_ok) and klass == NO_CLASS:
             raise Bug("Empty class has no classroom")
         return self[klass].classroom
 
@@ -90,7 +91,7 @@ class ClassGroups:
             self.init_divisions(divs.split(';'))
         else:
             self.init_divisions([])
- 
+
     def init_divisions(
         self,
         divlist:list[str],
@@ -205,7 +206,7 @@ class ClassGroups:
             else:
                 divs.append(pgroups)
         return divs
-        
+
     def text_value(self) -> str:
         """Return a text representation of the data:
             - divisions as '+'-separated primary groups
@@ -267,7 +268,7 @@ if __name__ == "__main__":
 
 
     quit(0)
-   
+
     if True:
 
         for g, alist in cg.group2atoms.items():

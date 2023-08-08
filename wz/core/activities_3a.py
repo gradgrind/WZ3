@@ -188,7 +188,7 @@ if __name__ == "__main__":
     open_database("wz_db.sqlite")
     activities = read_from_db()
     for r in activities["T_ACTIVITIES"]["MT"]:
-        print(" --", r)
+        print(" >>", r)
 
     lg_map = collect_activity_groups()
     for lg, ag in lg_map.items():

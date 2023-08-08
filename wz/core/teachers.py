@@ -1,5 +1,5 @@
 """
-core/teachers.py - last updated 2023-03-23
+core/teachers.py - last updated 2023-08-08
 
 Manage teacher data.
 
@@ -38,6 +38,8 @@ if __name__ == "__main__":
 from typing import NamedTuple
 
 from core.db_access import open_database, db_read_fields
+
+NO_TEACHER = "--"
 
 ### -----
 

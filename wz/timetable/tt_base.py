@@ -186,22 +186,25 @@ def get_activity_groups(tt_data: TT_DATA):
         tbits = tt_data.teacher_bits[ti]
         checkbits = gbits | tbits
 
-        rooms = [r_map[r] for r in room_split(room)]
         try:
             lg_data = lg_map[lg]
             lg_data[0] |= checkbits
-            if rooms:
-                roomlist = lg_data[1]
-                if rooms not in roomlist:
-                    roomlist.append(rooms)
+            if room:
+                lg_data[1].add(room)
             lg_data[2].append(row)
 
         except KeyError:
             lg_map[lg] = [
                 checkbits,
-                [rooms] if rooms else [],
+                {room} if room else set(),
                 [row],
             ]
+    # Process the room choices
+    for lg_data in lg_map.values():
+        lg_data[1] = simplify_room_lists(
+            [[r_map[r] for r in room_split(rx)] for rx in lg_data[1]]
+        )
+        #print("  -->", lg_data[1])
     return lg_map
 
 
@@ -222,58 +225,13 @@ def get_lessons():
     return {r[1]: r for r in db_query(q)}
 
 
-#TODO: This is the version for "3a", using the PARALLEL_LESSONS table.
-# A future version might integrate the info into the LESSONS table.
-def get_parallels():
-    q = """select
-
-        TAG,
-        Lesson_id,
-        WEIGHTING
-
-        from PARALLEL_LESSONS
-
-        --where WEIGHTING = '+'
-    """
-    pmap = {}
-    for row in db_query(q):
-        tag, lid, w = row
-        try:
-            ll, w0 = pmap[tag]
-            ll.append(lid)
-#TODO: ...
-            if w != w0:
-                print(f"WARNING: // weight mismatch for {tag}: {ll} – '{w0}' vs '{w}'")
-
-                # Take the smaller weight
-                if w != '+' and (w0 == '+' or w < w0):
-                    pmap[tag][1] = w
-
-        except KeyError:
-            pmap[tag] = [[lid], w]
-
-#TODO: ... check > 1 lids
-    for tag, ll in pmap.items():
-        if len(ll) < 2:
-            print(f"WARNING: // missing lesson for {tag}: {ll}")
-    return pmap
-
-
 def collate_lessons(
     lid_map: dict[int, list],
     parallel_map: dict[str, list], # list: lid-list, weight
-    lg_map: dict[int, list[int, list[str], list[tuple]]],
+    lg_map: dict[int, list[int, set[str], list[tuple]]],
     rmap_i: dict[str, int],
 ):
-    tlessons = []   # (checkbits, list of room-choice lists, ???)
-    # Get 100%-parallel lessons and "combine" them
-    for tag, pdata in parallel_map.items():
-        # This removes processed items from <lid_map>
-        tl = multilesson(tag, pdata, lid_map, lg_map, rmap_i)
-        if tl:
-            tlessons.append(tl)
-        # else: weight not '+' or only one lesson-id
-    # ... then the single ones
+    tt_lessons = []   # (checkbits, list of room-choice lists, ???)
     for l_data in lid_map.values():
         lg, lid, l, t, p, rr = l_data
         lg_data = lg_map[lg]
@@ -281,62 +239,15 @@ def collate_lessons(
             rplist = [rmap_i[r] for r in rr.split(",")]
         else:
             rplist = []
-        tlessons.append((
+        tt_lessons.append((
             lg_data[0],
-            simplify_room_lists(lg_data[1]),
-            [(lid, lg, lg_data)],
+            lg_data[1],
+            lg_data[2],
             t,
             p,
             rplist
         ))
-    return tlessons
-
-
-def multilesson(tag, pdata, lid_map, lg_map, rmap_i):
-    ll, w = pdata
-    if w != '+' or len(ll) < 2:
-        return None
-    # Combine the lessons
-    llist = [lid_map.pop(lid) for lid in ll]
-    lglist = []
-    checkbits = 0
-    rilist = []     # rooms (indexes – list of lists)
-    fixed_time = ""
-    length = -1
-    p0 = ""
-    rplist = []     # previously allocated room list (indexes)
-    for l_data in llist:
-        lg, lid, l, t, p, rr = l_data
-        lg_data = lg_map[lg]
-        lglist.append((lid, lg, lg_data))
-        checkbits |= lg_data[0]
-        rix = lg_data[1]
-        rilist += rix
-        if t:
-#TODO: Add check when editing time & parallels?
-# Or else report here?
-            if fixed_time:
-                assert t == fixed_time
-            else:
-                fixed_time = t
-
-        if l != length:
-            assert length < 0
-            length = l
-        if p:
-            if p0:
-                if p != p0:
-                    p0 = "-"    # flag conflict, later set empty
-            else:
-                p0 = p
-        if rr:
-            for r in rr.split(","):
-                rplist.append(rmap_i[r])
-    assert length > 0
-    if p0 == "-":
-        p0 = ""
-    rooms = simplify_room_lists(rilist)
-    return (checkbits, rooms, lglist, fixed_time, p0, rplist)
+    return tt_lessons
 
 
 def room_split(room_choice: str) -> list[str]:
@@ -419,6 +330,63 @@ def simplify_room_lists(roomlists: list[list[int]]) -> Optional[
         [rl[1] for rl in rl1],
         [rl[1] for rl in rl2]
     )
+
+
+def read_tt_db():
+    """Read all timetable-relevant information from the database.
+    """
+    timap, tvec, b = get_teacher_bits(1)
+    cimap, cgvec, crvec, b = get_class_bits(b)
+    rimap = get_room_map()
+    tt_data = TT_DATA(
+        cimap,
+        cgvec,
+        crvec,
+        timap,
+        tvec,
+        rimap,
+    )
+    lg_map = get_activity_groups(tt_data)
+    l_map = get_lessons()
+    pmap = get_parallels()
+    tlessons = collate_lessons(l_map, pmap, lg_map, rimap)
+
+
+#TODO: This is the version for "3a", using the PARALLEL_LESSONS table.
+# A future version might integrate the info into the LESSONS table.
+def get_parallels():
+    q = """select
+
+        TAG,
+        Lesson_id,
+        WEIGHTING
+
+        from PARALLEL_LESSONS
+
+        --where WEIGHTING = '+'
+    """
+    pmap = {}
+    for row in db_query(q):
+        tag, lid, w = row
+        try:
+            ll, w0 = pmap[tag]
+            ll.append(lid)
+#TODO: ...
+            if w != w0:
+                print(f"WARNING: // weight mismatch for {tag}: {ll} – '{w0}' vs '{w}'")
+
+                # Take the smaller weight
+                if w != '+' and (w0 == '+' or w < w0):
+                    pmap[tag][1] = w
+
+        except KeyError:
+            pmap[tag] = [[lid], w]
+
+#TODO: ... check > 1 lids
+    for tag, ll in pmap.items():
+        if len(ll) < 2:
+            print(f"WARNING: // missing lesson for {tag}: {ll}")
+    return pmap
 
 
 # --#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#

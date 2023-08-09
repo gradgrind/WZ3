@@ -1,7 +1,7 @@
 """
 timetable/tt_base.py
 
-Last updated:  2023-08-08
+Last updated:  2023-08-09
 
 Handle the basic information for timetable display and processing.
 
@@ -46,17 +46,11 @@ from typing import NamedTuple, Optional
 from core.basic_data_3 import (
     get_classes,
     get_teachers,
-    get_subjects,
     get_rooms,
 )
 from core.classes import NO_CLASS, GROUP_ALL
 from core.teachers import NO_TEACHER
-from core.activities_3a import (
-    collect_activity_groups,
-    CourseWithRoom,
-)
-from core.db_access import db_select, db_query, Record
-#from timetable.tt_engine_3a import PlacementEngine
+from core.db_access import db_select, db_query
 
 
 def get_teacher_bits(b):
@@ -271,95 +265,78 @@ def collate_lessons(
     lg_map: dict[int, list[int, list[str], list[tuple]]],
     rmap_i: dict[str, int],
 ):
-    # Get 100%-parallel lessons and "combine" them
-    combined_list = []
-
-#TODO
-    for tag, pdata in parallel_map.items():
-        llist = multilesson(tag, pdata, lid_map, lg_map, rmap_i)
-#        combined_list.append(llist)
-
-    for ll, w in parallel_map.values():
-        if w == '+' and len(ll) > 1:
-            # Combine the lessons
-            combined_list.append([lid_map.pop(lid) for lid in ll])
-    # Collect the allocation items
-#TODO
     tlessons = []   # (checkbits, list of room-choice lists, ???)
-    # ... first the combined (parallel) ones
-    for combined in combined_list:
-        checkbits = 0
-        rilist = []
-        fixed_time = ""
-        for l_data in combined:
-            lg, lid, l, t, p, rr = l_data
-            lg_data = lg_map[lg]
-            checkbits |= lg_data[0]
-            rilist += lg_data[1]
-
-            if t:
-#TODO: Add check when editing time & parallels?
-# Or else report here?
-                if fixed_time:
-                    assert t == fixed_time
-                else:
-                    fixed_time = t
-
-# lid, length, placement info
-
-
-        tlessons.append((checkbits, rilist, combined))
+    # Get 100%-parallel lessons and "combine" them
+    for tag, pdata in parallel_map.items():
+        # This removes processed items from <lid_map>
+        tl = multilesson(tag, pdata, lid_map, lg_map, rmap_i)
+        if tl:
+            tlessons.append(tl)
+        # else: weight not '+' or only one lesson-id
     # ... then the single ones
     for l_data in lid_map.values():
-        checkbits, rilist, courselist = lg_map[l_data[0]]
-        tlessons.append((checkbits, rilist, [l_data]))
+        lg, lid, l, t, p, rr = l_data
+        lg_data = lg_map[lg]
+        if rr:
+            rplist = [rmap_i[r] for r in rr.split(",")]
+        else:
+            rplist = []
+        tlessons.append((
+            lg_data[0],
+            simplify_room_lists(lg_data[1]),
+            [(lid, lg, lg_data)],
+            t,
+            p,
+            rplist
+        ))
     return tlessons
 
 
 def multilesson(tag, pdata, lid_map, lg_map, rmap_i):
     ll, w = pdata
-    if w == '+' and len(ll) > 1:
-        # Combine the lessons
-#temp:
-#        llist = [lid_map.pop(lid) for lid in ll]
-        llist = [lid_map[lid] for lid in ll]
-
-        checkbits = 0
-        rilist = []
-        fixed_time = ""
-        length = -1
-        p0 = ""
-        rrlist = []
-        for l_data in llist:
-            lg, lid, l, t, p, rr = l_data
-            lg_data = lg_map[lg]
-            checkbits |= lg_data[0]
-            rix = lg_data[1]
-            rilist += rix
-
-            if t:
+    if w != '+' or len(ll) < 2:
+        return None
+    # Combine the lessons
+    llist = [lid_map.pop(lid) for lid in ll]
+    lglist = []
+    checkbits = 0
+    rilist = []     # rooms (indexes – list of lists)
+    fixed_time = ""
+    length = -1
+    p0 = ""
+    rplist = []     # previously allocated room list (indexes)
+    for l_data in llist:
+        lg, lid, l, t, p, rr = l_data
+        lg_data = lg_map[lg]
+        lglist.append((lid, lg, lg_data))
+        checkbits |= lg_data[0]
+        rix = lg_data[1]
+        rilist += rix
+        if t:
 #TODO: Add check when editing time & parallels?
 # Or else report here?
-                if fixed_time:
-                    assert t == fixed_time
-                else:
-                    fixed_time = t
+            if fixed_time:
+                assert t == fixed_time
+            else:
+                fixed_time = t
 
-            if l != length:
-                assert length < 0
-                length = l
-
-            if p:
-                if p0:
-                    if p != p0:
-                        pass
-
-            if rr:
-                rix0 = [rmap_i[r] for r in rr.split(",")]
-
-# lid, placement info
-        assert length > 0
-
+        if l != length:
+            assert length < 0
+            length = l
+        if p:
+            if p0:
+                if p != p0:
+                    p0 = "-"    # flag conflict, later set empty
+            else:
+                p0 = p
+        if rr:
+            for r in rr.split(","):
+                rplist.append(rmap_i[r])
+    assert length > 0
+    if p0 == "-":
+        p0 = ""
+    rooms = simplify_room_lists(rilist)
+    return (checkbits, rooms, lglist, fixed_time, p0, rplist)
 
 
 def room_split(room_choice: str) -> list[str]:
@@ -374,203 +351,18 @@ def room_split(room_choice: str) -> list[str]:
     return rl
 
 
-##########################################
-
-
-class TimetableActivity(NamedTuple):
-    teacher_set: set[str]
-    # division_groups: set[str]
-    class_atoms: dict[str, set[str]] # {class: {atomic-group. ... }}
-    roomlists: list[list[str]]
-    lesson_info: Record
-    sid: str
-    lesson_group: int
-    course_list: list[CourseWithRoom]
-
-
-class Places(NamedTuple):
-    PERIODS_PER_DAY: int
-
-
-### -----
-
-
-def class2group2atoms():
-    c2g2ags = {}
-    classes = get_classes()
-    for klass, name in classes.get_class_list():
-        cdata = classes[klass]
-        cg = cdata.divisions
-        divs = cg.divisions
-        g2ags = cg.group_atoms()
-        g2ags[GROUP_ALL] = cg.atomic_groups
-        c2g2ags[klass] = g2ags
-    return c2g2ags
-
-
-class Timetable:
-    def __init__(self):
-        self.init()
-        ## Set up the placement data
-        self.engine = PlacementEngine()
-        self.engine.setup_structures(
-            classes={
-                k: gmap[GROUP_ALL]
-                for k, gmap in self.class_group_atoms.items()
-                if self.class_activities[k]
-            },
-            subjects=self.subject_activities,
-            teachers=self.teacher_activities,
-        )
-        self.engine.set_activities(self.activities)
-
-    def init(self):
-        self.class_group_atoms = class2group2atoms()
-        ### Collect <Activity> items, they are then referenced by index
-        self.activities = []
-        ### (Ordered dict) Collect activity indexes for each class
-        self.class_activities: dict[str, list[int]] = {}
-        ### (Ordered dict) Collect activity indexes for each teacher
-        self.teacher_activities = {
-            t: [] for t in get_teachers()
-        }
-        ### (Ordered dict) Collect activity indexes for each room
-        self.room_activities = {
-            r: [] for r in get_rooms().key_list()
-        }
-        ### (Ordered dict) Collect activity indexes for each subject
-        self.subject_activities = {
-            s: [] for s in get_subjects().key_list()
-        }
-        ### group-division map for each class
-        self.group_division = {}
-        for klass, cdata in get_classes().items():
-            self.class_activities[klass] = []
-            divs = cdata.divisions.divisions
-            g2div = {GROUP_ALL: (-1, GROUP_ALL)}
-            self.group_division[klass] = g2div
-            for i, div in enumerate(divs):
-                dgas = []
-                for d, v in div:
-                    if v is None:
-                        dgas.append(d)
-                        g2div[d] = (i, [d])
-                    else:
-                        g2div[d] = (i, v)
-                g2div[f"%{i}"] = dgas
-#TODO--
-#            print("\n%DIV%", klass, self.group_division[klass])
-
-# For constraints concerning relative placement of individual
-# lessons in the various subjects, collect the "atomic" pupil
-# groups and their activity ids for each subject, divided by class:
-#TODO: If I use this, it should probably use indexes as far as possible
-#        self.class2sid2ag2aids: dict[str, dict[str, dict[str, list[int]]]] = {}
-
-        ### Collect data for each lesson-group
-        lg_map = collect_activity_groups()
-        ### Add activities
-        for lg, act in lg_map.items():
-            class_atoms = {}    # {class: {atomic groups}}
-
-# Collect groups, teachers and rooms on a class basis, so that the
-# lesson tiles don't try to show too much. A ',+' on the group can
-# indicate that other classes are parallel.
-# Of course, for teacher and room tables the collection criteria
-# would be different! Would it make sense to collect them all in
-# one place, or would there be completely separate handlers?
-
-            ## Collect the data needed for timetable placements, etc.
-            teacher_set = set()
-            room_set = set()
-            for cwr in act.course_list:
-                klass = cwr.klass
-                if cwr.group and klass != "--":
-                    # Only add a group entry if there is a
-                    # group and a (real) class
-                    gatoms = self.class_group_atoms[klass][cwr.group]
-                    try:
-                        class_atoms[klass].update(gatoms)
-                        # pg_sets[klass].add(cwr.group)
-                    except KeyError:
-                        class_atoms[klass] = set(gatoms)
-                        # pg_sets[klass] = {cwr.group}
-                if cwr.teacher != "--":
-                    teacher_set.add(cwr.teacher)
-                if cwr.room:
-                    room_set.add(cwr.room)
-
-            # Get the subject-id from the block-tag, if it has a
-            # subject, otherwise from the course (of which there
-            # should be only one!)
-            sid = act.block_sid if act.block_sid else cwr.subject
-
-            ## Handle rooms
-            # Room allocations containing '+' should not block anything.
-            # It could possibly imply that manual selection is necessary.
-            # The room specification can be a choice rather than a
-            # particular room. In this case the choice list can only be
-            # used to eliminate certain rooms from consideration ...
-#TODO
-            # A more sophisticated approach might include a check that at
-            # least one of a list of reasonable candidates (based on what?)
-            # is available.
-
-            # As there can be multi-room requirements, the data structure is
-            # a list of lists (a single requirement potentially being a
-            # choice – assumed to be ordered).
-            # A '+' entry should always be the last in a choice list.
-
-            roomlists = simplify_room_lists_(room_set)
-            if roomlists is None:
-                REPORT(
-                    "ERROR",
-                    T["BLOCK_ROOMS_INCOMPATIBLE"].format(
-                        classes=",".join(class_atoms),
-                        sid=sid,
-                        rooms=" & ".join(room_set)
-                    )
-                )
-                roomlists=[]
-            # print("???r:", roomlists)
-
-            ## Generate the activity or activities
-            for ldata in act.lessons:
-                #print("???", ldata)
-#TODO: Perhaps split it up into different lists with a common index?
-                a = TimetableActivity(
-                    teacher_set,
-                    # pg_sets,
-                    class_atoms,
-                    roomlists,
-                    ldata,
-                    sid,
-                    lg,
-                    act.course_list,
-                )
-                a_index = len(self.activities)
-#TODO--
-#                print(" +++", a_index, a)
-                self.activities.append(a)
-                for k in class_atoms:
-                    self.class_activities[k].append(a_index)
-                for t in teacher_set:
-                    self.teacher_activities[t].append(a_index)
-                self.subject_activities[sid].append(a_index)
-
-
-def simplify_room_lists_(room_set: set[str]) -> Optional[
+def simplify_room_lists(roomlists: list[list[int]]) -> Optional[
     tuple[
-        list[str],          # required single rooms
-        list[list[str]],    # fixed room choices
-        list[list[str]]     # flexible room choices
-    ]]:
+        list[int],          # required single rooms
+        list[list[int]],    # fixed room choices
+        list[list[int]]     # flexible room choices
+    ]
+]:
     """Simplify room lists, where possible, and check for room conflicts.
 
-    The room specifications for the individual courses (via the
-    "WORKLOAD" entries) are collected as a set – thus eliminating
-    textual duplicates.
-    The number of entries in <room_set> is taken to be the number of
+    The basic room specifications for the individual "tlessons" are
+    processed into three separate lists (see result type).
+    The number of entries in <roomlist> is taken to be the number of
     distinct rooms needed.
     This approach is in some respects not ideal, but given the
     difficulties of specifying concisely the room requirements for
@@ -580,19 +372,19 @@ def simplify_room_lists_(room_set: set[str]) -> Optional[
     srooms = [] # (single) fixed room
     rooms = []  # "normal" room choice list
     xrooms = [] # "flexible" room choice list (with '+')
-    for r in room_set:
-        rlist = room_split(r)
-        if rlist[-1] == '+':
-            xrooms.append(rlist[:-1])
-        elif len(rlist) == 1:
+    for rchoice in roomlists:
+        if rchoice[-1] < 0:
+            xrooms.append(rchoice[:-1])
+        elif len(rchoice) == 1:
+            r = rchoice[0]
             if r in srooms:
-                return None
+                return None     # Internal conflict!
             srooms.append(r)
         else:
-            rooms.append(rlist)
+            rooms.append(rchoice)
     i = 0
     while i < len(srooms):
-        # Filter already claimed rooms from the choice lists
+        # Filter already-claimed rooms from the choice lists
         r = srooms[i]
         i += 1
         rooms_1 = []    # temporary buffer for rebuilding <rooms>
@@ -679,11 +471,9 @@ if __name__ == '__main__':
         print(f"  // {tag:10} : {pmap[tag]}")
 
     print("\n TLESSONS:")
-#TODO:
     tlessons = collate_lessons(l_map, pmap, lg_map, tt_data.room_i)
     for tl in tlessons:
         print("   --", tl)
-
 
 
 #???
